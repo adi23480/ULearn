@@ -1,0 +1,7 @@
+.env
+.env.*
+!.env.example
+/vendor/
+/uploads/
+.DS_Store
+Thumbs.db
