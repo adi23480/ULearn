@@ -278,9 +278,5 @@ $theme = (string)($user['theme'] ?? 'system');
 </main><script>
 // Prevent accidental double clicks while the browser is sending the upload.
 const uploadForm = document.querySelector('form[enctype="multipart/form-data"]');
-if (uploadForm) uploadForm.addEventListener('submit', function () {
-    if (!uploadForm.checkValidity()) return;
-    const button = document.getElementById('submitNote');
-    if (button) { button.disabled = true; button.textContent = 'Submitting…'; }
-});
+
 </script></body></html>
