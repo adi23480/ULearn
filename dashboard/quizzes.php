@@ -908,6 +908,39 @@ body{background:var(--quiz-bg);color:var(--quiz-text)}.quiz-wrap{max-width:1080p
 
 </main>
 
+<!-- AI Study Assistant Sliding Drawer -->
+<div id="ai-study-drawer" class="ai-drawer hidden" style="position:fixed; right:-350px; top:0; width:350px; height:100%; background:#fff; box-shadow:-2px 0 10px rgba(0,0,0,0.1); padding:20px; z-index:9999; transition: right 0.3s ease;">
+    <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #ddd; padding-bottom:10px;">
+        <h4 style="margin:0; font-size:16px; color:#333;">ULearn AI Support Assistant</h4>
+        <button onclick="closeAiDrawer()" style="background:none; border:none; font-size:18px; cursor:pointer; color:#666;">✕</button>
+    </div>
+    <div id="ai-chat-history" style="height: calc(100% - 100px); overflow-y:auto; margin-top:15px; font-size:14px; color:#333; line-height: 1.5;">
+        <p style="color: #666;">Click "Why is this correct? Ask AI" on any quiz question to get instant, deep-dive answers right here!</p>
+    </div>
+</div>
 
+<script>
+function openAiDrawer() {
+    const drawer = document.getElementById('ai-study-drawer');
+    drawer.style.right = '0'; // Slide into view
+}
+
+function closeAiDrawer() {
+    const drawer = document.getElementById('ai-study-drawer');
+    drawer.style.right = '-350px'; // Slide out of view
+}
+
+function triggerAiExplanation(questionText, explanationText) {
+    openAiDrawer();
+    document.getElementById('ai-chat-history').innerHTML = `
+        <div style="margin-bottom:15px; padding-bottom: 10px; border-bottom: 1px solid #eee;">
+            <strong style="color: #1a73e8;">Question:</strong><br><span style="color: #444;">${questionText}</span>
+        </div>
+        <div style="background:#f8f9fa; padding:12px; border-radius:6px; border-left: 4px solid #1a73e8;">
+            <strong style="color: #333;">AI Detailed Breakdown:</strong><br><p style="margin: 5px 0 0 0; color: #555;">${explanationText}</p>
+        </div>
+    `;
+}
+</script>
 
 </body></html>
