@@ -49,30 +49,26 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $tmp = (string)($upload['tmp_name'] ?? '');
         $size = (int)($upload['size'] ?? 0);
         if ($original === '' || strlen($original) > 255 || !isset($allowed[$extension])) {
-            $error = 'Only PDF, DOCX and PPTX files are supported.';
+            $error = 'Choose a valid PDF, DOCX or PPTX file (up to 20 MB).';
         } elseif ($size < 1 || $size > $maxBytes || !is_uploaded_file($tmp)) {
             $error = 'The file must be between 1 byte and 20 MB.';
         } else {
             $mime = (new finfo(FILEINFO_MIME_TYPE))->file($tmp) ?: '';
-            if (!in_array($mime, $allowed[$extension], true)) {
-                $error = 'The selected file does not match its file type.';
-            } elseif ($extension === 'pdf' && file_get_contents($tmp, false, null, 0, 5) !== '%PDF-') {
-                $error = 'The PDF file is invalid.';
-            } elseif ($extension !== 'pdf') {
-                if (!class_exists('ZipArchive')) {
-                    $error = 'ZIP support is required to validate Office files. Please enable the PHP zip extension.';
-                } else {
-                    $zip = new ZipArchive();
-                    if ($zip->open($tmp) !== true) {
-                        $error = 'The Office document is invalid.';
-                    } else {
-                        $required = $extension === 'docx' ? 'word/document.xml' : 'ppt/presentation.xml';
-                        if ($zip->locateName($required) === false || $zip->locateName('[Content_Types].xml') === false) {
-                            $error = 'This file is not a valid ' . strtoupper($extension) . ' document.';
-                        }
-                        $zip->close();
-                    }
-                }
+
+if ($extension === 'pdf') {
+    if ($mime !== 'application/pdf') {
+        $error = 'Invalid PDF file.';
+    }
+} elseif ($extension === 'docx' || $extension === 'pptx') {
+    if (!in_array($mime, [
+        'application/zip',
+        'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+        'application/octet-stream'
+    ], true)) {
+        $error = 'Invalid Word or PowerPoint file.';
+    }
+}
             }
             if ($error === '') {
                 // Serialize uploads for this student/module so rapid repeat submissions cannot race.
@@ -137,7 +133,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
         }
     }
-}
+
 if (isset($_SESSION['ulearn_notes_upload_success'])) {
     $success = (string)$_SESSION['ulearn_notes_upload_success'];
     unset($_SESSION['ulearn_notes_upload_success']);
@@ -184,7 +180,25 @@ $theme = (string)($user['theme'] ?? 'system');
 <div class="field"><label for="note_file">Choose document</label><input id="note_file" type="file" name="note_file" accept=".pdf,.docx,.pptx" required><div class="help">Only upload content you have permission to share. Your name will appear when the note is published.</div></div>
 <button class="primary" type="submit" id="submitNote">Submit for admin approval →</button></form><?php endif; ?></section>
 <aside class="panel"><div class="eyebrow">Contribution rewards</div><h2>Your points</h2><div class="stat"><?= number_format($points) ?></div><p class="muted small">Points are earned after an administrator approves a student-uploaded note, not when you submit it.</p><hr style="border:0;border-top:1px solid var(--border);margin:25px 0"><h2>What happens next?</h2><p class="muted small">1. Submit your note.<br>2. An administrator reviews it.<br>3. Approved notes become visible in the public Notes Hub.<br>4. Other students can preview, download and rate them.</p><p class="muted small">Public browsing, document previews, ratings and the admin review queue will be added in the next steps.</p></aside></div>
-<section class="section"><h2>Your uploaded notes</h2><?php if (!$myNotes): ?><div class="panel"><strong>No uploads yet</strong><p class="muted">Your submitted notes and their approval status will appear here.</p></div><?php else: ?><div class="notes"><?php foreach ($myNotes as $n): ?><article class="note"><div><div class="eyebrow"><?= e((string)$n['module_code']) ?> · <?= e((string)$n['module_name']) ?></div><h3><?= e((string)$n['title']) ?></h3><?php if (!empty($n['description'])): ?><p class="muted small"><?= nl2br(e((string)$n['description'])) ?></p><?php endif; ?><p class="muted small file-meta"><?= e((string)$n['original_filename']) ?> · <?= number_format((int)$n['file_size']/1048576,2) ?> MB · <?= e(date('M j, Y',strtotime((string)$n['created_at']))) ?></p><?php if ((string)$n['status']==='rejected' && !empty($n['rejection_reason'])): ?><p class="small" style="color:#d34c68">Reason: <?= e((string)$n['rejection_reason']) ?></p><?php endif; ?></div><span class="badge status-<?= e((string)$n['status']) ?>"><?= e((string)$n['status']) ?></span></article><?php endforeach; ?></div><?php endif; ?></section>
+<section class="section"><h2>Your uploaded notes</h2><?php if (!$myNotes): ?><div class="panel"><strong>No uploads yet</strong><p class="muted">Your submitted notes and their approval status will appear here.</p></div><?php else: ?><div class="notes"><?php foreach ($myNotes as $n): ?><article class="note"><div><div class="eyebrow"><?= e((string)$n['module_code']) ?> · <?= e((string)$n['module_name']) ?></div><h3><?= e((string)$n['title']) ?></h3><?php if (!empty($n['description'])): ?><p class="muted small"><?= nl2br(e((string)$n['description'])) ?></p><?php endif; ?><p class="muted small file-meta"><?= e((string)$n['original_filename']) ?> · <?= number_format((int)$n['file_size']/1048576,2) ?> MB · <?= e(date('M j, Y',strtotime((string)$n['created_at']))) ?></p><?php if ((string)$n['status']==='rejected' && !empty($n['rejection_reason'])): ?><p class="small" style="color:#d34c68">Reason: <?= e((string)$n['rejection_reason']) ?></p><?php endif; ?></div><div>
+    <span class="badge status-<?= e((string)$n['status']) ?>">
+        <?= e((string)$n['status']) ?>
+    </span>
+
+    <?php if ((string)$n['status'] === 'pending'): ?>
+        <form method="post" style="margin-top:10px;"
+              onsubmit="return confirm('Are you sure you want to delete this note?');">
+
+            <input type="hidden" name="csrf" value="<?= e(csrf()) ?>">
+            <input type="hidden" name="action" value="delete">
+            <input type="hidden" name="note_id" value="<?= (int)$n['id'] ?>">
+
+            <button type="submit" style="background:#dc3545;color:white;border:none;">
+                Delete
+            </button>
+        </form>
+    <?php endif; ?>
+</div></article><?php endforeach; ?></div><?php endif; ?></section>
 </main><script>
 // Prevent accidental double clicks while the browser is sending the upload.
 const uploadForm = document.querySelector('form[enctype="multipart/form-data"]');
