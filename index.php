@@ -1,5 +1,3 @@
-adhithya lokuda???
-
 <?php
 declare(strict_types=1);
 $projectName = 'U Learn';
