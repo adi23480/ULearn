@@ -1,750 +1,130 @@
 <?php
 declare(strict_types=1);
-
 require_once __DIR__ . '/../config/bootstrap.php';
-
 $user = require_login();
-
-if (!in_array((string)$user['role'], ['admin', 'main_admin'], true)) {
-    http_response_code(403);
-    exit('Access denied. Admin permission required.');
-}
-
+if (!in_array((string)$user['role'], ['admin','main_admin'], true)) { http_response_code(403); exit('Admin permission required.'); }
 $pdo = db();
 $error = '';
-$notice = '';
-
-if (isset($_SESSION['academic_notice'])) {
-    $notice = (string)$_SESSION['academic_notice'];
-    unset($_SESSION['academic_notice']);
+$notice = (string)($_SESSION['academic_notice'] ?? '');
+unset($_SESSION['academic_notice']);
+function ai(string $key): int { $n = filter_var($_POST[$key] ?? null, FILTER_VALIDATE_INT); return $n === false || $n === null ? 0 : (int)$n; }
+function required_id(string $key): int { $n=ai($key); if($n<1) throw new RuntimeException('Please select a valid record.'); return $n; }
+function exists_active(PDO $pdo, string $table, int $id): bool {
+    $allowed=['awarding_universities','academic_degrees','academic_batches','academic_modules'];
+    if (!in_array($table,$allowed,true)) return false;
+    $q=$pdo->prepare("SELECT 1 FROM $table WHERE id=? AND is_active=1"); $q->execute([$id]); return (bool)$q->fetchColumn();
 }
-
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+if ($_SERVER['REQUEST_METHOD']==='POST') {
     csrf_check();
-
-    $action = (string)($_POST['action'] ?? '');
-
     try {
-        if ($action === 'degree') {
-            $name = trim((string)($_POST['name'] ?? ''));
-            $code = strtoupper(trim((string)($_POST['code'] ?? '')));
-
-            if ($name === '' || $code === '' ||
-                strlen($name) > 200 || strlen($code) > 30) {
-                throw new RuntimeException('Enter a valid degree name and code.');
-            }
-
-            $stmt = $pdo->prepare(
-                "INSERT INTO academic_degrees (name, code, is_active)
-                 VALUES (?, ?, 1)"
-            );
-            $stmt->execute([$name, $code]);
-
-            $_SESSION['academic_notice'] = 'Degree programme added successfully.';
-            go('admin/academics.php');
-        }
-
-        if ($action === 'batch') {
-            $batchCode = strtoupper(trim((string)($_POST['batch_code'] ?? '')));
-            $year = filter_var($_POST['intake_year'] ?? null, FILTER_VALIDATE_INT);
-            $number = filter_var($_POST['intake_number'] ?? null, FILTER_VALIDATE_INT);
-
-            if ($batchCode === '' || strlen($batchCode) > 50 ||
-                !$year || $year < 2000 || $year > 2100 ||
-                !$number || $number < 1 || $number > 20) {
-                throw new RuntimeException('Enter valid batch details.');
-            }
-
-            $stmt = $pdo->prepare(
-                "INSERT INTO academic_batches
-                 (batch_code, intake_year, intake_number, is_active)
-                 VALUES (?, ?, ?, 1)"
-            );
-            $stmt->execute([$batchCode, $year, $number]);
-
-            $_SESSION['academic_notice'] = 'University batch added successfully.';
-            go('admin/academics.php');
-        }
-
-        if ($action === 'module') {
-            $code = strtoupper(trim((string)($_POST['module_code'] ?? '')));
-            $name = trim((string)($_POST['module_name'] ?? ''));
-            $description = trim((string)($_POST['description'] ?? ''));
-
-            if ($code === '' || $name === '' ||
-                strlen($code) > 30 || strlen($name) > 200 ||
-                strlen($description) > 5000) {
-                throw new RuntimeException('Enter valid module details.');
-            }
-
-            $stmt = $pdo->prepare(
-                "INSERT INTO academic_modules
-                 (module_code, module_name, description, is_active)
-                 VALUES (?, ?, ?, 1)"
-            );
-            $stmt->execute([$code, $name, $description]);
-
-            $_SESSION['academic_notice'] = 'Academic module added successfully.';
-            go('admin/academics.php');
-        }
-
-        throw new RuntimeException('Invalid action.');
-
-    } catch (PDOException $exception) {
-        error_log('U Learn academic management error: ' . $exception->getMessage());
-        $error = $exception->getCode() === '23000'
-            ? 'This record may already exist. Check its code and try again.'
-            : 'Unable to save the record. Please check the database structure.';
-    } catch (RuntimeException $exception) {
-        $error = $exception->getMessage();
-    }
+        $action=(string)($_POST['action'] ?? '');
+        $id=ai('id');
+        if ($action==='degree_save') {
+            $name=trim((string)($_POST['name']??'')); $code=strtoupper(trim((string)($_POST['code']??'')));
+            $uni=required_id('university_id'); $duration=ai('duration_years');
+            if ($name===''||$code===''||strlen($name)>200||strlen($code)>30||$duration<1||$duration>5||!exists_active($pdo,'awarding_universities',$uni)) throw new RuntimeException('Check the university, degree name, code and duration (1–5 years).');
+            if ($id) { $q=$pdo->prepare('UPDATE academic_degrees SET name=?, code=?, awarding_university_id=?, duration_years=? WHERE id=?'); $q->execute([$name,$code,$uni,$duration,$id]); }
+            else { $q=$pdo->prepare('INSERT INTO academic_degrees (name,code,awarding_university_id,duration_years,is_active) VALUES (?,?,?,?,1)'); $q->execute([$name,$code,$uni,$duration]); }
+            $notice='Degree programme saved.';
+        } elseif ($action==='degree_toggle') {
+            $id=required_id('id'); $q=$pdo->prepare('UPDATE academic_degrees SET is_active=1-is_active WHERE id=?'); $q->execute([$id]); $notice='Degree status updated.';
+        } elseif ($action==='batch_save') {
+            $code=trim((string)($_POST['batch_code']??'')); $year=ai('intake_year'); $number=ai('intake_number');
+            if (!preg_match('/^[0-9]{2}\\.[0-9]{1,2}$/',$code)||$year<2000||$year>2100||$number<1||$number>20||$code!==substr((string)$year,-2).'.'.$number) throw new RuntimeException('Use a matching intake code, for example 25.1 for year 2025, intake 1.');
+            if ($id) {$q=$pdo->prepare('UPDATE academic_batches SET batch_code=?,intake_year=?,intake_number=? WHERE id=?');$q->execute([$code,$year,$number,$id]);}
+            else {$q=$pdo->prepare('INSERT INTO academic_batches (batch_code,intake_year,intake_number,is_active) VALUES (?,?,?,1)');$q->execute([$code,$year,$number]);}
+            $notice='Intake saved.';
+        } elseif ($action==='batch_toggle') {
+            $q=$pdo->prepare('UPDATE academic_batches SET is_active=1-is_active WHERE id=?');$q->execute([required_id('id')]);$notice='Intake status updated.';
+        } elseif ($action==='intake_link') {
+            $degree=required_id('degree_id');$batch=required_id('batch_id');
+            if (!exists_active($pdo,'academic_degrees',$degree)||!exists_active($pdo,'academic_batches',$batch)) throw new RuntimeException('Select an active degree and intake.');
+            $q=$pdo->prepare('INSERT INTO academic_degree_intakes (degree_id,batch_id,is_active) VALUES (?,?,1) ON DUPLICATE KEY UPDATE is_active=1');$q->execute([$degree,$batch]);$notice='Intake linked to degree.';
+        } elseif ($action==='intake_unlink') {
+            $degree=required_id('degree_id');$batch=required_id('batch_id');
+            $q=$pdo->prepare('SELECT COUNT(*) FROM academic_curriculum WHERE degree_id=? AND batch_id=? AND is_active=1');$q->execute([$degree,$batch]);
+            if ((int)$q->fetchColumn()>0) throw new RuntimeException('Archive the curriculum assignments for this intake before unlinking it.');
+            $q=$pdo->prepare('UPDATE academic_degree_intakes SET is_active=0 WHERE degree_id=? AND batch_id=?');$q->execute([$degree,$batch]);$notice='Degree intake archived.';
+        } elseif ($action==='module_save') {
+            $code=strtoupper(trim((string)($_POST['module_code']??'')));$name=trim((string)($_POST['module_name']??''));$desc=trim((string)($_POST['description']??''));
+            if ($code===''||$name===''||strlen($code)>30||strlen($name)>200||strlen($desc)>5000) throw new RuntimeException('Enter a valid module code, name and description.');
+            if ($id) {$q=$pdo->prepare('UPDATE academic_modules SET module_code=?,module_name=?,description=? WHERE id=?');$q->execute([$code,$name,$desc,$id]);}
+            else {$q=$pdo->prepare('INSERT INTO academic_modules (module_code,module_name,description,is_active) VALUES (?,?,?,1)');$q->execute([$code,$name,$desc]);}
+            $notice='Module saved.';
+        } elseif ($action==='module_toggle') {
+            $q=$pdo->prepare('UPDATE academic_modules SET is_active=1-is_active WHERE id=?');$q->execute([required_id('id')]);$notice='Module status updated.';
+        } elseif ($action==='curriculum_add') {
+            $degree=required_id('degree_id');$batch=required_id('batch_id');$module=required_id('module_id');$year=ai('study_year');$semester=ai('semester');
+            $q=$pdo->prepare('SELECT duration_years FROM academic_degrees WHERE id=? AND is_active=1');$q->execute([$degree]);$duration=(int)$q->fetchColumn();
+            $q=$pdo->prepare('SELECT 1 FROM academic_degree_intakes WHERE degree_id=? AND batch_id=? AND is_active=1');$q->execute([$degree,$batch]);
+            if (!$duration||$year<1||$year>$duration||$semester<1||$semester>2||!$q->fetchColumn()||!exists_active($pdo,'academic_modules',$module)) throw new RuntimeException('Select a linked intake, valid study year, semester and active module.');
+            $q=$pdo->prepare('INSERT INTO academic_curriculum (degree_id,batch_id,module_id,study_year,semester,is_active) VALUES (?,?,?,?,?,1) ON DUPLICATE KEY UPDATE study_year=VALUES(study_year),semester=VALUES(semester),is_active=1');$q->execute([$degree,$batch,$module,$year,$semester]);$notice='Module assigned to curriculum.';
+        } elseif ($action==='curriculum_toggle') {
+            $q=$pdo->prepare('UPDATE academic_curriculum SET is_active=1-is_active WHERE id=?');$q->execute([required_id('id')]);$notice='Curriculum assignment status updated.';
+        } else throw new RuntimeException('Unknown action.');
+        $_SESSION['academic_notice']=$notice;
+        $back=(string)($_POST['return_to']??'');
+        if (!preg_match('/^\\?university=[0-9]+(&degree=[0-9]+)?(&batch=[0-9]+)?$/',$back)) $back='';
+        header('Location: '.url('admin/academics.php').$back);exit;
+    } catch(PDOException $ex) {error_log('ULearn academic structure: '.$ex->getMessage());$error=(string)$ex->getCode()==='23000'?'This code or assignment already exists.':'Unable to save. Ensure migration 003 was imported successfully.';}
+    catch(RuntimeException $ex) {$error=$ex->getMessage();}
 }
-
-$degrees = $pdo->query(
-    "SELECT id, name, code
-     FROM academic_degrees
-     WHERE is_active = 1
-     ORDER BY name"
-)->fetchAll();
-
-$batches = $pdo->query(
-    "SELECT id, batch_code, intake_year, intake_number
-     FROM academic_batches
-     WHERE is_active = 1
-     ORDER BY intake_year DESC, intake_number ASC"
-)->fetchAll();
-
-$modules = $pdo->query(
-    "SELECT id, module_code, module_name
-     FROM academic_modules
-     WHERE is_active = 1
-     ORDER BY module_code"
-)->fetchAll();
-
-$nameParts = preg_split('/\s+/', trim((string)$user['full_name']));
-$firstName = $nameParts[0] ?: 'Admin';
-$initial = strtoupper(substr($firstName, 0, 1));
+$universities=$pdo->query('SELECT id,name,code,is_active FROM awarding_universities ORDER BY is_active DESC,name')->fetchAll(PDO::FETCH_ASSOC);
+$degrees=$pdo->query('SELECT id,name,code,awarding_university_id,duration_years,is_active FROM academic_degrees ORDER BY is_active DESC,name')->fetchAll(PDO::FETCH_ASSOC);
+$batches=$pdo->query('SELECT id,batch_code,intake_year,intake_number,is_active FROM academic_batches ORDER BY intake_year DESC,intake_number')->fetchAll(PDO::FETCH_ASSOC);
+$modules=$pdo->query('SELECT id,module_code,module_name,description,is_active FROM academic_modules ORDER BY module_code')->fetchAll(PDO::FETCH_ASSOC);
+$links=$pdo->query('SELECT degree_id,batch_id,is_active FROM academic_degree_intakes ORDER BY id DESC')->fetchAll(PDO::FETCH_ASSOC);
+$curriculum=$pdo->query('SELECT c.id,c.degree_id,c.batch_id,c.module_id,c.study_year,c.semester,c.is_active,m.module_code,m.module_name FROM academic_curriculum c JOIN academic_modules m ON m.id=c.module_id ORDER BY c.study_year,c.semester,m.module_code')->fetchAll(PDO::FETCH_ASSOC);
+$universityId=max(0,(int)($_GET['university']??0));$degreeId=max(0,(int)($_GET['degree']??0));$batchId=max(0,(int)($_GET['batch']??0));
+$selectedUniversity=null;$selectedDegree=null;$selectedBatch=null;
+foreach($universities as $u)if((int)$u['id']===$universityId)$selectedUniversity=$u;
+foreach($degrees as $d)if((int)$d['id']===$degreeId&&(int)$d['awarding_university_id']===$universityId)$selectedDegree=$d;
+foreach($batches as $b)if((int)$b['id']===$batchId)$selectedBatch=$b;
+if (!$selectedUniversity) {$selectedDegree=null;$selectedBatch=null;}
+if (!$selectedDegree) $selectedBatch=null;
+if ($selectedBatch) { $valid=false; foreach($links as $link) if((int)$link['degree_id']===$degreeId && (int)$link['batch_id']===$batchId && (int)$link['is_active']===1) $valid=true; if(!$valid) $selectedBatch=null; }
+$base=url('admin/academics.php');
+$back='?university='.$universityId.($selectedDegree?'&degree='.$degreeId:'').($selectedBatch?'&batch='.$batchId:'');
+$csrf=e(csrf());
 ?>
-<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Academic Management — U Learn</title>
-
-<script>
-(function () {
-    const saved = localStorage.getItem('ulearn-theme');
-    const theme = saved === 'light' || saved === 'dark'
-        ? saved
-        : (window.matchMedia('(prefers-color-scheme: dark)').matches
-            ? 'dark' : 'light');
-    document.documentElement.dataset.theme = theme;
-})();
-</script>
-
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Academic Structure · ULearn</title>
+<script>(function(){let t=localStorage.getItem('ulearn-theme');document.documentElement.dataset.theme=t==='light'||t==='dark'?t:(matchMedia('(prefers-color-scheme:dark)').matches?'dark':'light')})();</script>
 <style>
-:root {
-    color-scheme: light;
-    --bg: #f7f8fc;
-    --surface: #ffffff;
-    --surface-alt: #f1f2f8;
-    --text: #171927;
-    --muted: #777b90;
-    --border: #e7e8f0;
-    --accent: #6756e8;
-    --accent-light: #f0edff;
-}
-
-:root[data-theme="dark"] {
-    color-scheme: dark;
-    --bg: #0c0e16;
-    --surface: #161924;
-    --surface-alt: #202431;
-    --text: #f4f4fa;
-    --muted: #a0a4b6;
-    --border: #2b2e3c;
-    --accent: #a99aff;
-    --accent-light: #292440;
-}
-
-* { box-sizing: border-box; }
-
-body {
-    margin: 0;
-    background: var(--bg);
-    color: var(--text);
-    font-family: Inter, "Segoe UI", Arial, sans-serif;
-    line-height: 1.6;
-}
-
-a { color: inherit; text-decoration: none; }
-button, input, textarea { font: inherit; }
-
-.layout {
-    display: grid;
-    grid-template-columns: 250px minmax(0, 1fr);
-    min-height: 100vh;
-}
-
-.sidebar {
-    background: var(--surface);
-    border-right: 1px solid var(--border);
-    padding: 32px 20px;
-    display: flex;
-    flex-direction: column;
-    gap: 40px;
-}
-
-.brand {
-    font-size: 26px;
-    font-weight: 800;
-    letter-spacing: -1.5px;
-    padding-left: 12px;
-}
-
-.brand span { color: var(--accent); }
-
-.nav-label, .eyebrow {
-    color: var(--muted);
-    font-size: 11px;
-    font-weight: 750;
-    letter-spacing: 1.7px;
-    text-transform: uppercase;
-}
-
-.nav-label { margin: 0 12px 14px; }
-
-.nav { display: grid; gap: 6px; }
-
-.nav a {
-    display: block;
-    padding: 12px 14px;
-    border-radius: 12px;
-    font-size: 14px;
-    font-weight: 600;
-}
-
-.nav a:hover { background: var(--surface-alt); }
-
-.nav a.active {
-    background: var(--accent-light);
-    color: var(--accent);
-}
-
-.sidebar-bottom {
-    margin-top: auto;
-    border: 1px solid var(--border);
-    border-radius: 16px;
-    padding: 16px;
-    font-size: 13px;
-}
-
-.sidebar-bottom strong { display: block; }
-.sidebar-bottom small { color: var(--muted); }
-
-.main {
-    min-width: 0;
-    padding: 34px clamp(20px, 5vw, 76px) 80px;
-}
-
-.topbar {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 20px;
-    margin-bottom: 55px;
-}
-
-.topbar-right {
-    display: flex;
-    align-items: center;
-    gap: 16px;
-}
-
-.avatar {
-    width: 40px;
-    height: 40px;
-    border-radius: 50%;
-    background: var(--accent-light);
-    color: var(--accent);
-    display: grid;
-    place-items: center;
-    font-weight: 800;
-}
-
-.logout {
-    background: transparent;
-    border: 0;
-    color: var(--muted);
-    cursor: pointer;
-    font-size: 13px;
-    font-weight: 650;
-}
-
-h1, h2, h3, p { margin-top: 0; }
-
-h1 {
-    font-size: clamp(36px, 4vw, 56px);
-    line-height: 1.15;
-    letter-spacing: -2px;
-    margin: 15px 0;
-}
-
-h1 span { color: var(--accent); }
-
-.lead {
-    color: var(--muted);
-    font-size: 15px;
-    max-width: 650px;
-}
-
-.section-heading {
-    display: flex;
-    align-items: baseline;
-    justify-content: space-between;
-    gap: 15px;
-    margin: 46px 0 20px;
-}
-
-.section-heading h2 {
-    margin: 0;
-    font-size: 23px;
-    letter-spacing: -.7px;
-}
-
-.section-heading small { color: var(--muted); }
-
-.panel {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 20px;
-    padding: 28px;
-}
-
-.form-grid {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 18px;
-}
-
-.field { margin-bottom: 18px; }
-
-label {
-    display: block;
-    font-size: 13px;
-    font-weight: 700;
-    margin-bottom: 9px;
-}
-
-input, textarea {
-    width: 100%;
-    padding: 13px 14px;
-    border: 1px solid var(--border);
-    border-radius: 11px;
-    background: var(--surface-alt);
-    color: var(--text);
-    outline: none;
-}
-
-input:focus, textarea:focus {
-    border-color: var(--accent);
-}
-
-textarea {
-    resize: vertical;
-    min-height: 95px;
-}
-
-.button {
-    background: var(--text);
-    color: var(--bg);
-    border: 0;
-    border-radius: 11px;
-    padding: 13px 20px;
-    font-size: 13px;
-    font-weight: 700;
-    cursor: pointer;
-}
-
-.button:hover { opacity: .86; }
-
-.records {
-    margin-top: 24px;
-    border-top: 1px solid var(--border);
-    padding-top: 20px;
-}
-
-.records h3 {
-    font-size: 14px;
-    margin-bottom: 12px;
-}
-
-.record {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 14px;
-    padding: 13px 0;
-    border-bottom: 1px solid var(--border);
-    font-size: 13px;
-}
-
-.record:last-child { border-bottom: 0; }
-
-.record strong { display: block; }
-
-.record small {
-    display: block;
-    color: var(--muted);
-    margin-top: 3px;
-}
-
-.pill {
-    background: var(--accent-light);
-    color: var(--accent);
-    border-radius: 100px;
-    padding: 6px 11px;
-    font-size: 11px;
-    font-weight: 750;
-    white-space: nowrap;
-}
-
-.message {
-    padding: 14px 17px;
-    border-radius: 12px;
-    margin: 22px 0;
-    font-size: 14px;
-}
-
-.success { background: #e9f8ef; color: #176b43; }
-.error { background: #ffedf0; color: #a32143; }
-
-.empty {
-    color: var(--muted);
-    font-size: 13px;
-    padding: 14px 0;
-}
-
-@media (max-width: 900px) {
-    .layout { grid-template-columns: 1fr; }
-    .sidebar {
-        border-right: 0;
-        border-bottom: 1px solid var(--border);
-        padding: 18px;
-        gap: 18px;
-    }
-    .nav { display: flex; flex-wrap: wrap; }
-    .sidebar-bottom { display: none; }
-    .main { padding-top: 25px; }
-    .topbar { margin-bottom: 35px; }
-}
-
-@media (max-width: 600px) {
-    .main { padding: 24px 18px 60px; }
-    .form-grid { grid-template-columns: 1fr; }
-    .panel { padding: 20px; }
-    h1 { letter-spacing: -1.5px; }
-}
-</style>
-</head>
-
-<body>
-
-<div class="layout">
-
-    <aside class="sidebar">
-
-        <a class="brand" href="<?= e(url('admin/index.php')) ?>">
-            u learn<span>.</span>
-        </a>
-
-        <nav aria-label="Admin navigation">
-
-            <p class="nav-label">Your workspace</p>
-
-            <div class="nav">
-
-                <a href="<?= e(url('admin/index.php')) ?>">
-                    ◫ &nbsp; Overview
-                </a>
-
-                <a href="<?= e(url('admin/lecturers.php')) ?>">
-                    ♙ &nbsp; Lecturers
-                </a>
-
-                <a class="active" href="<?= e(url('admin/academics.php')) ?>">
-                    ▤ &nbsp; Academics
-                </a>
-
-            </div>
-
-        </nav>
-
-        <div class="sidebar-bottom">
-            <small>Signed in as</small>
-            <strong><?= e((string)$user['full_name']) ?></strong>
-            <small><?= e((string)$user['email']) ?></small>
-        </div>
-
-    </aside>
-
-    <main class="main">
-
-        <header class="topbar">
-
-            <span class="eyebrow">
-                U LEARN / ACADEMIC MANAGEMENT
-            </span>
-
-            <div class="topbar-right">
-
-                <div class="avatar"><?= e($initial) ?></div>
-
-                <form method="post"
-                      action="<?= e(url('auth/logout.php')) ?>">
-                    <input type="hidden" name="csrf"
-                           value="<?= e(csrf()) ?>">
-                    <button type="submit" class="logout">
-                        Log out ↗
-                    </button>
-                </form>
-
-            </div>
-
-        </header>
-
-        <section>
-            <div class="eyebrow">ADMINISTRATION WORKSPACE</div>
-            <h1>Academic management<span>.</span></h1>
-            <p class="lead">
-                Build and organize the academic structure of U Learn.
-                Add degree programmes, university intakes,
-                and modules for your students.
-            </p>
-        </section>
-
-        <?php if ($notice): ?>
-            <div class="message success" role="status">
-                <?= e($notice) ?>
-            </div>
-        <?php endif; ?>
-
-        <?php if ($error): ?>
-            <div class="message error" role="alert">
-                <?= e($error) ?>
-            </div>
-        <?php endif; ?>
-
-        <section id="degrees">
-
-            <div class="section-heading">
-                <h2>Degree programmes</h2>
-                <small><?= count($degrees) ?> active degrees</small>
-            </div>
-
-            <div class="panel">
-
-                <form method="post">
-
-                    <input type="hidden" name="csrf"
-                           value="<?= e(csrf()) ?>">
-                    <input type="hidden" name="action"
-                           value="degree">
-
-                    <div class="form-grid">
-
-                        <div class="field">
-                            <label for="degree_name">Degree name</label>
-                            <input id="degree_name" name="name"
-                                   placeholder="BSc (Hons) in Computer Science"
-                                   maxlength="200" required>
-                        </div>
-
-                        <div class="field">
-                            <label for="degree_code">Degree code</label>
-                            <input id="degree_code" name="code"
-                                   placeholder="BSC-CS"
-                                   maxlength="30" required>
-                        </div>
-
-                    </div>
-
-                    <button type="submit" class="button">
-                        Add degree programme ↗
-                    </button>
-
-                </form>
-
-                <div class="records">
-                    <h3>Existing degree programmes</h3>
-
-                    <?php if (!$degrees): ?>
-                        <div class="empty">No degrees added yet.</div>
-                    <?php endif; ?>
-
-                    <?php foreach ($degrees as $degree): ?>
-                        <div class="record">
-                            <div>
-                                <strong><?= e($degree['name']) ?></strong>
-                                <small><?= e($degree['code']) ?></small>
-                            </div>
-                            <span class="pill">Active</span>
-                        </div>
-                    <?php endforeach; ?>
-
-                </div>
-
-            </div>
-
-        </section>
-
-        <section id="batches">
-
-            <div class="section-heading">
-                <h2>University batches</h2>
-                <small><?= count($batches) ?> active batches</small>
-            </div>
-
-            <div class="panel">
-
-                <form method="post">
-
-                    <input type="hidden" name="csrf"
-                           value="<?= e(csrf()) ?>">
-                    <input type="hidden" name="action"
-                           value="batch">
-
-                    <div class="form-grid">
-
-                        <div class="field">
-                            <label for="batch_code">Batch code</label>
-                            <input id="batch_code" name="batch_code"
-                                   placeholder="25.1"
-                                   maxlength="50" required>
-                        </div>
-
-                        <div class="field">
-                            <label for="intake_year">Intake year</label>
-                            <input type="number" id="intake_year"
-                                   name="intake_year" min="2000"
-                                   max="2100" placeholder="2025" required>
-                        </div>
-
-                        <div class="field">
-                            <label for="intake_number">Intake number</label>
-                            <input type="number" id="intake_number"
-                                   name="intake_number" min="1" max="20"
-                                   placeholder="1" required>
-                        </div>
-
-                    </div>
-
-                    <button type="submit" class="button">
-                        Add university batch ↗
-                    </button>
-
-                </form>
-
-                <div class="records">
-                    <h3>Existing batches</h3>
-
-                    <?php if (!$batches): ?>
-                        <div class="empty">No batches added yet.</div>
-                    <?php endif; ?>
-
-                    <?php foreach ($batches as $batch): ?>
-                        <div class="record">
-                            <div>
-                                <strong><?= e($batch['batch_code']) ?></strong>
-                                <small>
-                                    Intake <?= (int)$batch['intake_number'] ?>
-                                    · <?= (int)$batch['intake_year'] ?>
-                                </small>
-                            </div>
-                            <span class="pill">Active</span>
-                        </div>
-                    <?php endforeach; ?>
-
-                </div>
-
-            </div>
-
-        </section>
-
-        <section id="modules">
-
-            <div class="section-heading">
-                <h2>Academic modules</h2>
-                <small><?= count($modules) ?> active modules</small>
-            </div>
-
-            <div class="panel">
-
-                <form method="post">
-
-                    <input type="hidden" name="csrf"
-                           value="<?= e(csrf()) ?>">
-                    <input type="hidden" name="action"
-                           value="module">
-
-                    <div class="form-grid">
-
-                        <div class="field">
-                            <label for="module_code">Module code</label>
-                            <input id="module_code" name="module_code"
-                                   placeholder="CS101"
-                                   maxlength="30" required>
-                        </div>
-
-                        <div class="field">
-                            <label for="module_name">Module name</label>
-                            <input id="module_name" name="module_name"
-                                   placeholder="Introduction to Programming"
-                                   maxlength="200" required>
-                        </div>
-
-                    </div>
-
-                    <div class="field">
-                        <label for="description">Module description</label>
-                        <textarea id="description" name="description"
-                                  placeholder="Describe what students will learn..."
-                                  maxlength="5000"></textarea>
-                    </div>
-
-                    <button type="submit" class="button">
-                        Add academic module ↗
-                    </button>
-
-                </form>
-
-                <div class="records">
-                    <h3>Existing modules</h3>
-
-                    <?php if (!$modules): ?>
-                        <div class="empty">No modules added yet.</div>
-                    <?php endif; ?>
-
-                    <?php foreach ($modules as $module): ?>
-                        <div class="record">
-                            <div>
-                                <strong><?= e($module['module_name']) ?></strong>
-                                <small><?= e($module['module_code']) ?></small>
-                            </div>
-                            <span class="pill">Active</span>
-                        </div>
-                    <?php endforeach; ?>
-
-                </div>
-
-            </div>
-
-        </section>
-
-    </main>
-
-</div>
-
-</body>
-</html>
+:root{color-scheme:light;--bg:#f6f7fc;--panel:#fff;--soft:#f0edff;--alt:#f8f8fc;--border:#e6e7f0;--text:#19192b;--muted:#74798e;--purple:#6756e8;--shadow:0 14px 42px #22224b0b}:root[data-theme=dark]{color-scheme:dark;--bg:#0c0e16;--panel:#171a26;--soft:#292440;--alt:#222635;--border:#303444;--text:#f3f3fa;--muted:#a5a8ba;--purple:#aa9aff;--shadow:none}*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font:14px/1.55 Inter,'Segoe UI',Arial,sans-serif}a{color:inherit;text-decoration:none}button,input,select,textarea{font:inherit}button{cursor:pointer}.layout{display:grid;grid-template-columns:245px minmax(0,1fr);min-height:100vh}.side{background:var(--panel);border-right:1px solid var(--border);padding:30px 19px;display:flex;flex-direction:column;gap:32px}.brand{font-size:27px;font-weight:850;letter-spacing:-1.5px;padding:0 12px}.brand span{color:var(--purple)}.nav{display:grid;gap:6px}.nav a{padding:12px 14px;border-radius:11px;color:var(--muted);font-weight:650}.nav a.active{color:var(--purple);background:var(--soft)}.nav a:hover{background:var(--alt)}.foot{margin-top:auto;border:1px solid var(--border);border-radius:14px;padding:15px;overflow-wrap:anywhere}.muted,.foot small{color:var(--muted)}.main{padding:34px clamp(20px,4vw,65px) 75px;min-width:0}.top{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:43px}.crumb{font-size:12px;color:var(--muted)}.theme{background:var(--panel);color:var(--text);border:1px solid var(--border);border-radius:10px;padding:8px 12px}.eyebrow{font-size:11px;letter-spacing:1.7px;color:var(--muted);font-weight:800;text-transform:uppercase}h1{font-size:clamp(31px,4vw,48px);letter-spacing:-1.8px;margin:8px 0 8px;line-height:1.18}h1 span{color:var(--purple)}h2{font-size:21px;letter-spacing:-.5px;margin:0}p{color:var(--muted)}.heading{display:flex;align-items:end;justify-content:space-between;gap:20px;flex-wrap:wrap;margin-bottom:26px}.heading p{margin:0;max-width:650px}.button{background:var(--purple);color:white;border:0;border-radius:11px;padding:11px 16px;font-weight:750}.button:hover{filter:brightness(1.07)}.ghost{background:var(--alt);border:1px solid var(--border);color:var(--text);padding:8px 11px;border-radius:9px;font-weight:650}.ghost:hover{border-color:var(--purple)}.danger{color:#b35c66}.panel{background:var(--panel);border:1px solid var(--border);border-radius:19px;padding:24px;box-shadow:var(--shadow);margin:17px 0}.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}.item{display:block;background:var(--panel);border:1px solid var(--border);border-radius:17px;padding:22px;box-shadow:var(--shadow);transition:.2s}.item:hover{border-color:var(--purple);transform:translateY(-2px)}.item h3{margin:9px 0 5px;font-size:18px;line-height:1.35}.item .icon{display:inline-grid;place-items:center;width:43px;height:43px;border-radius:12px;background:var(--soft);color:var(--purple);font-size:21px}.pill{display:inline-block;padding:4px 9px;background:var(--soft);color:var(--purple);border-radius:100px;font-size:11px;font-weight:750}.row{display:flex;align-items:center;justify-content:space-between;gap:13px;flex-wrap:wrap}.row+.row{border-top:1px solid var(--border);padding-top:13px;margin-top:13px}.row strong{display:block}.row small{display:block;color:var(--muted)}.actions{display:flex;gap:7px;align-items:center;flex-wrap:wrap}.actions form{margin:0}.alert{padding:14px 17px;border-radius:12px;background:var(--soft);margin-bottom:20px}.error{background:#ffedf0;color:#a32143}.breadcrumbs{display:flex;gap:9px;flex-wrap:wrap;margin:15px 0 24px;font-weight:700;color:var(--purple)}.breadcrumbs span{color:var(--muted)}.year{border:1px solid var(--border);border-radius:15px;margin:13px 0;overflow:hidden}.year summary{padding:17px 19px;font-weight:800;cursor:pointer;background:var(--alt)}.year-body{padding:16px 19px}.sem{margin:14px 0 8px;font-weight:800}.hint{font-size:12px;color:var(--muted)}.overlay{position:fixed;inset:0;background:#0808179c;display:none;justify-content:flex-end;z-index:20}.overlay.open{display:flex}.drawer{height:100%;width:min(100%,490px);overflow:auto;background:var(--panel);padding:32px;box-shadow:-10px 0 45px #0002}.drawer h2{font-size:27px;margin:5px 0 24px}.field{margin:16px 0}.field label{display:block;font-weight:750;margin-bottom:8px}.field input,.field select,.field textarea{width:100%;border:1px solid var(--border);border-radius:11px;padding:12px 13px;background:var(--alt);color:var(--text)}.field textarea{min-height:90px}.drawer-buttons{display:flex;justify-content:space-between;gap:10px;margin-top:25px}.hidden{display:none!important}.mini{font-size:12px}.section{margin-top:30px}.section-title{margin-bottom:14px}.empty{padding:23px;color:var(--muted);border:1px dashed var(--border);border-radius:13px}.search{width:100%;max-width:340px;padding:11px 13px;background:var(--panel);border:1px solid var(--border);color:var(--text);border-radius:10px}@media(max-width:850px){.layout{grid-template-columns:1fr}.side{padding:15px;gap:12px;border-bottom:1px solid var(--border)}.nav{display:flex;flex-wrap:wrap}.foot{display:none}.main{padding:25px 18px 60px}}@media(max-width:600px){.grid{grid-template-columns:1fr}.drawer{padding:22px}}
+</style></head><body><div class="layout"><aside class="side"><a class="brand" href="<?= e(url('admin/index.php')) ?>">u learn<span>.</span></a><nav class="nav"><a href="<?= e(url('admin/index.php')) ?>">◫ &nbsp; Overview</a><a href="<?= e(url('admin/universities.php')) ?>">◈ &nbsp; Universities</a><a class="active" href="<?= e($base) ?>">▤ &nbsp; Academic Structure</a><a href="<?= e(url('admin/lecturers.php')) ?>">♙ &nbsp; Lecturers</a><a href="<?= e(url('admin/assignments.php')) ?>">↗ &nbsp; Assignments</a></nav><div class="foot"><small>Signed in as</small><strong><?= e((string)$user['full_name']) ?></strong><small><?= e((string)$user['email']) ?></small></div></aside><main class="main"><div class="top"><div class="crumb">ULearn / Administration / Academic Structure</div><button type="button" class="theme" id="theme">◐ &nbsp; Appearance</button></div>
+<div class="heading"><div><div class="eyebrow">Academic management / Curriculum builder</div><h1>Academic structure<span>.</span></h1><p>Organize universities, degree programmes, intake batches, study years, semesters and modules in one workspace.</p></div><a class="ghost" href="<?= e(url('admin/universities.php')) ?>">Manage universities ↗</a></div>
+<?php if($notice):?><div class="alert" role="status"><?= e($notice) ?></div><?php endif;?><?php if($error):?><div class="alert error" role="alert"><?= e($error) ?></div><?php endif;?>
+<div class="breadcrumbs"><a href="<?= e($base) ?>">Universities</a><?php if($selectedUniversity):?><span>›</span><a href="?university=<?= $universityId ?>"><?= e($selectedUniversity['name']) ?></a><?php endif;?><?php if($selectedDegree):?><span>›</span><a href="?university=<?= $universityId ?>&amp;degree=<?= $degreeId ?>"><?= e($selectedDegree['name']) ?></a><?php endif;?><?php if($selectedBatch):?><span>›</span><span><?= e($selectedBatch['batch_code']) ?></span><?php endif;?></div>
+<?php if(!$selectedUniversity):?>
+<div class="row section-title"><h2>Choose an awarding university</h2><a class="button" href="<?= e(url('admin/universities.php')) ?>">＋ Add university</a></div><input id="search" class="search" placeholder="Search university…" aria-label="Search university"><div class="grid section" id="cards"><?php foreach($universities as $u):?><a class="item" data-search="<?= e(strtolower($u['name'].' '.$u['code'])) ?>" href="?university=<?= (int)$u['id'] ?>"><span class="icon">◈</span><h3><?= e($u['name']) ?></h3><div class="row"><span class="hint"><?= e($u['code']) ?></span><span class="pill"><?= (int)$u['is_active']?'Active':'Archived' ?></span></div></a><?php endforeach;?></div>
+<?php elseif(!$selectedDegree):?>
+<div class="row section-title"><h2><?= e($selectedUniversity['name']) ?> · Degree programmes</h2><button class="button" type="button" onclick="openForm('degree',null)">＋ Add degree</button></div><div class="grid"><?php foreach($degrees as $d):if((int)$d['awarding_university_id']!==$universityId)continue;?><div class="item"><a href="?university=<?= $universityId ?>&amp;degree=<?= (int)$d['id'] ?>"><span class="icon">♧</span><h3><?= e($d['name']) ?></h3><p class="hint"><?= e($d['code']) ?> · <?= (int)$d['duration_years'] ?> study years</p></a><div class="row"><span class="pill"><?= (int)$d['is_active']?'Active':'Archived' ?></span><div class="actions"><button class="ghost mini" type="button" onclick='openForm("degree",<?= json_encode($d,JSON_HEX_TAG|JSON_HEX_AMP|JSON_HEX_APOS|JSON_HEX_QUOT) ?>)'>Edit</button><form method="post" onsubmit="return confirm('Change degree active status?')"><input type="hidden" name="csrf" value="<?= $csrf ?>"><input type="hidden" name="action" value="degree_toggle"><input type="hidden" name="id" value="<?= (int)$d['id'] ?>"><input type="hidden" name="return_to" value="<?= e($back) ?>"><button class="ghost mini" type="submit"><?= (int)$d['is_active']?'Archive':'Restore' ?></button></form></div></div></div><?php endforeach;?></div>
+<?php elseif(!$selectedBatch):?>
+<div class="row section-title"><h2><?= e($selectedDegree['name']) ?> · Intake batches</h2><button class="button" type="button" onclick="openForm('intake',null)">＋ Link intake</button></div><div class="grid"><?php $hasLinks=false;foreach($links as $link):if((int)$link['degree_id']!==$degreeId||(int)$link['is_active']!==1)continue;foreach($batches as $b):if((int)$b['id']!==(int)$link['batch_id'])continue;$hasLinks=true;?><div class="item"><a href="?university=<?= $universityId ?>&amp;degree=<?= $degreeId ?>&amp;batch=<?= (int)$b['id'] ?>"><span class="icon">◷</span><h3>Intake <?= e($b['batch_code']) ?></h3><p class="hint"><?= (int)$b['intake_year'] ?> · Intake <?= (int)$b['intake_number'] ?></p></a><form method="post" onsubmit="return confirm('Archive this degree intake?')"><input type="hidden" name="csrf" value="<?= $csrf ?>"><input type="hidden" name="action" value="intake_unlink"><input type="hidden" name="degree_id" value="<?= $degreeId ?>"><input type="hidden" name="batch_id" value="<?= (int)$b['id'] ?>"><input type="hidden" name="return_to" value="<?= e($back) ?>"><button class="ghost mini" type="submit">Archive intake</button></form></div><?php endforeach;endforeach;?></div><?php if(!$hasLinks):?><div class="empty">No intake batches linked to this degree yet.</div><?php endif;?><div class="section"><div class="row"><h2>Intake catalogue</h2><button class="ghost" onclick="openForm('batch',null)">＋ Create intake batch</button></div><div class="panel"><?php foreach($batches as $b):?><div class="row"><div><strong><?= e($b['batch_code']) ?></strong><small><?= (int)$b['intake_year'] ?> · Intake <?= (int)$b['intake_number'] ?></small></div><div class="actions"><button class="ghost mini" onclick='openForm("batch",<?= json_encode($b,JSON_HEX_TAG|JSON_HEX_AMP|JSON_HEX_APOS|JSON_HEX_QUOT) ?>)'>Edit</button><form method="post"><input type="hidden" name="csrf" value="<?= $csrf ?>"><input type="hidden" name="action" value="batch_toggle"><input type="hidden" name="id" value="<?= (int)$b['id'] ?>"><input type="hidden" name="return_to" value="<?= e($back) ?>"><button class="ghost mini" type="submit"><?= (int)$b['is_active']?'Archive':'Restore' ?></button></form></div></div><?php endforeach;?></div></div>
+<?php else:?>
+<div class="row section-title"><div><h2><?= e($selectedDegree['name']) ?> · Intake <?= e($selectedBatch['batch_code']) ?></h2><p>Curriculum across <?= (int)$selectedDegree['duration_years'] ?> study years. Modules are shared catalogue records; assignments are intake-specific.</p></div><button class="button" onclick="openForm('curriculum',null)">＋ Assign module</button></div>
+<?php for($y=1;$y<=(int)$selectedDegree['duration_years'];$y++):?><details class="year" <?= $y===1?'open':'' ?>><summary>Year <?= $y ?></summary><div class="year-body"><?php for($s=1;$s<=2;$s++):?><div class="sem">Semester <?= $s ?></div><?php $found=false;foreach($curriculum as $c):if((int)$c['degree_id']!==$degreeId||(int)$c['batch_id']!==$batchId||(int)$c['study_year']!==$y||(int)$c['semester']!==$s)continue;$found=true;?><div class="row"><div><strong><?= e($c['module_name']) ?></strong><small><?= e($c['module_code']) ?> · <?= (int)$c['is_active'] ? 'Active' : 'Archived' ?></small></div><div class="actions"><button class="ghost mini" onclick='openForm("curriculum",<?= json_encode($c,JSON_HEX_TAG|JSON_HEX_AMP|JSON_HEX_APOS|JSON_HEX_QUOT) ?>)'>Edit placement</button><form method="post"><input type="hidden" name="csrf" value="<?= $csrf ?>"><input type="hidden" name="action" value="curriculum_toggle"><input type="hidden" name="id" value="<?= (int)$c['id'] ?>"><input type="hidden" name="return_to" value="<?= e($back) ?>"><button class="ghost mini" type="submit"><?= (int)$c['is_active']?'Archive':'Restore' ?></button></form></div></div><?php endforeach;if(!$found):?><div class="hint">No modules assigned yet.</div><?php endif;endfor;?></div></details><?php endfor;?>
+<div class="section"><div class="row"><h2>Module catalogue</h2><button class="ghost" onclick="openForm('module',null)">＋ Create module</button></div><div class="panel"><?php foreach($modules as $m):?><div class="row"><div><strong><?= e($m['module_name']) ?></strong><small><?= e($m['module_code']) ?></small></div><div class="actions"><button class="ghost mini" onclick='openForm("module",<?= json_encode($m,JSON_HEX_TAG|JSON_HEX_AMP|JSON_HEX_APOS|JSON_HEX_QUOT) ?>)'>Edit</button><form method="post"><input type="hidden" name="csrf" value="<?= $csrf ?>"><input type="hidden" name="action" value="module_toggle"><input type="hidden" name="id" value="<?= (int)$m['id'] ?>"><input type="hidden" name="return_to" value="<?= e($back) ?>"><button class="ghost mini" type="submit"><?= (int)$m['is_active']?'Archive':'Restore' ?></button></form></div></div><?php endforeach;?></div></div>
+<?php endif;?><p class="hint section">ULearn Academic Structure · Archive records rather than deleting historical academic data.</p></main></div>
+<div class="overlay" id="overlay"><div class="drawer" role="dialog" aria-modal="true" aria-labelledby="formTitle"><div class="row"><span class="eyebrow">Academic management</span><button class="ghost" type="button" onclick="closeForm()">✕</button></div><h2 id="formTitle">Manage record</h2><form method="post" id="editForm"><input type="hidden" name="csrf" value="<?= $csrf ?>"><input type="hidden" name="action" id="action"><input type="hidden" name="id" id="recordId"><input type="hidden" name="return_to" value="<?= e($back) ?>"><div id="fields"></div><div class="drawer-buttons"><button type="button" class="ghost" onclick="closeForm()">Cancel</button><button class="button" type="submit">Save changes →</button></div></form></div></div>
+<script>
+const universities=<?= json_encode(array_values(array_filter($universities,fn($u)=>(int)$u['is_active']===1)),JSON_HEX_TAG|JSON_HEX_AMP|JSON_HEX_APOS|JSON_HEX_QUOT) ?>;
+const batches=<?= json_encode(array_values(array_filter($batches,fn($b)=>(int)$b['is_active']===1)),JSON_HEX_TAG|JSON_HEX_AMP|JSON_HEX_APOS|JSON_HEX_QUOT) ?>;
+const modules=<?= json_encode(array_values(array_filter($modules,fn($m)=>(int)$m['is_active']===1)),JSON_HEX_TAG|JSON_HEX_AMP|JSON_HEX_APOS|JSON_HEX_QUOT) ?>;
+const linked=<?= json_encode(array_values(array_filter($links,fn($l)=>(int)$l['degree_id']===$degreeId&&(int)$l['is_active']===1)),JSON_HEX_TAG|JSON_HEX_AMP|JSON_HEX_APOS|JSON_HEX_QUOT) ?>;
+const uid=<?= $universityId ?>,did=<?= $degreeId ?>,bid=<?= $batchId ?>,duration=<?= (int)($selectedDegree['duration_years']??4) ?>;
+const overlay=document.getElementById('overlay');
+function field(label,name,value='',type='text',extra=''){return `<div class="field"><label>${label}</label><input name="${name}" type="${type}" value="${esc(value)}" ${extra} required></div>`}
+function esc(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+function select(label,name,options,value){return `<div class="field"><label>${label}</label><select name="${name}" required>${options.map(o=>`<option value="${esc(o.value)}" ${String(o.value)===String(value)?'selected':''}>${esc(o.label)}</option>`).join('')}</select></div>`}
+function openForm(kind,obj){obj=obj||{};document.getElementById('editForm').reset();document.getElementById('recordId').value=obj.id||'';let title='',action='',html='';
+if(kind==='degree'){title=obj.id?'Edit degree programme':'Add degree programme';action='degree_save';html=field('Degree name','name',obj.name,'text','maxlength="200"')+field('Degree code','code',obj.code,'text','maxlength="30"')+select('Awarding university','university_id',universities.map(u=>({value:u.id,label:u.name})),obj.awarding_university_id||uid)+select('Duration (study years)','duration_years',[1,2,3,4,5].map(n=>({value:n,label:n+' year'+(n===1?'':'s')})),obj.duration_years||4)}
+else if(kind==='batch'){title=obj.id?'Edit intake':'Create intake';action='batch_save';html=field('Intake code (e.g. 25.1)','batch_code',obj.batch_code,'text','pattern="[0-9]{2}\\.[0-9]{1,2}"')+field('Calendar year','intake_year',obj.intake_year||new Date().getFullYear(),'number','min="2000" max="2100"')+field('Intake number','intake_number',obj.intake_number||1,'number','min="1" max="20"')}
+else if(kind==='intake'){title='Link intake to degree';action='intake_link';html=`<input type="hidden" name="degree_id" value="${did}">`+select('Existing intake','batch_id',batches.map(b=>({value:b.id,label:b.batch_code+' · '+b.intake_year})),batches[0]?.id)}
+else if(kind==='module'){title=obj.id?'Edit module':'Create module';action='module_save';html=field('Module code','module_code',obj.module_code,'text','maxlength="30"')+field('Module name','module_name',obj.module_name,'text','maxlength="200"')+`<div class="field"><label>Description</label><textarea name="description" maxlength="5000">${esc(obj.description)}</textarea></div>`}
+else if(kind==='curriculum'){title='Assign module to curriculum';action='curriculum_add';html=`<input type="hidden" name="degree_id" value="${did}"><input type="hidden" name="batch_id" value="${bid}">`+select('Module','module_id',modules.map(m=>({value:m.id,label:m.module_code+' · '+m.module_name})),obj.module_id||modules[0]?.id)+select('Study year','study_year',Array.from({length:duration},(_,i)=>({value:i+1,label:'Year '+(i+1)})),obj.study_year||1)+select('Semester','semester',[{value:1,label:'Semester 1'},{value:2,label:'Semester 2'}],obj.semester||1)}
+else return;
+document.getElementById('formTitle').textContent=title;document.getElementById('action').value=action;document.getElementById('fields').innerHTML=html;overlay.classList.add('open');document.body.style.overflow='hidden';}
+function closeForm(){overlay.classList.remove('open');document.body.style.overflow=''}
+overlay.addEventListener('click',e=>{if(e.target===overlay)closeForm()});document.addEventListener('keydown',e=>{if(e.key==='Escape')closeForm()});document.getElementById('theme').addEventListener('click',()=>{let t=document.documentElement.dataset.theme==='dark'?'light':'dark';document.documentElement.dataset.theme=t;localStorage.setItem('ulearn-theme',t)});const search=document.getElementById('search');if(search)search.addEventListener('input',()=>document.querySelectorAll('#cards .item').forEach(c=>c.classList.toggle('hidden',!c.dataset.search.includes(search.value.toLowerCase()))));
+</script></body></html>

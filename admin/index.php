@@ -987,6 +987,15 @@ a.tool-card:hover {
                     Academics
 
                 </a>
+                
+               <a href="<?= e(url('admin/universities.php')) ?>">
+                     <svg class="nav-icon" fill="none"
+                         stroke="currentColor" stroke-width="1.8">
+                       <use href="#i-cap"/>
+                     </svg>
+                   Universities
+                </a>
+
 
                 <a href="<?= e(url('admin/quizzes.php')) ?>">
 
@@ -1366,6 +1375,29 @@ a.tool-card:hover {
                     </span>
 
                 </a>
+                         
+<a class="tool-card"
+   href="<?= e(url('admin/universities.php')) ?>">
+
+    <div class="icon-box">
+        <svg fill="none" stroke="currentColor"
+             stroke-width="1.7">
+            <use href="#i-cap"/>
+        </svg>
+    </div>
+
+    <h3>University Management</h3>
+
+    <p>
+        Add and manage awarding universities
+        for ULearn degree programmes.
+    </p>
+
+    <span class="tool-footer">
+        Open university management ↗
+    </span>
+</a>
+
 
                 <a class="tool-card" href="<?= e(url('admin/quizzes.php')) ?>">
 
