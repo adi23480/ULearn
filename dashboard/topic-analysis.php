@@ -189,13 +189,12 @@ try {
         GROUP BY COALESCE(NULLIF(TRIM(qq.topic), ''), 'General')
         ORDER BY accuracy ASC, answered DESC, topic ASC
     ";
+
     $stmt = $pdo->prepare($topicSql);
+
     $stmt->execute($params);
+
     $topics = $stmt->fetchAll(PDO::FETCH_ASSOC);
-
-    // The mistake-only condition must be part of the WHERE clause.
-
-    // Build a separate, explicit query to avoid ambiguous joins.
 
     $mistakeSql = "
 
@@ -709,6 +708,39 @@ function topicPriority(array $topic): string {
 
 }
 
+/* Luxurious, Palette-Matched YouTube Action Chip */
+.youtube-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  background: var(--surface);
+  color: var(--text);
+  border: 1px solid var(--line);
+  padding: 7px 12px;
+  border-radius: 10px;
+  text-decoration: none;
+  font-size: 11px;
+  font-weight: 750;
+  margin-top: 12px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.youtube-chip svg {
+  width: 14px;
+  height: 14px;
+  fill: #ff3333;
+  transition: transform 0.2s ease;
+}
+.youtube-chip:hover {
+  background: var(--soft);
+  border-color: var(--accent);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px color-mix(in srgb, var(--accent) 15%, transparent);
+}
+.youtube-chip:hover svg {
+  transform: scale(1.1);
+}
+
 .ult-enter {animation:ult-enter .5s ease-out both}
 
 .ult-stats {animation-delay:.08s}
@@ -817,7 +849,7 @@ function topicPriority(array $topic): string {
 
     Discover which concepts need more attention, review
 
-    incorrect answers, and build a stronger understanding
+    incorrect answers, watch recommended video tutorials, and build a stronger understanding
 
     through targeted practice.
 
@@ -993,6 +1025,14 @@ function topicPriority(array $topic): string {
 
           </div>
 
+          <!-- Luxurious YouTube Action Chip -->
+          <div>
+            <a href="https://www.youtube.com/results?search_query=<?= urlencode((string)$topic['topic'] . ' tutorial explanation concept') ?>" target="_blank" class="youtube-chip">
+              <svg viewBox="0 0 24 24"><path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/></svg>
+              Watch Video
+            </a>
+          </div>
+
         </div>
 
       <?php endforeach; ?>
@@ -1058,6 +1098,11 @@ function topicPriority(array $topic): string {
               <?php endif; ?>
 
             </p>
+
+            <a href="https://www.youtube.com/results?search_query=<?= urlencode((string)$topic['topic'] . ' revision study guide') ?>" target="_blank" class="youtube-chip" style="margin-top:8px;">
+              <svg viewBox="0 0 24 24"><path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/></svg>
+              Watch Video
+            </a>
 
           </div>
 
@@ -1172,6 +1217,13 @@ function topicPriority(array $topic): string {
           </div>
 
         <?php endif; ?>
+
+        <div style="margin-top:12px;">
+          <a href="https://www.youtube.com/results?search_query=<?= urlencode((string)$mistake['topic'] . ' ' . (string)$mistake['question_text']) ?>" target="_blank" class="youtube-chip">
+            <svg viewBox="0 0 24 24"><path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/></svg>
+            Watch Video
+          </a>
+        </div>
 
       </article>
 

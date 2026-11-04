@@ -769,5 +769,19 @@ document.querySelectorAll('form').forEach(function(form){
     }
 });
 </script>
+<div class="ai-quiz-generator" style="background: #f9f9f9; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
+    <h3>🤖 AI Quiz Generator</h3>
+    <p>Paste the content of your reference sheet below to automatically generate multiple-choice questions.</p>
+    
+    <textarea id="reference-material" rows="6" style="width: 100%; padding: 10px; margin-bottom: 10px;" placeholder="Paste lecture notes or reference text here..."></textarea>
+    
+    <button onclick="generateAIQuiz()" style="padding: 10px 20px; background: #0056b3; color: white; border: none; border-radius: 4px; cursor: pointer;">
+        Generate Quiz
+    </button>
+    
+    <div id="quiz-output" style="margin-top: 20px; display: none;">
+        <!-- Generated questions will appear here -->
+    </div>
+</div>
 </body>
 </html>
