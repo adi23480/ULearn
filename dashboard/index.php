@@ -2015,6 +2015,8 @@ $initial = strtoupper(substr($firstName, 0, 1));
 
 </div>
 
+<?php require __DIR__ . '/../includes/student-bot.php'; ?>
+
 </body>
 
 </html>
