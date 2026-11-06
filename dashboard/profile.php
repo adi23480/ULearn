@@ -121,6 +121,9 @@ $initial = strtoupper(substr(trim((string)$profile['full_name']), 0, 1));
 <a href="<?= e(url('dashboard/quizzes.php')) ?>">▣ &nbsp; Quizzes</a>
 <a href="<?= e(url('dashboard/consultations.php')) ?>">◷ &nbsp; Consultations</a>
 <a href="<?= e(url('dashboard/kuppiya.php')) ?>">♧ &nbsp; Kuppiya</a>
+<a href="<?= e(url('dashboard/leaderboard.php')) ?>">
+    🏆 &nbsp; Leaderboard
+</a>
 <a href="<?= e(url('dashboard/notifications.php')) ?>">♢ &nbsp; Notifications</a>
 <a class="active" href="<?= e(url('dashboard/profile.php')) ?>" aria-current="page">⚙ &nbsp; My Profile & Settings</a>
 </nav>

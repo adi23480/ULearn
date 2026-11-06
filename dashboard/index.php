@@ -1294,6 +1294,10 @@ $initial = strtoupper(substr($firstName, 0, 1));
 
                 </a>
 
+                <a href="<?= e(url('dashboard/leaderboard.php')) ?>">
+    🏆 &nbsp; Leaderboard
+</a>
+
                 <a href="<?= e(url('dashboard/profile.php')) ?>">
 
                     ◉ &nbsp; My Profile &amp; Settings
