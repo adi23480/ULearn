@@ -53,6 +53,14 @@ $bulkPreview = [];
 $bulkErrors = [];
 $selectedQuizId = filter_input(INPUT_GET, 'quiz', FILTER_VALIDATE_INT) ?: 0;
 $editQuizId = filter_input(INPUT_GET, 'edit', FILTER_VALIDATE_INT) ?: 0;
+
+// Keep the selected quiz attached to POST previews/actions as well as GET requests.
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['quiz_id'])) {
+    $postedQuizId = filter_var($_POST['quiz_id'], FILTER_VALIDATE_INT);
+    if ($selectedQuizId < 1 && $postedQuizId && $postedQuizId > 0) {
+        $selectedQuizId = (int)$postedQuizId;
+    }
+}
 $editQuestionId = filter_input(INPUT_GET, 'edit_question', FILTER_VALIDATE_INT) ?: 0;
 if ($selectedQuizId < 1 && $editQuizId > 0) { $selectedQuizId = $editQuizId; }
 
@@ -202,7 +210,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $moduleId = filter_var($_POST['module_id'] ?? null, FILTER_VALIDATE_INT);
             $newModuleCode = strtoupper(trim((string)($_POST['new_module_code'] ?? '')));
             $newModuleName = trim((string)($_POST['new_module_name'] ?? ''));
-            $quizType = (string)($_POST['quiz_type'] ?? 'topic');
+            $quizType = (string)($_POST['quiz_type'] ?? 'practice');
             $duration = filter_var($_POST['duration_minutes'] ?? null, FILTER_VALIDATE_INT);
             $points = filter_var($_POST['points_per_question'] ?? null, FILTER_VALIDATE_INT);
             $availabilityMode = (string)($_POST['availability_mode'] ?? 'unlimited');
@@ -240,7 +248,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if ($newModuleName !== '' && strlen($newModuleName) > 200) {
                 throw new RuntimeException('Module name must be no longer than 200 characters.');
             }
-            if (!in_array($quizType, ['topic', 'general', 'exam'], true)) {
+            if (!in_array($quizType, ['module', 'practice', 'timed'], true)) {
                 throw new RuntimeException('Choose a valid quiz type.');
             }
             if (!$duration || $duration < 1 || $duration > 600) {
@@ -300,10 +308,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $uploadedText = extractQuizUpload($_FILES['source_file'] ?? ['error' => UPLOAD_ERR_NO_FILE]);
             if ($uploadedText !== '') $bulkText = $uploadedText;
             if (!$quizId || $quizId < 1) throw new RuntimeException('Select a valid quiz before importing questions.');
-            $check = $pdo->prepare('SELECT is_published FROM quizzes WHERE id = ?');
-            $check->execute([$quizId]); $quizState = $check->fetchColumn();
-            if ($quizState === false) throw new RuntimeException('Quiz not found.');
-            if ((int)$quizState === 1) throw new RuntimeException('Move the quiz back to draft before importing questions.');
+            // Confirm that this lecturer owns the selected quiz and is still assigned to its module.
+            $quizRow = lecturerQuizOwned($pdo, (int)$quizId, (int)$user['id'], $allowedModuleIds);
+            if ((int)$quizRow['is_published'] === 1) {
+                throw new RuntimeException('Move the quiz back to draft before importing questions.');
+            }
             $parsed = parseBulkQuizText($bulkText);
             $bulkPreview = $parsed['questions'];
             $bulkErrors = $parsed['errors'];
@@ -311,33 +320,101 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
 
         if ($action === 'import_bulk') {
-            $quizId = filter_var($_POST['quiz_id'] ?? null, FILTER_VALIDATE_INT);
-            $bulkText = (string)($_POST['bulk_text'] ?? '');
-            if (!$quizId || $quizId < 1) throw new RuntimeException('Select a valid quiz before importing questions.');
-            $check = $pdo->prepare('SELECT is_published FROM quizzes WHERE id = ?');
-            $check->execute([$quizId]); $quizState = $check->fetchColumn();
-            if ($quizState === false) throw new RuntimeException('Quiz not found.');
-            if ((int)$quizState === 1) throw new RuntimeException('Move the quiz back to draft before importing questions.');
-            $parsed = parseBulkQuizText($bulkText);
-            if ($parsed['errors']) throw new RuntimeException('Import stopped: ' . implode(' ', array_slice($parsed['errors'], 0, 5)));
-            if (!$parsed['questions']) throw new RuntimeException('No valid questions were found to import.');
-            $optionExplanationColumn = $pdo->query("SHOW COLUMNS FROM quiz_options LIKE 'explanation'")->fetch();
-            if (!$optionExplanationColumn) throw new RuntimeException('Run the supplied quiz_options_explanation_migration.sql once in phpMyAdmin before importing option-specific reasons.');
 
-            $pdo->beginTransaction();
-            $questionStmt = $pdo->prepare('INSERT INTO quiz_questions (quiz_id, question_text, explanation, topic, difficulty) VALUES (?, ?, ?, ?, ?)');
-            $optionStmt = $pdo->prepare('INSERT INTO quiz_options (question_id, option_text, is_correct, explanation) VALUES (?, ?, ?, ?)');
-            foreach ($parsed['questions'] as $question) {
-                $questionStmt->execute([$quizId, $question['question_text'], $question['explanation'], $question['topic'], $question['difficulty'] !== '' ? $question['difficulty'] : null]);
-                $questionId = (int)$pdo->lastInsertId();
-                foreach (['A','B','C','D'] as $letter) {
-                    $optionStmt->execute([$questionId, $question['options'][$letter], $question['correct'] === $letter ? 1 : 0, $question['option_explanations'][$letter]]);
-                }
+    $quizId = filter_var($_POST['quiz_id'] ?? null, FILTER_VALIDATE_INT);
+    $bulkText = (string)($_POST['bulk_text'] ?? '');
+
+    if (!$quizId || $quizId < 1) {
+        throw new RuntimeException('Select a valid quiz.');
+    }
+
+    // Verify lecturer owns this quiz
+    lecturerQuizOwned($pdo, $quizId, (int)$user['id'], $allowedModuleIds);
+
+    $check = $pdo->prepare(
+        'SELECT is_published FROM quizzes WHERE id = ?'
+    );
+    $check->execute([$quizId]);
+
+    $quizState = $check->fetchColumn();
+
+    if ($quizState === false) {
+        throw new RuntimeException('Quiz not found.');
+    }
+
+    if ((int)$quizState === 1) {
+        throw new RuntimeException('Unpublish the quiz before importing questions.');
+    }
+
+    $parsed = parseBulkQuizText($bulkText);
+
+    if (!empty($parsed['errors'])) {
+        throw new RuntimeException(
+            'Import stopped: ' . implode(' ', array_slice($parsed['errors'], 0, 5))
+        );
+    }
+
+    if (empty($parsed['questions'])) {
+        throw new RuntimeException('No valid questions found.');
+    }
+
+    $pdo->beginTransaction();
+
+    try {
+
+        $questionStmt = $pdo->prepare(
+            'INSERT INTO quiz_questions
+            (quiz_id, question_text, explanation, topic, difficulty)
+            VALUES (?, ?, ?, ?, ?)'
+        );
+
+        $optionStmt = $pdo->prepare(
+            'INSERT INTO quiz_options
+            (question_id, option_text, is_correct, explanation)
+            VALUES (?, ?, ?, ?)'
+        );
+
+        foreach ($parsed['questions'] as $question) {
+
+            $questionStmt->execute([
+                $quizId,
+                $question['question_text'],
+                $question['explanation'],
+                $question['topic'],
+                $question['difficulty'] !== ''
+                    ? $question['difficulty']
+                    : null
+            ]);
+
+            $questionId = (int)$pdo->lastInsertId();
+
+            foreach (['A', 'B', 'C', 'D'] as $letter) {
+
+                $optionStmt->execute([
+                    $questionId,
+                    $question['options'][$letter],
+                    $question['correct'] === $letter ? 1 : 0,
+                    $question['option_explanations'][$letter]
+                ]);
             }
-            $pdo->commit();
-            $_SESSION['quiz_notice'] = count($parsed['questions']) . ' questions imported successfully. Review the quiz before publishing.';
-            quizRedirect('quiz=' . $quizId);
         }
+
+        $pdo->commit();
+
+    } catch (Throwable $e) {
+
+        if ($pdo->inTransaction()) {
+            $pdo->rollBack();
+        }
+
+        throw $e;
+    }
+
+    $_SESSION['quiz_notice'] =
+        count($parsed['questions']) . ' questions imported successfully.';
+
+    quizRedirect('quiz=' . $quizId);
+}
 
         if ($action === 'add_question') {
             $quizId = filter_var($_POST['quiz_id'] ?? null, FILTER_VALIDATE_INT);
@@ -487,7 +564,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             quizRedirect();
         }
 
-        throw new RuntimeException('Unknown action. Refresh the page and try again.');
+        // preview_bulk is a display action: keep the parsed preview on this page.
+        // Every other unhandled action should still be rejected.
+        if ($action !== 'preview_bulk') {
+            throw new RuntimeException('Unknown action. Refresh the page and try again.');
+        }
     } catch (Throwable $exception) {
         if ($pdo->inTransaction()) $pdo->rollBack();
         error_log('ULearn quiz management error: ' . $exception->getMessage());
@@ -601,7 +682,7 @@ document.addEventListener('DOMContentLoaded',()=>{const b=document.getElementByI
     <form method="post">
         <input type="hidden" name="csrf" value="<?= e(csrf()) ?>">
         <input type="hidden" name="action" value="<?= $editingQuiz ? 'update_quiz' : 'create_quiz' ?>">
-        <?php if ($editingQuiz): ?><input type="hidden" name="quiz_id" value="<?= (int)$editingQuiz['id'] ?>"><?php endif; ?>
+        <?php if ($editingQuiz): ?><input type="hidden" name="quiz_id" value="<?= (int)$selectedQuizId ?>"><?php endif; ?>
         <div class="field"><label for="title">Quiz title</label><input id="title" name="title" maxlength="200" required placeholder="e.g. Sorting Algorithms — Practice 01" value="<?= e((string)($editingQuiz['title'] ?? '')) ?>"></div>
         <div class="field">
             <label for="module_id">Assigned module</label>
@@ -615,7 +696,24 @@ document.addEventListener('DOMContentLoaded',()=>{const b=document.getElementByI
         </div>
         <div class="field"><label for="description">Description <span style="color:var(--muted);font-weight:500">(optional)</span></label><textarea id="description" name="description" maxlength="5000" placeholder="What should students practise or learn?"><?= e((string)($editingQuiz['description'] ?? '')) ?></textarea></div>
         <div class="two">
-            <div class="field"><label for="quiz_type">Quiz category</label><select id="quiz_type" name="quiz_type"><option value="topic" <?= ($editingQuiz['quiz_type'] ?? 'topic') === 'topic' ? 'selected' : '' ?>>Topic practice</option><option value="general" <?= ($editingQuiz['quiz_type'] ?? '') === 'general' ? 'selected' : '' ?>>General practice</option><option value="exam" <?= ($editingQuiz['quiz_type'] ?? '') === 'exam' ? 'selected' : '' ?>>Exam preparation</option></select></div>
+            <div class="field"><label for="quiz_type">Quiz category</label>
+            
+            <select id="quiz_type" name="quiz_type">
+
+    <option value="module" <?= ($editingQuiz['quiz_type'] ?? '') === 'module' ? 'selected' : '' ?>>
+        Topic practice
+    </option>
+
+    <option value="practice" <?= ($editingQuiz['quiz_type'] ?? 'practice') === 'practice' ? 'selected' : '' ?>>
+        General practice
+    </option>
+
+    <option value="timed" <?= ($editingQuiz['quiz_type'] ?? '') === 'timed' ? 'selected' : '' ?>>
+        Exam preparation
+    </option>
+
+</select>
+        </div>
             <div class="field"><label for="duration_minutes">Duration (minutes)</label><input id="duration_minutes" name="duration_minutes" type="number" min="1" max="600" required value="<?= e((string)($editingQuiz['duration_minutes'] ?? 20)) ?>"></div>
         </div>
         <div class="field"><label for="points_per_question">Points per question</label><input id="points_per_question" name="points_per_question" type="number" min="1" max="100" required value="<?= e((string)($editingQuiz['points_per_question'] ?? 1)) ?>"></div>
@@ -669,15 +767,16 @@ document.addEventListener('DOMContentLoaded',()=>{const b=document.getElementByI
     <p class="hint">Paste all questions at once. ULearn separates the options, correct answer, explanation, topic and optional reason for each option. Students will not see answer keys during the quiz.</p>
     <form method="post" enctype="multipart/form-data" class="section-gap">
         <input type="hidden" name="csrf" value="<?= e(csrf()) ?>"><input type="hidden" name="action" value="preview_bulk"><input type="hidden" name="quiz_id" value="<?= (int)$editingQuiz['id'] ?>">
-        <div class="field"><label for="source_file">Or upload a .txt / .docx file</label><input id="source_file" name="source_file" type="file" accept=".txt,.docx"><p class="fine">If you choose a file, its text is used for preview. Otherwise paste below.</p></div><div class="field"><label for="bulk_text">Paste question set</label><textarea id="bulk_text" name="bulk_text" style="min-height:280px" placeholder="Q1: What is the time complexity of binary search?&#10;A) O(n)&#10;B) O(log n)&#10;C) O(n²)&#10;D) O(1)&#10;Correct: B&#10;Topic: Searching&#10;Explanation: Binary search halves the search interval at each step.&#10;Reason A: A linear scan is O(n), not binary search.&#10;Reason B: Each step halves the interval, so this is correct.&#10;Reason C: This is not the complexity of binary search.&#10;Reason D: The search is not constant time in general."><?= e($bulkText) ?></textarea></div>
-        <p class="fine">Use Q1: / Q2: headers; A)–D) options; Correct: B; optional Topic:, Difficulty:, Explanation:, and Reason A:–Reason D: lines. One blank line between questions is recommended. Word .docx and text .txt files are supported where PHP ZipArchive is enabled.</p>
+        <div class="field"><label for="source_file">Upload question file (.txt or .docx)</label><input id="source_file" name="source_file" type="file" accept=".txt,.docx,text/plain,application/vnd.openxmlformats-officedocument.wordprocessingml.document"><p class="fine">Maximum file size: 5 MB. If a file is selected, the file content is used instead of the textbox. For .docx uploads, enable PHP ZipArchive and DOM extensions. You can also paste the questions below.</p></div><div class="field"><label for="bulk_text">Paste question set</label><textarea id="bulk_text" name="bulk_text" style="min-height:280px" placeholder="Q1: What is the time complexity of binary search?&#10;A) O(n)&#10;B) O(log n)&#10;C) O(n²)&#10;D) O(1)&#10;Correct: B&#10;Topic: Searching&#10;Explanation: Binary search halves the search interval at each step.&#10;Reason A: A linear scan is O(n), not binary search.&#10;Reason B: Each step halves the interval, so this is correct.&#10;Reason C: This is not the complexity of binary search.&#10;Reason D: The search is not constant time in general."><?= e($bulkText) ?></textarea></div>
+        <div class="message success" style="margin-top:14px"><strong>Lecturer upload guidelines</strong><ul style="margin:8px 0 0;padding-left:20px"><li>Upload only .txt or .docx files, up to 5 MB.</li><li>Use one question block at a time, starting with Q1:, Q2:, Q3:.</li><li>Every question must contain exactly four options: A), B), C), and D).</li><li>Add one correct answer line, for example: Correct: B.</li><li>Topic, Difficulty, Explanation, and Reason A–D are optional.</li><li>Keep each option and explanation on its own labelled line; leave a blank line between questions.</li><li>Click Preview and validate first. Check every question and correct answer before confirming import.</li></ul></div>
+        <p class="fine"><strong>Required format:</strong> Q1: question text → A) option → B) option → C) option → D) option → Correct: B. Optional lines: Topic: Sorting, Difficulty: Easy, Explanation: ..., Reason A: ..., Reason B: ..., Reason C: ..., Reason D: ....</p>
         <button class="btn btn-primary full" type="submit">Preview and validate questions →</button>
     </form>
     <?php if ($bulkPreview): ?>
         <div class="separator"></div><div class="topline"><div><div class="kicker">Import preview</div><h2><?= count($bulkPreview) ?> question block(s) detected</h2></div><span class="badge <?= $bulkErrors ? 'draft' : 'published' ?>"><?= $bulkErrors ? count($bulkErrors) . ' issue(s)' : 'Ready to import' ?></span></div>
         <?php foreach ($bulkErrors as $bulkIssue): ?><div class="message error"><?= e($bulkIssue) ?></div><?php endforeach; ?>
         <?php foreach ($bulkPreview as $pi => $pq): ?><article class="question-item"><div class="question-text"><?= ($pi + 1) ?>. <?= e($pq['question_text']) ?></div><div class="options"><?php foreach (['A','B','C','D'] as $letter): ?><div class="option <?= $pq['correct'] === $letter ? 'correct' : '' ?>"><?= $letter ?>. <?= e($pq['options'][$letter]) ?><?= $pq['correct'] === $letter ? ' · Correct answer' : '' ?><?php if ($pq['option_explanations'][$letter] !== ''): ?><div class="fine"><?= e($pq['option_explanations'][$letter]) ?></div><?php endif; ?></div><?php endforeach; ?></div><p class="hint" style="margin-top:10px">Topic: <?= e($pq['topic']) ?><?= $pq['difficulty'] !== '' ? ' · Difficulty: ' . e($pq['difficulty']) : '' ?></p><?php if ($pq['explanation'] !== ''): ?><p class="hint"><strong>Explanation:</strong> <?= e($pq['explanation']) ?></p><?php endif; ?></article><?php endforeach; ?>
-        <?php if (!$bulkErrors): ?><form method="post" class="section-gap" onsubmit="return confirm('Import all <?= count($bulkPreview) ?> questions into this draft?')"><input type="hidden" name="csrf" value="<?= e(csrf()) ?>"><input type="hidden" name="action" value="import_bulk"><input type="hidden" name="quiz_id" value="<?= (int)$editingQuiz['id'] ?>"><textarea name="bulk_text" hidden><?= e($bulkText) ?></textarea><button class="btn btn-primary full" type="submit">Confirm &amp; import <?= count($bulkPreview) ?> questions</button></form><?php endif; ?>
+        <?php if (!$bulkErrors): ?><form method="post" class="section-gap" onsubmit="return confirm('Import all <?= count($bulkPreview) ?> questions into this draft?')"><input type="hidden" name="csrf" value="<?= e(csrf()) ?>"><input type="hidden" name="action" value="import_bulk"><input type="hidden" name="quiz_id" value="<?= (int)$selectedQuizId ?>"><textarea name="bulk_text" hidden><?= e($bulkText) ?></textarea><button class="btn btn-primary full" type="submit">Confirm &amp; import <?= count($bulkPreview) ?> questions</button></form><?php endif; ?>
     <?php endif; ?>
     <div class="separator"></div><div class="kicker">Or add one question manually</div>
     <form method="post">

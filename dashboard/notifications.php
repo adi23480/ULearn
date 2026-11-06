@@ -105,7 +105,17 @@ document.addEventListener('DOMContentLoaded',updateThemeButton);
 <div class="sidebar-bottom"><small>Signed in as</small><strong><?= e((string)($u['full_name'] ?? 'User')) ?></strong><small><?= e((string)($u['email'] ?? '')) ?></small></div>
 </aside>
 <main class="main">
-<header class="topbar"><span class="eyebrow">U LEARN / NOTIFICATION CENTER</span><div class="topbar-right"><button id="themeButton" class="theme-button" type="button" onclick="toggleTheme()" aria-label="Toggle appearance">☾</button><div class="avatar"><?= e($initial) ?></div></div></header>
+<header class="topbar"><span class="eyebrow">U LEARN / NOTIFICATION CENTER</span><div class="topbar-right"><button id="themeButton" class="theme-button" type="button" onclick="toggleTheme()" aria-label="Toggle appearance">☾</button>
+
+<?php
+// Link to the lecturer's profile page.
+?>
+<a class="avatar"
+   href="<?= e(url('lecturer/profile.php')) ?>"
+   title="My Profile">
+    <?= e($initial) ?>
+</a>
+</div></header>
 <span class="eyebrow">STAY IN THE LOOP</span><h1>Notifications<span style="color:var(--accent)">.</span></h1><p class="lead">Your updates, reminders and announcements in one place.</p>
 <?php if ($notice !== ''): ?><div class="flash" role="status"><?= e($notice) ?></div><?php endif; ?>
 <div class="section-head section"><h2>University announcements</h2><span class="badge"><?= count($announcements) ?> current</span></div>
