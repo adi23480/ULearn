@@ -1991,21 +1991,19 @@ $initial = strtoupper(substr($firstName, 0, 1));
 
                 </a>
 
-<article class="feature">
+<a class="feature"
+   href="<?= e(url('dashboard/group-peer/index.php')) ?>"
+   style="display:block; text-decoration:none; color:inherit;">
 
-                    <div class="symbol">◎</div>
+    <div class="symbol">◎</div>
 
-                    <h3>Group Peer & Q&A</h3>
+    <h3>Group Peer & Q&A</h3>
 
-                    <p>
+    <p>Connect with students and discuss difficult topics.</p>
 
-                        Connect with students and discuss
+    <span class="pill">Open Q&A ↗</span>
 
-                        difficult topics.
-
-                    </p>
-
-                </article>
+</a>
 
             </div>
 

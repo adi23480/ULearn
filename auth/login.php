@@ -175,13 +175,28 @@ ob_start();
             Password
         </label>
 
-        <input
-            type="password"
-            id="password"
-            name="password"
-            autocomplete="current-password"
-            required
-        >
+        <div class="password-input-wrap">
+            <input
+                type="password"
+                id="password"
+                name="password"
+                autocomplete="current-password"
+                required
+            >
+
+            <button
+                type="button"
+                class="password-toggle"
+                data-password-toggle="password"
+                aria-label="Show password"
+                aria-pressed="false"
+            >
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7-10-7-10-7z"></path>
+                    <circle cx="12" cy="12" r="3"></circle>
+                </svg>
+            </button>
+        </div>
 
     </div>
 

@@ -26,12 +26,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     } elseif (!filter_var($email, FILTER_VALIDATE_EMAIL) || strlen($email) > 254) {
         $error = 'Enter a valid email address.';
     } elseif (
-        strlen($password) < 8 ||
+        preg_match_all('/./us', $password) < 8 ||
         !preg_match('/[A-Z]/', $password) ||
         !preg_match('/[0-9]/', $password) ||
-        !preg_match('/[^a-zA-Z0-9]/', $password)
+        preg_match_all('/[^\\p{L}\\p{N}\\s]/u', $password) < 2
     ) {
-        $error = 'Password needs at least 8 characters, an uppercase letter, a number and a symbol.';
+        $error = 'Password needs at least 8 characters, an uppercase letter, a number and at least 2 symbols.';
     } elseif ($password !== $confirm) {
         $error = 'Passwords do not match.';
     } else {
@@ -119,16 +119,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 ob_start();
 ?>
 
-<style>
-.password-hint {
-    margin: 8px 0 0;
-    font-size: 12px;
-    line-height: 1.6;
-    color: var(--muted, #a0a3b5);
-}
-.password-hint.good { color: #39b88b; }
-.password-hint.bad { color: #ee7786; }
-</style>
+
 
 <h2>Create your account</h2>
 <p class="sub">Start learning with your personal email address.</p>
@@ -170,30 +161,78 @@ ob_start();
 
     <div class="field">
         <label for="password">Password</label>
-        <input
-            id="password"
-            name="password"
-            type="password"
-            minlength="8"
-            autocomplete="new-password"
-            required
-        >
-        <p class="password-hint">
-            At least 8 characters, one uppercase letter,
-            one number and one symbol.
-        </p>
+
+        <div class="password-input-wrap">
+            <input
+                id="password"
+                name="password"
+                type="password"
+                minlength="8"
+                autocomplete="new-password"
+                aria-describedby="password-rules"
+                required
+            >
+
+            <button
+                type="button"
+                class="password-toggle"
+                data-password-toggle="password"
+                aria-label="Show password"
+                aria-pressed="false"
+            >
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7-10-7-10-7z"></path>
+                    <circle cx="12" cy="12" r="3"></circle>
+                </svg>
+            </button>
+        </div>
+
+        <div class="password-strength" id="password-rules" aria-live="polite">
+            <div class="strength-heading">
+                <span>Password requirements</span>
+                <span id="strength-label">Not started</span>
+            </div>
+
+            <div class="strength-track">
+                <span id="strength-bar"></span>
+            </div>
+
+            <ul class="password-rules">
+                <li data-rule="length"><span class="rule-icon">○</span> At least 8 characters</li>
+                <li data-rule="uppercase"><span class="rule-icon">○</span> At least one uppercase letter (A–Z)</li>
+                <li data-rule="number"><span class="rule-icon">○</span> At least one number (0–9)</li>
+                <li data-rule="symbols"><span class="rule-icon">○</span> At least 2 special symbols (!, @, #, $, etc.)</li>
+            </ul>
+        </div>
     </div>
 
     <div class="field">
         <label for="confirm_password">Confirm password</label>
-        <input
-            id="confirm_password"
-            name="confirm_password"
-            type="password"
-            minlength="8"
-            autocomplete="new-password"
-            required
-        >
+
+        <div class="password-input-wrap">
+            <input
+                id="confirm_password"
+                name="confirm_password"
+                type="password"
+                minlength="8"
+                autocomplete="new-password"
+                required
+            >
+
+            <button
+                type="button"
+                class="password-toggle"
+                data-password-toggle="confirm_password"
+                aria-label="Show confirm password"
+                aria-pressed="false"
+            >
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7-10-7-10-7z"></path>
+                    <circle cx="12" cy="12" r="3"></circle>
+                </svg>
+            </button>
+        </div>
+
         <p
             id="password-match"
             class="password-hint"
@@ -216,28 +255,66 @@ ob_start();
 document.addEventListener('DOMContentLoaded', function () {
     const password = document.getElementById('password');
     const confirm = document.getElementById('confirm_password');
-    const message = document.getElementById('password-match');
+    const matchMessage = document.getElementById('password-match');
+    const strengthLabel = document.getElementById('strength-label');
+    const strengthBar = document.getElementById('strength-bar');
+function updatePasswordRules() {
+        const value = password.value;
+        const symbolMatches = value.match(/[^\p{L}\p{N}\s]/gu);
+        const rules = {
+            length: Array.from(value).length >= 8,
+            uppercase: /[A-Z]/.test(value),
+            number: /[0-9]/.test(value),
+            symbols: (symbolMatches ? symbolMatches.length : 0) >= 2
+        };
+
+        let passed = 0;
+
+        Object.keys(rules).forEach(function (ruleName) {
+            const item = document.querySelector('[data-rule="' + ruleName + '"]');
+            const icon = item.querySelector('.rule-icon');
+            item.classList.remove('good', 'bad');
+
+            if (rules[ruleName]) {
+                item.classList.add('good');
+                icon.textContent = '✓';
+                passed++;
+            } else if (value.length > 0) {
+                item.classList.add('bad');
+                icon.textContent = '✕';
+            } else {
+                icon.textContent = '○';
+            }
+        });
+
+        const labels = ['Not started', 'Weak', 'Fair', 'Good', 'Strong'];
+        strengthLabel.textContent = value.length === 0 ? labels[0] : labels[passed];
+        strengthBar.style.width = (passed * 25) + '%';
+        strengthBar.classList.toggle('complete', passed === 4);
+
+        updateMatch();
+    }
 
     function updateMatch() {
         if (!confirm.value) {
-            message.textContent = '';
-            message.className = 'password-hint';
+            matchMessage.textContent = '';
+            matchMessage.className = 'password-hint';
             return;
         }
 
         const matches = password.value === confirm.value;
+        matchMessage.textContent = matches
+            ? '✓ Passwords match'
+            : '✕ Passwords do not match';
 
-        message.textContent = matches
-            ? 'Passwords match'
-            : 'Passwords do not match';
-
-        message.className = matches
+        matchMessage.className = matches
             ? 'password-hint good'
             : 'password-hint bad';
     }
 
-    password.addEventListener('input', updateMatch);
+    password.addEventListener('input', updatePasswordRules);
     confirm.addEventListener('input', updateMatch);
+    updatePasswordRules();
 });
 </script>
 
