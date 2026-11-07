@@ -39,6 +39,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $action = (string)($_POST['action'] ?? '');
 
     if ($action === 'academic') {
+        $error = 'Academic identity is set at registration. Contact an administrator to request changes.';
+    } elseif (false && $action === 'academic') {
 
         $degreeId = filter_var(
 
@@ -160,13 +162,16 @@ $stmt = $pdo->prepare(
 
             d.name AS degree_name,
 
-            b.batch_code
+            b.batch_code,
+            au.name AS university_name, ap.study_year AS current_year, ap.semester AS current_semester
 
      FROM student_academic_profiles p
 
      JOIN academic_degrees d ON d.id = p.degree_id
 
      JOIN academic_batches b ON b.id = p.batch_id
+     LEFT JOIN awarding_universities au ON au.id=d.awarding_university_id
+     LEFT JOIN academic_intake_progression ap ON ap.degree_id=p.degree_id AND ap.batch_id=p.batch_id
 
      WHERE p.user_id = ?"
 
@@ -182,9 +187,9 @@ $availableYears = [];
 
 $availableSemesters = [];
 
-$selectedYear = (isset($_GET['year']) && $_GET['year'] !== '') ? filter_var($_GET['year'], FILTER_VALIDATE_INT) : null;
+$selectedYear = $profile ? (int)($profile['current_year'] ?? 1) : null;
 
-$selectedSemester = (isset($_GET['semester']) && $_GET['semester'] !== '') ? filter_var($_GET['semester'], FILTER_VALIDATE_INT) : null;
+$selectedSemester = $profile ? (int)($profile['current_semester'] ?? 1) : null;
 
 if ($profile) {
 
@@ -1224,13 +1229,19 @@ $initial = strtoupper(substr($firstName, 0, 1));
 
     </script>
 
+
+<script src="<?= htmlspecialchars(url('assets/js/theme-global.js?v=20261107-2'), ENT_QUOTES, 'UTF-8') ?>"></script>
+<link rel="stylesheet" href="<?= e(url('assets/css/ulearn-design-system.css?v=1')) ?>">
+<script defer src="<?= e(url('assets/js/ulearn-motion.js?v=1')) ?>"></script>
+<link rel="stylesheet" href="<?= e(url('assets/css/ulearn-student-shell.css?v=2')) ?>">
+<script defer src="<?= e(url('assets/js/ulearn-student-shell.js?v=2')) ?>"></script>
 </head>
 
 <body>
 
 <div class="layout">
 
-    <aside class="sidebar">
+    <aside class="sidebar" id="studentSidebar">
 
         <a class="brand" href="<?= e(url()) ?>">
 
@@ -1242,77 +1253,23 @@ $initial = strtoupper(substr($firstName, 0, 1));
 
             <p class="nav-label">Your workspace</p>
 
-            <div class="nav">
-
-                <a class="active" href="#overview">
-
-                    ◫ &nbsp; Overview
-
-                </a>
-
-                <a href="#modules">
-
-                    ▤ &nbsp; My Modules
-
-                </a>
-
-                <a href="<?= e(url('dashboard/explore.php')) ?>">
-
-                    ⊕ &nbsp; Explore & Enroll
-
-                </a>
-
-                <a href="<?= e(url('dashboard/notifications.php')) ?>">
-
-                    ♧ &nbsp; Notifications
-
-                </a>
-
-                <a href="<?= e(url('dashboard/notes-library.php')) ?>">▦ &nbsp; Notes Library</a>
-                <a href="<?= e(url('dashboard/notes.php')) ?>">↥ &nbsp; Upload My Notes</a>
-                <a href="<?= e(url('dashboard/kuppiya.php')) ?>">
-
-                    ♧ &nbsp; Kuppiya Sessions
-
-                </a>
-
-                <a href="<?= e(url('dashboard/quiz-history.php')) ?>">
-
-                    ◷ &nbsp; My Quiz History
-
-                </a>
-
-                <a href="<?= e(url('dashboard/analytics.php')) ?>">
-
-                    ◉ &nbsp; Performance Analytics
-
-                </a>
-
-                <a href="<?= e(url('dashboard/topic-analysis.php')) ?>">
-
-                    ◈ &nbsp; Topic Weaknesses
-
-                </a>
-
-                <a href="<?= e(url('dashboard/profile.php')) ?>">
-
-                    ◉ &nbsp; My Profile &amp; Settings
-
-                </a>
-
-                <a href="#academic">
-
-                    ◇ &nbsp; Academic Profile
-
-                </a>
-
-                <a href="#features">
-
-                    ◎ &nbsp; Learning Tools
-
-                </a>
-
-            </div>
+<div class="nav ul-nav">
+ <a class="active" href="#overview"><svg class="ul-nav-icon" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="9" rx="1"/><rect x="14" y="3" width="7" height="5" rx="1"/><rect x="14" y="12" width="7" height="9" rx="1"/><rect x="3" y="16" width="7" height="5" rx="1"/></svg><span>Overview</span></a>
+ <a href="#modules"><svg class="ul-nav-icon" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 7v14M3 18V4a1 1 0 0 1 1-1h5a3 3 0 0 1 3 3 3 3 0 0 1 3-3h5a1 1 0 0 1 1 1v14h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z"/></svg><span>My Modules</span></a>
+ <a href="<?= e(url('dashboard/explore.php')) ?>"><svg class="ul-nav-icon" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="m16 8-2 6-6 2 2-6z"/></svg><span>Explore & Enroll</span></a>
+ <a href="<?= e(url('dashboard/notes-library.php')) ?>"><svg class="ul-nav-icon" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="8" y="7" width="12" height="14" rx="2"/><path d="M16 7V5a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h2"/></svg><span>Notes Library</span></a>
+ <a href="<?= e(url('dashboard/notes.php')) ?>"><svg class="ul-nav-icon" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V8m-4 4 4-4 4 4M4 17a5 5 0 0 1 1-9 7 7 0 0 1 13 0 5 5 0 0 1 2 9"/></svg><span>Upload Notes</span></a>
+ <a href="<?= e(url('dashboard/quiz-history.php')) ?>"><svg class="ul-nav-icon" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-7M3 3v6h6M12 7v5l3 2"/></svg><span>Quiz History</span></a>
+ <a href="<?= e(url('dashboard/learning-insights.php')) ?>"><svg class="ul-nav-icon" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="m3 17 6-6 4 4 8-8M15 7h6v6"/></svg><span>Learning Insights</span></a>
+ <a href="<?= e(url('dashboard/analytics.php')) ?>"><svg class="ul-nav-icon" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20V12h4v8M10 20V4h4v16M16 20v-9h4v9M2 20h20"/></svg><span>Performance Analytics</span></a>
+ <a href="<?= e(url('dashboard/topic-analysis.php')) ?>"><svg class="ul-nav-icon" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1"/></svg><span>Topic Weaknesses</span></a>
+ <a href="<?= e(url('dashboard/ai-study.php')) ?>"><svg class="ul-nav-icon" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="m12 3 1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8zM19 17l.7 1.3L21 19l-1.3.7L19 21l-.7-1.3L17 19l1.3-.7z"/></svg><span>AI Study Assistant</span></a>
+ <a href="<?= e(url('dashboard/consultations.php')) ?>"><svg class="ul-nav-icon" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M20 11V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v10l4-3h11a2 2 0 0 0 2-1zM9 16v3a2 2 0 0 0 2 2h8l3 2v-9"/></svg><span>Consultations</span></a>
+ <a href="<?= e(url('dashboard/kuppiya.php')) ?>"><svg class="ul-nav-icon" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3"/><path d="M3 20v-2a6 6 0 0 1 12 0v2M17 5a3 3 0 0 1 0 6M17 15a5 5 0 0 1 4 5"/></svg><span>Kuppiya Sessions</span></a>
+ <a href="<?= e(url('dashboard/leaderboard.php')) ?>"><svg class="ul-nav-icon" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M7 4h10v7a5 5 0 0 1-10 0zM7 6H4v3a4 4 0 0 0 4 4m9-7h3v3a4 4 0 0 1-4 4M12 16v4m-4 1h8"/></svg><span>Leaderboard</span></a>
+ <a href="<?= e(url('dashboard/notifications.php')) ?>"><svg class="ul-nav-icon" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4"/></svg><span>Notifications</span></a>
+ <a href="<?= e(url('dashboard/profile.php')) ?>"><svg class="ul-nav-icon" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M4 17h16"/><circle cx="8" cy="7" r="2"/><circle cx="16" cy="17" r="2"/></svg><span>My Profile & Settings</span></a>
+</div>
 
         </nav>
 
@@ -1322,7 +1279,7 @@ $initial = strtoupper(substr($firstName, 0, 1));
 
             <strong><?= e($u['full_name']) ?></strong>
 
-            <small><?= e($u['email']) ?></small><small style="display:block;margin-top:12px">🏆 <?= $notePoints ?> contribution points</small>
+            <small><?= e($u['email']) ?></small><small style="display:block;margin-top:12px"><?= $notePoints ?> contribution points</small>
 
         </div>
 
@@ -1331,6 +1288,7 @@ $initial = strtoupper(substr($firstName, 0, 1));
     <main class="main" id="overview">
 
         <header class="topbar">
+            <button type="button" class="ul-menu-toggle" id="ulMenuToggle" aria-expanded="false" aria-controls="studentSidebar" aria-label="Toggle navigation"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
 
             <span class="eyebrow">
 
@@ -1408,32 +1366,15 @@ $initial = strtoupper(substr($firstName, 0, 1));
 
         </header>
 
-        <section>
-
-            <div class="eyebrow">
-
-                YOUR LEARNING SPACE
-
+        <section class="ul-welcome" aria-label="Welcome">
+            <div class="eyebrow">YOUR LEARNING SPACE</div>
+            <h1>Welcome back, <?= e($firstName) ?><span>.</span></h1>
+            <p class="lead">Everything you need to learn, practice and grow — in one place.</p>
+            <div class="ul-quick-actions">
+                <a class="ul-quick primary" href="<?= e(url('dashboard/explore.php')) ?>">Explore modules <span aria-hidden="true">→</span></a>
+                <a class="ul-quick" href="<?= e(url('dashboard/quiz-history.php')) ?>">My quiz history <span aria-hidden="true">→</span></a>
+                <a class="ul-quick" href="<?= e(url('dashboard/learning-insights.php')) ?>">Learning insights <span aria-hidden="true">→</span></a>
             </div>
-
-            <h1>
-
-                Welcome back,
-
-                <?= e($firstName) ?><span>.</span>
-
-            </h1>
-
-            <p class="lead">
-
-                Your own space to discover modules,
-
-                organize resources, and learn
-
-                alongside your peers.
-
-            </p>
-
         </section>
 
         <?php if ($notice): ?>
@@ -1456,6 +1397,15 @@ $initial = strtoupper(substr($firstName, 0, 1));
 
         <?php endif; ?>
 
+        <section class="ul-identity" aria-label="Student identity">
+            <div><div class="eyebrow">STUDENT IDENTITY</div><strong><?= e($u['full_name']) ?></strong>
+                <p><?= $profile ? e(($profile['university_name'] ?? '').' · '.$profile['degree_name'].' · Intake '.$profile['batch_code']) : 'Academic profile not configured' ?></p>
+            </div>
+            <div class="ul-identity-meta"><span><?= e((string)($u['student_number'] ?: 'Student ID pending')) ?></span>
+                <?php if ($profile): ?><span>Year <?= (int)($profile['current_year'] ?? 1) ?> · Semester <?= (int)($profile['current_semester'] ?? 1) ?></span><?php endif; ?>
+            </div>
+            <?php if(empty($u['email_verified_at'])): ?><p class="ul-verification">Email verification pending. <a href="<?= e(url('auth/verify.php')) ?>">Verify your email</a>.</p><?php endif; ?>
+        </section>
         <section id="academic">
 
             <div class="section-heading">
@@ -1526,162 +1476,11 @@ $initial = strtoupper(substr($firstName, 0, 1));
 
                 <?php endif; ?>
 
-                <form method="post" action="#academic">
-
-                    <input
-
-                        type="hidden"
-
-                        name="csrf"
-
-                        value="<?= e(csrf()) ?>"
-
-                    >
-
-                    <input
-
-                        type="hidden"
-
-                        name="action"
-
-                        value="academic"
-
-                    >
-
-                    <div class="fields">
-
-                        <div>
-
-                            <label for="degree_id">
-
-                                Degree Programme
-
-                            </label>
-
-                            <select
-
-                                id="degree_id"
-
-                                name="degree_id"
-
-                                required
-
-                            >
-
-                                <option value="">
-
-                                    Choose your degree
-
-                                </option>
-
-                                <?php foreach ($degrees as $degree): ?>
-
-                                    <option
-
-                                        value="<?= (int)$degree['id'] ?>"
-
-                                        <?= $profile &&
-
-                                            (int)$profile['degree_id'] ===
-
-                                            (int)$degree['id']
-
-                                            ? 'selected' : '' ?>
-
-                                    >
-
-                                        <?= e($degree['name']) ?>
-
-                                    </option>
-
-                                <?php endforeach; ?>
-
-                            </select>
-
-                        </div>
-
-                        <div>
-
-                            <label for="batch_id">
-
-                                University Batch / Intake
-
-                            </label>
-
-                            <select
-
-                                id="batch_id"
-
-                                name="batch_id"
-
-                                required
-
-                            >
-
-                                <option value="">
-
-                                    Choose your batch
-
-                                </option>
-
-                                <?php foreach ($batches as $batch): ?>
-
-                                    <option
-
-                                        value="<?= (int)$batch['id'] ?>"
-
-                                        <?= $profile &&
-
-                                            (int)$profile['batch_id'] ===
-
-                                            (int)$batch['id']
-
-                                            ? 'selected' : '' ?>
-
-                                    >
-
-                                        <?= e($batch['batch_code']) ?>
-
-                                    </option>
-
-                                <?php endforeach; ?>
-
-                            </select>
-
-                        </div>
-
-                    </div>
-
-                    <button
-
-                        type="submit"
-
-                        class="button"
-
-                        <?= !$degrees || !$batches ? 'disabled' : '' ?>
-
-                    >
-
-                        <?= $profile
-
-                            ? 'Update academic profile ↗'
-
-                            : 'Save as my default ↗' ?>
-
-                    </button>
-
-                </form>
-
-                <p class="muted"
-
-                   style="font-size:12px;margin:18px 0 0">
-
-                    Your selection is saved to your account.
-
-                    You can change it later.
-
-                </p>
-
+                <div class="ul-academic-note">
+                    <strong>Academic identity is protected</strong>
+                    <p>Your degree and intake are managed by the university. Contact an administrator if any details need correcting.</p>
+                    <a class="ul-quick" href="<?= e(url('dashboard/profile.php')) ?>">View my profile →</a>
+                </div>
             </div>
 
         </section>
@@ -1991,7 +1790,7 @@ $initial = strtoupper(substr($firstName, 0, 1));
 
                 </a>
 
-<article class="feature">
+<a class="feature" href="<?= e(url('dashboard/group-peer/index.php')) ?>" style="display:block;text-decoration:none;color:inherit;cursor:pointer" aria-label="Open Group Peer and Q&amp;A">
 
                     <div class="symbol">◎</div>
 
@@ -2005,7 +1804,7 @@ $initial = strtoupper(substr($firstName, 0, 1));
 
                     </p>
 
-                </article>
+                </a>
 
             </div>
 
@@ -2015,6 +1814,7 @@ $initial = strtoupper(substr($firstName, 0, 1));
 
 </div>
 
+<script src="<?= e(url('assets/js/notifications-live.js')) ?>" data-base="<?= e(rtrim(url(), '/')) ?>" defer></script>
 </body>
 
 </html>

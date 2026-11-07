@@ -1,0 +1,36 @@
+/* ULearn Phase 4 — Community and Productivity. Works with Phase 1 shared tokens. */
+:root{--p4-accent:#087f59;--p4-soft:#eaf6f0;--p4-line:#dfe9e5;--p4-radius:15px;--p4-shadow:0 6px 24px rgba(14,42,49,.045)}
+html[data-theme="dark"]{--p4-accent:#56dba2;--p4-soft:#183a34;--p4-line:#2a454a;--p4-shadow:0 8px 25px rgba(0,0,0,.13)}
+/* spacing is intentionally compact: less scrolling, more useful content */
+body:where(:not(.no-p4)){line-height:1.5}
+:where(.wrap,.main,.content,.main-content){min-width:0}
+:where(.card,.panel,.item,.stage9-card,.podium-card,.thread-detail,.thread-preview){border-radius:var(--p4-radius)!important;box-shadow:var(--p4-shadow)!important}
+:where(.card,.panel,.item,.stage9-card){border-color:var(--p4-line)!important}
+:where(.card,.panel,.item,.stage9-card) h2{letter-spacing:-.035em;line-height:1.3}
+:where(.card,.panel,.item,.stage9-card) p{line-height:1.55}
+:where(.btn,button,.stage9-button,.rank-search button){border-radius:10px;transition:transform .18s ease,box-shadow .18s ease,border-color .18s ease}
+:where(.btn,button,.stage9-button,.rank-search button):not(:disabled):hover{transform:translateY(-1px)}
+:where(input,select,textarea):focus-visible{outline:3px solid var(--p4-accent);outline-offset:2px}
+:where(.badge,.pill,.tag){border-radius:999px}
+/* Leaderboard */
+.podium-grid{gap:10px!important}.podium-card{padding:16px 12px!important}.podium{margin-bottom:14px!important}
+.rank-search{gap:10px!important}.rank-search input{min-width:0}.person{min-width:0}
+/* Peer Q&A */
+.qa-nav{gap:4px!important;margin-bottom:15px!important}.qa-nav a{padding:9px 13px!important}
+.qa-page-intro{margin:10px 0 18px!important}.qa-page-intro h1{margin:5px 0!important}
+.qa-type-card{padding:15px!important}.qa-ask-form{padding:clamp(16px,3vw,28px)!important}
+/* Profile: remove conflicting purple controls; keep original form behavior */
+.stage9-button{background:#087f59!important;color:#fff!important}
+.theme-choice input{accent-color:#087f59!important}
+.theme-choice:has(input:checked){border-color:var(--p4-accent)!important;box-shadow:0 0 0 2px color-mix(in srgb,var(--p4-accent) 16%,transparent)!important}
+.stage9-card{margin:12px 0!important;padding:18px!important}
+/* Notifications */
+.thread-list,.thread-detail{min-width:0}.thread-preview,.thread-message{overflow-wrap:anywhere}
+/* Kuppiya: compact cards, preserve booking/join actions */
+.kp-session-grid{gap:12px!important}.kp-toolbar{gap:9px!important}.kp-filter{border-radius:10px!important}
+.kp-session-details{min-width:0}.kp-session-top{gap:9px!important}
+/* Chat room: messages should never overflow on mobile */
+.compose,.chat-head,.layout{min-width:0}.item,.message{overflow-wrap:anywhere}
+@media(max-width:850px){.kp-session-grid{grid-template-columns:repeat(auto-fit,minmax(245px,1fr))!important}}
+@media(max-width:600px){.wrap,.main{padding-left:14px!important;padding-right:14px!important}.card,.panel,.item{padding:16px!important}.podium-card{padding:12px 7px!important}.qa-type-grid{grid-template-columns:1fr!important}.theme-options{gap:7px!important}.theme-choice{min-width:0}}
+@media(prefers-reduced-motion:reduce){.card,.panel,.item,.btn,button{transition:none!important;animation:none!important}}

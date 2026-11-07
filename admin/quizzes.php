@@ -274,6 +274,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $parsed = parseBulkQuizText($bulkText);
             $bulkPreview = $parsed['questions'];
             $bulkErrors = $parsed['errors'];
+            // Keep parsed data across the POST/redirect/GET boundary, avoiding a browser resubmit.
+            $_SESSION['quiz_import_preview'] = [
+                'quiz_id' => (int)$quizId,
+                'questions' => $bulkPreview,
+                'errors' => $bulkErrors,
+            ];
+            quizRedirect('quiz=' . (int)$quizId . '&import_preview=1');
             $selectedQuizId = (int)$quizId;
         }
 
@@ -289,7 +296,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if ($parsed['errors']) throw new RuntimeException('Import stopped: ' . implode(' ', array_slice($parsed['errors'], 0, 5)));
             if (!$parsed['questions']) throw new RuntimeException('No valid questions were found to import.');
             $optionExplanationColumn = $pdo->query("SHOW COLUMNS FROM quiz_options LIKE 'explanation'")->fetch();
-            if (!$optionExplanationColumn) throw new RuntimeException('Run the supplied quiz_options_explanation_migration.sql once in phpMyAdmin before importing option-specific reasons.');
+            if (!$optionExplanationColumn) throw new RuntimeException('Run database/migrations/013_quiz_option_reasons.sql in phpMyAdmin before importing questions.');
 
             $pdo->beginTransaction();
             $questionStmt = $pdo->prepare('INSERT INTO quiz_questions (quiz_id, question_text, explanation, topic, difficulty) VALUES (?, ?, ?, ?, ?)');
@@ -496,6 +503,16 @@ try {
     $error = $error ?: 'The quiz page could not load its data. Check that the database tables and columns match the existing ULearn schema.';
 }
 
+$isImportPreviewPage = isset($_GET['import_preview']) && (string)$_GET['import_preview'] === '1';
+if ($isImportPreviewPage) {
+    $savedPreview = $_SESSION['quiz_import_preview'] ?? null;
+    if (is_array($savedPreview) && (int)($savedPreview['quiz_id'] ?? 0) === (int)($selectedQuizId ?? 0)) {
+        $bulkPreview = $savedPreview['questions'] ?? [];
+        $bulkErrors = $savedPreview['errors'] ?? [];
+    }
+    unset($_SESSION['quiz_import_preview']);
+}
+
 $fullName = (string)($user['full_name'] ?? 'Administrator');
 $theme = (string)($user['theme'] ?? 'system');
 $publishedCount = count(array_filter($quizzes, static fn($q) => (int)$q['is_published'] === 1));
@@ -515,8 +532,11 @@ document.addEventListener('DOMContentLoaded',()=>{const b=document.getElementByI
 <style>
 :root{color-scheme:light;--bg:#f7f8fc;--surface:#fff;--surface-alt:#f1f2f8;--text:#171927;--muted:#777b90;--border:#e7e8f0;--accent:#6756e8;--accent-light:#f0edff;--shadow:0 10px 40px rgba(30,30,60,.04);--green:#18794e;--green-bg:#e9f8f0;--red:#b4233c;--red-bg:#fff0f2}
 :root[data-theme="dark"]{color-scheme:dark;--bg:#0c0e16;--surface:#161924;--surface-alt:#202431;--text:#f4f4fa;--muted:#a0a4b6;--border:#2b2e3c;--accent:#a99aff;--accent-light:#292440;--shadow:none;--green:#8ee0b8;--green-bg:#173127;--red:#ffb1bf;--red-bg:#351e28}
-*{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0;background:var(--bg);color:var(--text);font-family:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif;line-height:1.6}a{color:inherit;text-decoration:none}button,input,select,textarea{font:inherit}button{cursor:pointer}.layout{display:grid;grid-template-columns:250px minmax(0,1fr);min-height:100vh}.sidebar{background:var(--surface);border-right:1px solid var(--border);padding:28px 15px;display:flex;flex-direction:column;gap:30px}.brand{font-size:27px;font-weight:850;letter-spacing:-1.7px;padding:0 14px}.brand span,.accent-dot{color:var(--accent)}.nav-label{padding:0 14px;color:var(--muted);font-size:10px;letter-spacing:1.7px;font-weight:850;text-transform:uppercase}.nav{display:grid;gap:7px}.nav a{display:flex;align-items:center;gap:12px;padding:12px 14px;border-radius:13px;color:var(--muted);font-size:13px;font-weight:700;transition:.2s}.nav a:hover,.nav a.active{background:var(--accent-light);color:var(--accent)}.nav .ico{width:19px;text-align:center;font-size:16px}.sidebar-foot{margin-top:auto;padding:16px 14px;border:1px solid var(--border);border-radius:15px;color:var(--muted);font-size:11px}.main{min-width:0;padding:28px clamp(18px,4vw,54px) 60px}.topbar{display:flex;justify-content:space-between;align-items:center;gap:15px;margin-bottom:52px}.crumb{font-size:11px;letter-spacing:1.6px;text-transform:uppercase;color:var(--muted);font-weight:850}.top-actions{display:flex;align-items:center;gap:12px}.role{font-size:10px;color:var(--muted);font-weight:850;letter-spacing:1.2px;text-transform:uppercase}.theme-btn{width:42px;height:42px;border:1px solid var(--border);border-radius:14px;background:var(--surface);color:var(--text);font-size:18px}.logout{font-size:12px;color:var(--muted);font-weight:750}.intro{margin-bottom:30px;animation:rise .4s ease both}.eyebrow{font-size:11px;letter-spacing:1.7px;text-transform:uppercase;color:var(--muted);font-weight:850}h1{font-size:clamp(38px,5vw,62px);line-height:1.08;letter-spacing:-.06em;margin:14px 0;font-weight:820}h1 span{color:var(--accent)}.subtitle{color:var(--muted);font-size:16px;max-width:700px;margin:0;line-height:1.8}.stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px;margin:28px 0}.stat{background:var(--surface);border:1px solid var(--border);border-radius:19px;padding:20px 22px;box-shadow:var(--shadow)}.stat-label{color:var(--muted);font-size:12px;font-weight:700}.stat-number{font-size:30px;letter-spacing:-1px;font-weight:820;margin-top:8px}.stat-foot{color:var(--muted);font-size:11px;margin-top:3px}.columns{display:grid;grid-template-columns:minmax(300px,.9fr) minmax(0,1.35fr);gap:20px;align-items:start}.card{background:var(--surface);border:1px solid var(--border);border-radius:22px;padding:25px;box-shadow:var(--shadow);min-width:0;animation:rise .45s ease both}.card-head{display:flex;justify-content:space-between;align-items:flex-start;gap:14px;margin-bottom:20px}.kicker{color:var(--accent);font-size:10px;letter-spacing:1.5px;font-weight:850;text-transform:uppercase}.card h2{font-size:20px;letter-spacing:-.6px;margin:4px 0 7px}.hint{font-size:12px;color:var(--muted);margin:0;line-height:1.7}.field{margin-top:16px}label{display:block;font-size:12px;font-weight:750;margin-bottom:7px}input,select,textarea{width:100%;background:var(--surface-alt);color:var(--text);border:1px solid var(--border);border-radius:12px;padding:12px 13px;outline:none;transition:border-color .2s,box-shadow .2s}input,select{min-height:46px}textarea{min-height:82px;resize:vertical}input:focus,select:focus,textarea:focus{border-color:var(--accent);box-shadow:0 0 0 3px color-mix(in srgb,var(--accent) 18%,transparent)}.two{display:grid;grid-template-columns:1fr 1fr;gap:12px}.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;padding:11px 15px;border-radius:12px;border:1px solid var(--border);background:var(--surface-alt);color:var(--text);font-size:12px;font-weight:800;transition:transform .18s,border-color .18s}.btn:hover{transform:translateY(-1px);border-color:var(--accent)}.btn-primary{background:linear-gradient(110deg,#5d4ae0,#8571fa);border-color:transparent;color:#fff;box-shadow:0 9px 22px rgba(103,86,232,.2)}.btn-small{padding:8px 10px;font-size:11px}.btn-danger{color:var(--red)}.full{width:100%;margin-top:20px}.message{padding:13px 15px;border-radius:12px;margin-bottom:18px;font-size:13px}.success{background:var(--green-bg);color:var(--green)}.error{background:var(--red-bg);color:var(--red)}.badge{display:inline-flex;align-items:center;gap:6px;padding:6px 10px;border-radius:999px;background:var(--accent-light);color:var(--accent);font-size:10px;font-weight:850;white-space:nowrap}.badge.published{background:var(--green-bg);color:var(--green)}.badge.draft{background:var(--surface-alt);color:var(--muted)}.quiz-list{display:grid;gap:12px}.quiz-item{padding:16px;border:1px solid var(--border);border-radius:16px;background:var(--surface);transition:border-color .2s,transform .2s}.quiz-item:hover{border-color:color-mix(in srgb,var(--accent) 55%,var(--border));transform:translateY(-1px)}.quiz-title{font-size:15px;font-weight:800;letter-spacing:-.3px}.quiz-meta{font-size:11px;color:var(--muted);margin-top:7px;display:flex;gap:8px;flex-wrap:wrap}.quiz-actions{display:flex;gap:7px;flex-wrap:wrap;margin-top:13px}.empty{border:1px dashed var(--border);border-radius:16px;padding:30px 18px;text-align:center;color:var(--muted);font-size:12px}.empty strong{display:block;color:var(--text);font-size:14px;margin-bottom:6px}.section-gap{margin-top:20px}.question-item{border:1px solid var(--border);border-radius:15px;padding:16px;margin-top:12px}.question-text{font-size:13px;font-weight:750;white-space:pre-wrap;overflow-wrap:anywhere}.options{display:grid;gap:7px;margin-top:12px}.option{font-size:11px;color:var(--muted);padding:8px 10px;border-radius:9px;background:var(--surface-alt);overflow-wrap:anywhere}.option.correct{color:var(--green);background:var(--green-bg)}.topline{display:flex;justify-content:space-between;gap:12px;align-items:flex-start}.separator{height:1px;background:var(--border);margin:20px 0}.back-link{display:inline-flex;color:var(--accent);font-size:12px;font-weight:800;margin-bottom:14px}.fine{font-size:11px;color:var(--muted);margin-top:9px}@keyframes rise{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}@media(max-width:1100px){.layout{grid-template-columns:210px minmax(0,1fr)}.columns{grid-template-columns:1fr}.sidebar{padding-inline:10px}}@media(max-width:720px){.layout{grid-template-columns:1fr}.sidebar{padding:14px;gap:14px;border-right:0;border-bottom:1px solid var(--border)}.sidebar .nav{display:flex;overflow:auto}.sidebar .nav a{white-space:nowrap}.sidebar-foot,.nav-label{display:none}.main{padding:20px 15px 42px}.topbar{margin-bottom:34px}.stats{grid-template-columns:1fr 1fr}.stat:last-child{grid-column:1/-1}.card{padding:19px}.two{grid-template-columns:1fr}.top-actions{gap:8px}}@media(prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;transition-duration:.01ms!important;scroll-behavior:auto!important}}
+*{box-sizing:border-box}html{scroll-behavior:auto}body{margin:0;background:var(--bg);color:var(--text);font-family:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif;line-height:1.6}a{color:inherit;text-decoration:none}button,input,select,textarea{font:inherit}button{cursor:pointer}.layout{display:grid;grid-template-columns:250px minmax(0,1fr);min-height:100vh}.sidebar{background:var(--surface);border-right:1px solid var(--border);padding:28px 15px;display:flex;flex-direction:column;gap:30px}.brand{font-size:27px;font-weight:850;letter-spacing:-1.7px;padding:0 14px}.brand span,.accent-dot{color:var(--accent)}.nav-label{padding:0 14px;color:var(--muted);font-size:10px;letter-spacing:1.7px;font-weight:850;text-transform:uppercase}.nav{display:grid;gap:7px}.nav a{display:flex;align-items:center;gap:12px;padding:12px 14px;border-radius:13px;color:var(--muted);font-size:13px;font-weight:700;transition:.2s}.nav a:hover,.nav a.active{background:var(--accent-light);color:var(--accent)}.nav .ico{width:19px;text-align:center;font-size:16px}.sidebar-foot{margin-top:auto;padding:16px 14px;border:1px solid var(--border);border-radius:15px;color:var(--muted);font-size:11px}.main{min-width:0;padding:28px clamp(18px,4vw,54px) 60px}.topbar{display:flex;justify-content:space-between;align-items:center;gap:15px;margin-bottom:52px}.crumb{font-size:11px;letter-spacing:1.6px;text-transform:uppercase;color:var(--muted);font-weight:850}.top-actions{display:flex;align-items:center;gap:12px}.role{font-size:10px;color:var(--muted);font-weight:850;letter-spacing:1.2px;text-transform:uppercase}.theme-btn{width:42px;height:42px;border:1px solid var(--border);border-radius:14px;background:var(--surface);color:var(--text);font-size:18px}.logout{font-size:12px;color:var(--muted);font-weight:750}.intro{margin-bottom:30px;animation:rise .4s ease both}.eyebrow{font-size:11px;letter-spacing:1.7px;text-transform:uppercase;color:var(--muted);font-weight:850}h1{font-size:clamp(38px,5vw,62px);line-height:1.08;letter-spacing:-.06em;margin:14px 0;font-weight:820}h1 span{color:var(--accent)}.subtitle{color:var(--muted);font-size:16px;max-width:700px;margin:0;line-height:1.8}.stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px;margin:28px 0}.stat{background:var(--surface);border:1px solid var(--border);border-radius:19px;padding:20px 22px;box-shadow:var(--shadow)}.stat-label{color:var(--muted);font-size:12px;font-weight:700}.stat-number{font-size:30px;letter-spacing:-1px;font-weight:820;margin-top:8px}.stat-foot{color:var(--muted);font-size:11px;margin-top:3px}.columns{display:grid;grid-template-columns:minmax(300px,.9fr) minmax(0,1.35fr);gap:20px;align-items:start}.card{background:var(--surface);border:1px solid var(--border);border-radius:22px;padding:25px;box-shadow:var(--shadow);min-width:0;animation:rise .45s ease both}.card-head{display:flex;justify-content:space-between;align-items:flex-start;gap:14px;margin-bottom:20px}.kicker{color:var(--accent);font-size:10px;letter-spacing:1.5px;font-weight:850;text-transform:uppercase}.card h2{font-size:20px;letter-spacing:-.6px;margin:4px 0 7px}.hint{font-size:12px;color:var(--muted);margin:0;line-height:1.7}.field{margin-top:16px}label{display:block;font-size:12px;font-weight:750;margin-bottom:7px}input,select,textarea{width:100%;background:var(--surface-alt);color:var(--text);border:1px solid var(--border);border-radius:12px;padding:12px 13px;outline:none;transition:border-color .2s,box-shadow .2s}input,select{min-height:46px}textarea{min-height:82px;resize:vertical}input:focus,select:focus,textarea:focus{border-color:var(--accent);box-shadow:0 0 0 3px color-mix(in srgb,var(--accent) 18%,transparent)}.two{display:grid;grid-template-columns:1fr 1fr;gap:12px}.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;padding:11px 15px;border-radius:12px;border:1px solid var(--border);background:var(--surface-alt);color:var(--text);font-size:12px;font-weight:800;transition:transform .18s,border-color .18s}.btn:hover{transform:translateY(-1px);border-color:var(--accent)}.btn-primary{background:linear-gradient(110deg,#5d4ae0,#8571fa);border-color:transparent;color:#fff;box-shadow:0 9px 22px rgba(103,86,232,.2)}.btn-small{padding:8px 10px;font-size:11px}.btn-danger{color:var(--red)}.full{width:100%;margin-top:20px}.message{padding:13px 15px;border-radius:12px;margin-bottom:18px;font-size:13px}.success{background:var(--green-bg);color:var(--green)}.error{background:var(--red-bg);color:var(--red)}.badge{display:inline-flex;align-items:center;gap:6px;padding:6px 10px;border-radius:999px;background:var(--accent-light);color:var(--accent);font-size:10px;font-weight:850;white-space:nowrap}.badge.published{background:var(--green-bg);color:var(--green)}.badge.draft{background:var(--surface-alt);color:var(--muted)}.quiz-list{display:grid;gap:12px}.quiz-item{padding:16px;border:1px solid var(--border);border-radius:16px;background:var(--surface);transition:border-color .2s,transform .2s}.quiz-item:hover{border-color:color-mix(in srgb,var(--accent) 55%,var(--border));transform:translateY(-1px)}.quiz-title{font-size:15px;font-weight:800;letter-spacing:-.3px}.quiz-meta{font-size:11px;color:var(--muted);margin-top:7px;display:flex;gap:8px;flex-wrap:wrap}.quiz-actions{display:flex;gap:7px;flex-wrap:wrap;margin-top:13px}.empty{border:1px dashed var(--border);border-radius:16px;padding:30px 18px;text-align:center;color:var(--muted);font-size:12px}.empty strong{display:block;color:var(--text);font-size:14px;margin-bottom:6px}.section-gap{margin-top:20px}.question-item{border:1px solid var(--border);border-radius:15px;padding:16px;margin-top:12px}.question-text{font-size:13px;font-weight:750;white-space:pre-wrap;overflow-wrap:anywhere}.options{display:grid;gap:7px;margin-top:12px}.option{font-size:11px;color:var(--muted);padding:8px 10px;border-radius:9px;background:var(--surface-alt);overflow-wrap:anywhere}.option.correct{color:var(--green);background:var(--green-bg)}.topline{display:flex;justify-content:space-between;gap:12px;align-items:flex-start}.separator{height:1px;background:var(--border);margin:20px 0}.back-link{display:inline-flex;color:var(--accent);font-size:12px;font-weight:800;margin-bottom:14px}.fine{font-size:11px;color:var(--muted);margin-top:9px}@keyframes rise{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}@media(max-width:1100px){.layout{grid-template-columns:210px minmax(0,1fr)}.columns{grid-template-columns:1fr}.sidebar{padding-inline:10px}}@media(max-width:720px){.layout{grid-template-columns:1fr}.sidebar{padding:14px;gap:14px;border-right:0;border-bottom:1px solid var(--border)}.sidebar .nav{display:flex;overflow:auto}.sidebar .nav a{white-space:nowrap}.sidebar-foot,.nav-label{display:none}.main{padding:20px 15px 42px}.topbar{margin-bottom:34px}.stats{grid-template-columns:1fr 1fr}.stat:last-child{grid-column:1/-1}.card{padding:19px}.two{grid-template-columns:1fr}.top-actions{gap:8px}}@media(prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;transition-duration:.01ms!important;scroll-behavior:auto!important}}
 </style>
+
+<script src="<?= htmlspecialchars(url('assets/js/theme-global.js?v=20261107-2'), ENT_QUOTES, 'UTF-8') ?>"></script>
+<link rel="stylesheet" href="<?= e(url('assets/css/admin-unified-v1.css?v=1')) ?>">
 </head>
 <body>
 <div class="layout">
@@ -627,17 +647,52 @@ document.addEventListener('DOMContentLoaded',()=>{const b=document.getElementByI
     <div class="separator"></div>
     <div class="kicker">Faster workflow</div><h2>Bulk import questions</h2>
     <p class="hint">Paste all questions at once. ULearn separates the options, correct answer, explanation, topic and optional reason for each option. Students will not see answer keys during the quiz.</p>
-    <form method="post" enctype="multipart/form-data" class="section-gap">
+    <form method="post" enctype="multipart/form-data" class="section-gap" id="quiz-upload-form">
         <input type="hidden" name="csrf" value="<?= e(csrf()) ?>"><input type="hidden" name="action" value="preview_bulk"><input type="hidden" name="quiz_id" value="<?= (int)$editingQuiz['id'] ?>">
-        <div class="field"><label for="source_file">Or upload a .txt / .docx file</label><input id="source_file" name="source_file" type="file" accept=".txt,.docx"><p class="fine">If you choose a file, its text is used for preview. Otherwise paste below.</p></div><div class="field"><label for="bulk_text">Paste question set</label><textarea id="bulk_text" name="bulk_text" style="min-height:280px" placeholder="Q1: What is the time complexity of binary search?&#10;A) O(n)&#10;B) O(log n)&#10;C) O(n²)&#10;D) O(1)&#10;Correct: B&#10;Topic: Searching&#10;Explanation: Binary search halves the search interval at each step.&#10;Reason A: A linear scan is O(n), not binary search.&#10;Reason B: Each step halves the interval, so this is correct.&#10;Reason C: This is not the complexity of binary search.&#10;Reason D: The search is not constant time in general."><?= e($bulkText) ?></textarea></div>
+        <div class="field quiz-upload-field">
+          <label for="source_file">Upload your question document</label>
+          <div class="quiz-upload-zone" id="quiz-upload-zone">
+            <div class="quiz-upload-symbol" aria-hidden="true">&#8593;</div>
+            <strong>Drop a question file here</strong>
+            <span class="quiz-upload-description">Word DOCX or plain TXT · Select a file to automatically open the review page</span>
+            <label for="source_file" class="quiz-file-picker">Choose a file</label>
+            <input id="source_file" name="source_file" type="file" accept=".txt,.docx" aria-describedby="quiz-upload-status">
+            <div id="quiz-upload-status" class="quiz-upload-status" role="status" aria-live="polite">No file selected</div>
+          </div>
+          <button class="btn btn-primary full" type="submit" id="quiz-upload-button" disabled>Upload file &amp; review questions &rarr;</button>
+          <p class="fine">Selecting a file starts validation automatically. The button is available as a fallback. Your quiz remains a draft until you publish it.</p>
+        </div><div class="field"><label for="bulk_text">Paste question set</label><textarea id="bulk_text" name="bulk_text" style="min-height:280px" placeholder="Q1: What is the time complexity of binary search?&#10;A) O(n)&#10;B) O(log n)&#10;C) O(n²)&#10;D) O(1)&#10;Correct: B&#10;Topic: Searching&#10;Explanation: Binary search halves the search interval at each step.&#10;Reason A: A linear scan is O(n), not binary search.&#10;Reason B: Each step halves the interval, so this is correct.&#10;Reason C: This is not the complexity of binary search.&#10;Reason D: The search is not constant time in general."><?= e($bulkText) ?></textarea></div>
         <p class="fine">Use Q1: / Q2: headers; A)–D) options; Correct: B; optional Topic:, Difficulty:, Explanation:, and Reason A:–Reason D: lines. One blank line between questions is recommended. Word .docx and text .txt files are supported where PHP ZipArchive is enabled.</p>
-        <button class="btn btn-primary full" type="submit">Preview and validate questions →</button>
+        <button class="btn full" type="submit" id="quiz-paste-preview-button">Preview pasted questions &rarr;</button>
     </form>
     <?php if ($bulkPreview): ?>
+    <div id="import-preview-content">
         <div class="separator"></div><div class="topline"><div><div class="kicker">Import preview</div><h2><?= count($bulkPreview) ?> question block(s) detected</h2></div><span class="badge <?= $bulkErrors ? 'draft' : 'published' ?>"><?= $bulkErrors ? count($bulkErrors) . ' issue(s)' : 'Ready to import' ?></span></div>
         <?php foreach ($bulkErrors as $bulkIssue): ?><div class="message error"><?= e($bulkIssue) ?></div><?php endforeach; ?>
-        <?php foreach ($bulkPreview as $pi => $pq): ?><article class="question-item"><div class="question-text"><?= ($pi + 1) ?>. <?= e($pq['question_text']) ?></div><div class="options"><?php foreach (['A','B','C','D'] as $letter): ?><div class="option <?= $pq['correct'] === $letter ? 'correct' : '' ?>"><?= $letter ?>. <?= e($pq['options'][$letter]) ?><?= $pq['correct'] === $letter ? ' · Correct answer' : '' ?><?php if ($pq['option_explanations'][$letter] !== ''): ?><div class="fine"><?= e($pq['option_explanations'][$letter]) ?></div><?php endif; ?></div><?php endforeach; ?></div><p class="hint" style="margin-top:10px">Topic: <?= e($pq['topic']) ?><?= $pq['difficulty'] !== '' ? ' · Difficulty: ' . e($pq['difficulty']) : '' ?></p><?php if ($pq['explanation'] !== ''): ?><p class="hint"><strong>Explanation:</strong> <?= e($pq['explanation']) ?></p><?php endif; ?></article><?php endforeach; ?>
-        <?php if (!$bulkErrors): ?><form method="post" class="section-gap" onsubmit="return confirm('Import all <?= count($bulkPreview) ?> questions into this draft?')"><input type="hidden" name="csrf" value="<?= e(csrf()) ?>"><input type="hidden" name="action" value="import_bulk"><input type="hidden" name="quiz_id" value="<?= (int)$editingQuiz['id'] ?>"><textarea name="bulk_text" hidden><?= e($bulkText) ?></textarea><button class="btn btn-primary full" type="submit">Confirm &amp; import <?= count($bulkPreview) ?> questions</button></form><?php endif; ?>
+        <p class="hint" style="margin:12px 0">Review every question below. Edit the wording, answers, explanations, and reasons, or remove unwanted questions. Your edits are validated again before saving.</p>
+        <form method="post" class="section-gap" id="bulk-import-editor">
+          <input type="hidden" name="csrf" value="<?= e(csrf()) ?>">
+          <input type="hidden" name="action" value="import_bulk">
+          <input type="hidden" name="quiz_id" value="<?= (int)$editingQuiz['id'] ?>">
+          <textarea name="bulk_text" hidden id="edited-bulk-text"></textarea>
+          <div id="bulk-editable-list">
+          <?php foreach ($bulkPreview as $pi => $pq): ?>
+            <article class="question-item bulk-edit-question">
+              <div class="topline"><strong class="bulk-question-number">Question <?= $pi + 1 ?></strong><button type="button" class="btn btn-small btn-danger bulk-remove-question">Delete question</button></div>
+              <div class="field"><label>Question text</label><textarea data-field="question" required maxlength="10000"><?= e($pq['question_text']) ?></textarea></div>
+              <div class="two"><div class="field"><label>Topic</label><input data-field="topic" required maxlength="150" value="<?= e($pq['topic']) ?>"></div><div class="field"><label>Difficulty</label><select data-field="difficulty"><option value="">Not set</option><?php foreach (['Easy','Medium','Advanced'] as $level): ?><option value="<?= e($level) ?>" <?= strcasecmp((string)$pq['difficulty'],$level)===0?'selected':'' ?>><?= e($level) ?></option><?php endforeach; ?></select></div></div>
+              <?php foreach (['A','B','C','D'] as $letter): ?>
+                <div class="field"><label>Option <?= $letter ?></label><textarea data-field="option-<?= $letter ?>" required><?= e($pq['options'][$letter]) ?></textarea></div>
+                <div class="field"><label>Reason <?= $letter ?></label><textarea data-field="reason-<?= $letter ?>"><?= e($pq['option_explanations'][$letter]) ?></textarea></div>
+              <?php endforeach; ?>
+              <div class="field"><label>Correct answer</label><select data-field="correct" required><?php foreach (['A','B','C','D'] as $letter): ?><option value="<?= $letter ?>" <?= $pq['correct']===$letter?'selected':'' ?>><?= $letter ?></option><?php endforeach; ?></select></div>
+              <div class="field"><label>Overall explanation</label><textarea data-field="explanation"><?= e($pq['explanation']) ?></textarea></div>
+            </article>
+          <?php endforeach; ?>
+          </div>
+          <button class="btn btn-primary full" type="submit">Validate edits &amp; import questions</button>
+        </form>
+    </div>
     <?php endif; ?>
     <div class="separator"></div><div class="kicker">Or add one question manually</div>
     <form method="post">
@@ -728,6 +783,113 @@ document.querySelectorAll('form').forEach(function(form){
         });
     }
 });
+</script>
+<script>
+(function(){
+ const form=document.getElementById('bulk-import-editor');
+ if(!form)return;
+ const list=document.getElementById('bulk-editable-list');
+ const renumber=()=>[...list.querySelectorAll('.bulk-edit-question')].forEach((card,i)=>card.querySelector('.bulk-question-number').textContent='Question '+(i+1));
+ list.addEventListener('click',e=>{const btn=e.target.closest('.bulk-remove-question');if(!btn)return;if(!confirm('Remove this question from the import preview?'))return;btn.closest('.bulk-edit-question').remove();renumber();});
+ form.addEventListener('submit',e=>{
+   const cards=[...list.querySelectorAll('.bulk-edit-question')];
+   if(!cards.length){e.preventDefault();alert('Keep at least one question to import.');return;}
+   const get=(card,key)=>card.querySelector('[data-field="'+key+'"]')?.value.trim()||'';
+   const lines=[];
+   for(let i=0;i<cards.length;i++){
+     const c=cards[i], q=get(c,'question');
+     if(!q){e.preventDefault();alert('Question '+(i+1)+' has no text.');return;}
+     lines.push('Q'+(i+1)+': '+q);
+     for(const letter of ['A','B','C','D']){
+       const option=get(c,'option-'+letter);
+       if(!option){e.preventDefault();alert('Question '+(i+1)+' is missing option '+letter);return;}
+       lines.push(letter+') '+option);
+     }
+     lines.push('Correct: '+get(c,'correct'),'Topic: '+(get(c,'topic')||'General'));
+     if(get(c,'difficulty'))lines.push('Difficulty: '+get(c,'difficulty'));
+     lines.push('Explanation: '+get(c,'explanation'));
+     for(const letter of ['A','B','C','D'])lines.push('Reason '+letter+': '+get(c,'reason-'+letter));
+     lines.push('');
+   }
+   document.getElementById('edited-bulk-text').value=lines.join('\n');
+   if(!confirm('Import '+cards.length+' reviewed question(s) into this draft quiz?'))e.preventDefault();
+ });
+})();
+</script>
+<script>
+(function(){
+  // Import preview is its own focused screen, not a section below the upload form.
+  const previewMode = <?= $isImportPreviewPage ? 'true' : 'false' ?>;
+  if (!previewMode) return;
+  document.addEventListener('DOMContentLoaded', function(){
+    const main = document.querySelector('main.main');
+    const preview = document.getElementById('import-preview-content');
+    if (!main) return;
+    const pane = document.createElement('section');
+    pane.className = 'card';
+    pane.style.cssText = 'max-width:940px;margin:0 auto;animation:none';
+    const header = document.createElement('div');
+    header.innerHTML = '<a class="back-link" href="quizzes.php?quiz=<?= (int)($selectedQuizId ?? 0) ?>">← Back to quiz editor</a><div class="kicker">Step 2 of 3 · Review imported questions</div><h1 style="font-size:clamp(28px,3vw,40px);margin:12px 0">Review &amp; edit questions</h1><p class="hint">Edit questions, answers, explanations and reasons, or delete unwanted questions. Nothing is published until you confirm the import and publish the quiz.</p>';
+    pane.appendChild(header);
+    if (preview) pane.appendChild(preview);
+    else { const msg=document.createElement('p');msg.className='message error';msg.textContent='Preview expired. Return to the quiz and upload the file again.';pane.appendChild(msg); }
+    Array.from(main.children).forEach(child=>child.remove());
+    main.appendChild(pane);
+    document.documentElement.style.scrollBehavior='auto';
+    window.scrollTo(0,0);
+  });
+})();
+</script>
+<style>
+.quiz-upload-zone{position:relative;border:1.5px dashed color-mix(in srgb,var(--accent) 48%,var(--border));border-radius:19px;padding:28px 18px;text-align:center;background:linear-gradient(135deg,var(--accent-light),var(--surface));display:flex;flex-direction:column;align-items:center;gap:9px;transition:border-color .2s,background .2s}
+.quiz-upload-zone.dragover{border-color:var(--accent);background:var(--accent-light)}
+.quiz-upload-symbol{display:grid;place-items:center;width:48px;height:48px;border-radius:15px;background:var(--surface);color:var(--accent);font-size:27px;font-weight:700;border:1px solid var(--border)}
+.quiz-upload-zone strong{font-size:15px;letter-spacing:-.3px}
+.quiz-upload-description{font-size:12px;color:var(--muted);max-width:360px}
+.quiz-file-picker{display:inline-flex;align-items:center;justify-content:center;cursor:pointer;border-radius:11px;background:var(--accent);color:#fff;padding:11px 22px;margin:6px 0 0;font-size:12px;font-weight:800;box-shadow:0 7px 20px rgba(103,86,232,.18)}
+.quiz-upload-zone input[type=file]{position:absolute;width:1px;height:1px;opacity:0;overflow:hidden;padding:0;min-height:0;pointer-events:none}
+.quiz-upload-status{font-size:12px;font-weight:650;color:var(--muted);overflow-wrap:anywhere}
+#quiz-upload-button:disabled{opacity:.5;cursor:not-allowed;transform:none}
+</style>
+<script>
+(function(){
+  const form=document.getElementById('quiz-upload-form');
+  if(!form)return;
+  const input=form.querySelector('#source_file'),zone=form.querySelector('#quiz-upload-zone');
+  const status=form.querySelector('#quiz-upload-status'),uploadButton=form.querySelector('#quiz-upload-button');
+  const pasteButton=form.querySelector('#quiz-paste-preview-button');
+  let submitting=false;
+  function checkFile(file){
+    if(!file)return false;
+    if(!/\.(docx|txt)$/i.test(file.name)){status.textContent='Please select a .docx or .txt file.';return false;}
+    if(file.size>10*1024*1024){status.textContent='File exceeds 10 MB. Please choose a smaller file.';return false;}
+    return true;
+  }
+  function upload(){
+    if(submitting||!checkFile(input.files&&input.files[0]))return;
+    submitting=true;status.textContent='Uploading and validating '+input.files[0].name+'…';
+    uploadButton.disabled=true;uploadButton.textContent='Processing document…';
+    pasteButton.disabled=true;
+    if(form.requestSubmit)form.requestSubmit();
+    else form.submit();
+  }
+  input.addEventListener('change',function(){
+    const file=input.files&&input.files[0];
+    uploadButton.disabled=!checkFile(file);
+    status.textContent=file?(uploadButton.disabled?status.textContent:file.name+' · Ready to review'):'No file selected';
+    if(file&&!uploadButton.disabled)upload();
+  });
+  uploadButton.addEventListener('click',function(e){if(submitting)e.preventDefault();});
+  pasteButton.addEventListener('click',function(){input.value='';});
+  for(const eventName of ['dragenter','dragover'])zone.addEventListener(eventName,function(e){e.preventDefault();zone.classList.add('dragover');});
+  for(const eventName of ['dragleave','drop'])zone.addEventListener(eventName,function(e){e.preventDefault();zone.classList.remove('dragover');});
+  zone.addEventListener('drop',function(e){
+    const file=e.dataTransfer&&e.dataTransfer.files&&e.dataTransfer.files[0];
+    if(!checkFile(file))return;
+    try{const dt=new DataTransfer();dt.items.add(file);input.files=dt.files;input.dispatchEvent(new Event('change',{bubbles:true}));}
+    catch(err){status.textContent='Drag-and-drop is unavailable here. Please use Choose a file.';}
+  });
+})();
 </script>
 </body>
 </html>

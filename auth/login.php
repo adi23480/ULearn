@@ -63,13 +63,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 id,
                 password_hash,
                 email_verified_at,
+                account_status, session_version,
                 role
              FROM users
-             WHERE email = ?
+             WHERE email = ? OR username = ?
              LIMIT 1"
         );
 
-        $stmt->execute([$email]);
+        $stmt->execute([$email, $email]);
 
         $user = $stmt->fetch();
 
@@ -83,6 +84,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             $error = 'Invalid email or password.';
 
+        } elseif ($user['account_status'] === 'suspended') {
+            $error = 'This account is suspended. Contact the administrator.';
         } elseif (empty($user['email_verified_at'])) {
 
             $error = 'Please verify your email before logging in.';
@@ -114,6 +117,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 session_regenerate_id(true);
 
                 $_SESSION['uid'] = (int)$user['id'];
+                $_SESSION['session_version'] = (int)$user['session_version'];
 
                 unset($_SESSION['attempts']['login']);
 
@@ -155,11 +159,11 @@ ob_start();
     <div class="field">
 
         <label for="email">
-            Email address
+            Email address or username
         </label>
 
         <input
-            type="email"
+            type="text"
             id="email"
             name="email"
             value="<?= e($email) ?>"

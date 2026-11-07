@@ -10,6 +10,11 @@ if (me()) {
 $error = '';
 $name = '';
 $email = '';
+$studentNumber = '';
+$degreeId = 0; $batchId = 0;
+$pdo = db();
+$degreeOptions = $pdo->query("SELECT d.id,d.name,d.awarding_university_id,COALESCE(au.name,'Unassigned university') AS university_name FROM academic_degrees d LEFT JOIN awarding_universities au ON au.id=d.awarding_university_id WHERE d.is_active=1 AND au.is_active=1 ORDER BY au.name,d.name")->fetchAll();
+$intakeOptions = $pdo->query("SELECT adi.degree_id,adi.batch_id,b.batch_code FROM academic_degree_intakes adi JOIN academic_batches b ON b.id=adi.batch_id WHERE adi.is_active=1 AND b.is_active=1 ORDER BY b.intake_year DESC,b.intake_number")->fetchAll();
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     csrf_check();
@@ -18,6 +23,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $email = strtolower(trim((string)($_POST['email'] ?? '')));
     $password = (string)($_POST['password'] ?? '');
     $confirm = (string)($_POST['confirm_password'] ?? '');
+    $studentNumber = trim((string)($_POST['student_number'] ?? ''));
+    $degreeId = (int)($_POST['degree_id'] ?? 0); $batchId = (int)($_POST['batch_id'] ?? 0);
 
     if (too_many_attempts('register', 6, 3600)) {
         $error = 'Too many registration attempts. Please try again later.';
@@ -32,6 +39,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         !preg_match('/[^a-zA-Z0-9]/', $password)
     ) {
         $error = 'Password needs at least 8 characters, an uppercase letter, a number and a symbol.';
+    } elseif (!preg_match('/^[A-Za-z0-9._\/-]{3,60}$/', $studentNumber)) {
+        $error = 'Enter your valid university student ID (3–60 characters).';
     } elseif ($password !== $confirm) {
         $error = 'Passwords do not match.';
     } else {
@@ -39,7 +48,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         try {
             $pdo = db();
-
+            $valid = $pdo->prepare('SELECT 1 FROM academic_degree_intakes adi JOIN academic_degrees d ON d.id=adi.degree_id JOIN awarding_universities au ON au.id=d.awarding_university_id JOIN academic_batches b ON b.id=adi.batch_id WHERE adi.degree_id=? AND adi.batch_id=? AND adi.is_active=1 AND d.is_active=1 AND au.is_active=1 AND b.is_active=1');
+            $valid->execute([$degreeId,$batchId]);
+            if (!$valid->fetchColumn()) throw new RuntimeException('Select a valid university, degree and linked intake.');
             // Avoid creating another account for an existing email.
             $check = $pdo->prepare(
                 'SELECT id FROM users WHERE email = ? LIMIT 1'
@@ -53,17 +64,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
                 $insert = $pdo->prepare(
                     "INSERT INTO users
-                     (full_name, email, password_hash, role)
-                     VALUES (?, ?, ?, 'student')"
+                     (full_name, email, password_hash, student_number, role)
+                     VALUES (?, ?, ?, ?, 'student')"
                 );
 
                 $insert->execute([
                     $name,
                     $email,
-                    password_hash($password, PASSWORD_DEFAULT)
+                    password_hash($password, PASSWORD_DEFAULT),
+                    $studentNumber
                 ]);
 
                 $userId = (int)$pdo->lastInsertId();
+                $profileInsert=$pdo->prepare('INSERT INTO student_academic_profiles(user_id,degree_id,batch_id) VALUES (?,?,?)');
+                $profileInsert->execute([$userId,$degreeId,$batchId]);
                 $code = (string)random_int(100000, 999999);
 
                 $tokenHash = hash('sha256', $userId . ':' . $code);
@@ -101,16 +115,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         'Your account was created, but we could not send the code. Please try Resend code.';
                 }
 
+                // Registration is pending: do not authenticate until the OTP is verified.
+                unset($_SESSION['uid'], $_SESSION['session_version']);
+                session_regenerate_id(true);
                 go('auth/verify.php');
             }
 
+        } catch (RuntimeException $exception) {
+            if (isset($pdo) && $pdo->inTransaction()) $pdo->rollBack();
+            $error = $exception->getMessage();
         } catch (PDOException $exception) {
             if (isset($pdo) && $pdo->inTransaction()) {
                 $pdo->rollBack();
             }
 
             $error = $exception->getCode() === '23000'
-                ? 'This email is already registered.'
+                ? 'Email or student ID is already registered.'
                 : 'Registration is unavailable. Please check the database.';
         }
     }
@@ -168,6 +188,12 @@ ob_start();
         >
     </div>
 
+
+    <div class="field"><label for="student_number">University student ID</label><input id="student_number" name="student_number" maxlength="60" value="<?= e($studentNumber) ?>" required></div>
+    <div class="field"><label for="university_id">University</label><select id="university_id" required><option value="">Choose university</option><?php $seen=[];foreach($degreeOptions as $d):if(isset($seen[$d['awarding_university_id']]))continue;$seen[$d['awarding_university_id']]=true;?><option value="<?= (int)$d['awarding_university_id'] ?>"><?= e($d['university_name']) ?></option><?php endforeach;?></select></div>
+    <div class="field"><label for="degree_id">Degree programme</label><select name="degree_id" id="degree_id" required><option value="">Choose degree</option></select></div>
+    <div class="field"><label for="batch_id">Intake</label><select name="batch_id" id="batch_id" required><option value="">Choose intake</option></select></div>
+
     <div class="field">
         <label for="password">Password</label>
         <input
@@ -214,6 +240,11 @@ ob_start();
 
 <script>
 document.addEventListener('DOMContentLoaded', function () {
+    const degrees=<?= json_encode($degreeOptions,JSON_HEX_TAG|JSON_HEX_AMP|JSON_HEX_APOS|JSON_HEX_QUOT) ?>;
+    const intakes=<?= json_encode($intakeOptions,JSON_HEX_TAG|JSON_HEX_AMP|JSON_HEX_APOS|JSON_HEX_QUOT) ?>;
+    const uni=document.getElementById('university_id'),deg=document.getElementById('degree_id'),batch=document.getElementById('batch_id');
+    uni.addEventListener('change',()=>{deg.innerHTML='<option value="">Choose degree</option>';degrees.filter(d=>String(d.awarding_university_id)===uni.value).forEach(d=>deg.add(new Option(d.name,d.id)));deg.dispatchEvent(new Event('change'));});
+    deg.addEventListener('change',()=>{batch.innerHTML='<option value="">Choose intake</option>';intakes.filter(b=>String(b.degree_id)===deg.value).forEach(b=>batch.add(new Option(b.batch_code,b.batch_id)));});
     const password = document.getElementById('password');
     const confirm = document.getElementById('confirm_password');
     const message = document.getElementById('password-match');

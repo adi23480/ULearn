@@ -1,0 +1,15 @@
+ULearn Phase 6 — Unified Admin UI
+Source baseline: ulearn15(1).zip. This is a shared styling and density pass across Admin pages,
+not a complete rebuild of all admin templates.
+
+INSTALL
+1. Back up your entire current ULearn folder.
+2. Copy assets/css/admin-unified-v1.css into your project.
+3. If your admin PHP pages are unchanged since ulearn15(1).zip, copy the included admin files.
+4. IMPORTANT: If you have made any changes to admin PHP pages since that ZIP,
+   DO NOT overwrite them. Instead add this line immediately before </head> in each page:
+   <link rel="stylesheet" href="<?= e(url('assets/css/admin-unified-v1.css?v=1')) ?>">
+5. Hard refresh (Ctrl+Shift+R) and test all admin roles, forms, tables, light/dark and mobile.
+
+No database migrations, no SQL changes, no altered permissions or forms.
+Admin and Main Admin share the same visual layer where the existing code supports both.

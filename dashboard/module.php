@@ -160,8 +160,13 @@ if ($module && isset($_GET['download'])) {
 :root[data-theme="dark"]{color-scheme:dark;--bg:#0c0e16;--surface:#161924;--text:#f4f4fa;--muted:#a0a4b6;--border:#2b2e3c;--accent:#a99aff;--soft:#292440}
 *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font-family:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif;line-height:1.55}a{color:inherit;text-decoration:none}.wrap{max-width:1060px;margin:auto;padding:32px 22px 70px}.top{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:28px}.eyebrow{font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);font-weight:800}.button{display:inline-flex;align-items:center;justify-content:center;padding:10px 15px;border:1px solid var(--border);border-radius:11px;background:var(--surface);font-weight:700;font-size:13px}.button.primary{background:var(--accent);border-color:var(--accent);color:#fff}.button:hover,.tile:hover{border-color:var(--accent)}.hero,.tile,.quiz,.empty{background:var(--surface);border:1px solid var(--border);border-radius:19px;padding:25px}.hero{margin-bottom:22px}h1{font-size:clamp(30px,4vw,44px);letter-spacing:-.04em;line-height:1.2;margin:9px 0 14px}h2{font-size:21px;margin:0 0 14px}.muted{color:var(--muted)}.pill{display:inline-block;background:var(--soft);color:var(--accent);padding:6px 11px;border-radius:99px;font-size:12px;font-weight:750}.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:15px}.tile{display:block;min-width:0}.tile h3,.quiz h3{margin:10px 0 6px;font-size:18px}.tile p,.quiz p{font-size:14px;color:var(--muted);margin:0 0 15px}.section{margin-top:36px}.quiz-list{display:grid;gap:12px}.material-list{display:grid;gap:12px}.material{display:flex;justify-content:space-between;align-items:center;gap:18px;flex-wrap:wrap;background:var(--surface);border:1px solid var(--border);border-radius:17px;padding:20px}.material-info{flex:1;min-width:220px}.material h3{margin:5px 0 8px;font-size:17px}.material p{margin:0 0 8px;color:var(--muted);font-size:13px}.material-meta{font-size:12px;color:var(--muted);overflow-wrap:anywhere}.quiz{display:flex;align-items:center;justify-content:space-between;gap:20px;flex-wrap:wrap}.quiz-info{flex:1;min-width:220px}.quiz-meta{font-size:12px;color:var(--muted);margin-top:8px}.error{background:#ffedf0;color:#a32143;border-radius:12px;padding:16px}.actions{display:flex;gap:10px;flex-wrap:wrap}@media(max-width:640px){.wrap{padding:20px 15px 55px}.grid{grid-template-columns:1fr}.hero,.tile,.quiz{padding:20px}}
 </style>
+
+<script src="<?= htmlspecialchars(url('assets/js/theme-global.js?v=20261107-2'), ENT_QUOTES, 'UTF-8') ?>"></script>
+<link rel="stylesheet" href="<?= e(url('assets/css/ulearn-design-system.css?v=1')) ?>">
+<script defer src="<?= e(url('assets/js/ulearn-motion.js?v=1')) ?>"></script>
+<link rel="stylesheet" href="<?= e(url('assets/css/ulearn-student-workspaces.css?v=3')) ?>">
 </head>
-<body>
+<body class="ul3-module">
 <main class="wrap">
 <div class="top"><div><div class="eyebrow">ULearn / Student workspace</div><strong>Module Learning</strong></div><div class="actions"><a class="button" href="explore.php">Explore modules</a><a class="button" href="index.php#modules">← My Enrolled Modules</a></div></div>
 <?php if ($error !== ''): ?><div class="error" role="alert"><?= e($error) ?></div><?php endif; ?>
@@ -201,5 +206,5 @@ if ($module && isset($_GET['download'])) {
 </section>
 <?php endif; ?>
 </main>
-</body>
+<?php require_once __DIR__ . '/../includes/student-bot.php'; ?></body>
 </html>

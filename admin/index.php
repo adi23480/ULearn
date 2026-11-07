@@ -844,8 +844,19 @@ a.tool-card:hover {
 
 }
 
+.stage9-management{margin:12px 0 22px;padding:12px;border:1px solid var(--border, #35364c);border-radius:14px}.stage9-management summary{cursor:pointer;font-weight:750;padding:6px;color:var(--text,#eee)}.stage9-management a{display:block;padding:11px 9px;margin-top:4px;border-radius:9px;color:var(--muted,#aaa);font-size:13px}.stage9-management a:hover{background:var(--surface-alt,#29283c);color:var(--accent,#a99cff)}
 </style>
 
+
+<script src="<?= htmlspecialchars(url('assets/js/theme-global.js?v=20261107-2'), ENT_QUOTES, 'UTF-8') ?>"></script>
+<style id="ulearn-admin-feature-contrast-fix">
+.tool-card.soon{opacity:1!important;filter:none!important}
+.tool-card.soon h3{color:var(--text)!important}
+.tool-card.soon p{color:var(--muted)!important}
+.tool-card.soon .tool-footer{opacity:1!important;color:var(--muted)!important}
+</style>
+<link rel="stylesheet" href="<?= e(url('assets/css/admin-premium.css?v=3')) ?>">
+<link rel="stylesheet" href="<?= e(url('assets/css/admin-unified-v1.css?v=1')) ?>">
 </head>
 
 <body>
@@ -941,6 +952,8 @@ a.tool-card:hover {
         </a>
 
         <nav aria-label="Admin navigation">
+            <details open class="stage9-management"><summary>⚙ System Management</summary><a href="<?= e(url('admin/users.php')) ?>">◉ All Registered Users</a><a href="<?= e(url('admin/change-requests.php')) ?>">◇ Academic Change Requests</a></details>
+
 
             <p class="nav-label">Your workspace</p>
 
@@ -1030,6 +1043,10 @@ a.tool-card:hover {
                     Announcements
 
                 </a>
+                <a href="<?= e(url('admin/platform-settings.php')) ?>">
+                    <svg class="nav-icon" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><use href="#i-settings"/></svg>
+                    Platform Settings
+                </a>
                 <a href="<?= e(url('admin/profile.php')) ?>">
                     <svg class="nav-icon" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><use href="#i-settings"/></svg>
                     My Profile &amp; Settings
@@ -1046,33 +1063,9 @@ a.tool-card:hover {
 
 
 
-                <a class="disabled" aria-disabled="true">
+                <a href="<?= e(url('admin/consultations.php')) ?>"><svg class="nav-icon" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><use href="#i-calendar"/></svg> Consultations</a>
 
-                    <svg class="nav-icon" fill="none" stroke="currentColor"
-
-                         stroke-width="1.8">
-
-                        <use href="#i-calendar"/>
-
-                    </svg>
-
-                    Consultations · Soon
-
-                </a>
-
-                <a class="disabled" aria-disabled="true">
-
-                    <svg class="nav-icon" fill="none" stroke="currentColor"
-
-                         stroke-width="1.8">
-
-                        <use href="#i-users"/>
-
-                    </svg>
-
-                    Kuppiya Sessions · Soon
-
-                </a>
+                <a href="<?= e(url('admin/kuppiya.php')) ?>"><svg class="nav-icon" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><use href="#i-users"/></svg> Kuppiya Sessions</a>
 
             </div>
 
@@ -1465,101 +1458,16 @@ a.tool-card:hover {
 
 
 
-                <article class="tool-card soon">
+                <a class="tool-card" href="<?= e(url('admin/consultations.php')) ?>"><div class="icon-box"><svg fill="none" stroke="currentColor" stroke-width="1.7"><use href="#i-calendar"/></svg></div><h3>Consultation Management</h3><p>Review consultation requests, statuses, schedules and lecturer assignments.</p><span class="tool-footer">Open Consultation Management ↗</span></a>
 
-                    <div class="icon-box">
+                <a class="tool-card" href="<?= e(url('admin/kuppiya.php')) ?>"><div class="icon-box"><svg fill="none" stroke="currentColor" stroke-width="1.7"><use href="#i-users"/></svg></div><h3>Kuppiya Sessions</h3><p>Monitor peer-led sessions, hosts, participants and schedules.</p><span class="tool-footer">Open Kuppiya Sessions ↗</span></a>
 
-                        <svg fill="none" stroke="currentColor"
-
-                             stroke-width="1.7">
-
-                            <use href="#i-calendar"/>
-
-                        </svg>
-
-                    </div>
-
-                    <h3>Consultation Management</h3>
-
-                    <p>
-
-                        Oversee lecturer consultation requests,
-
-                        schedules, and student appointments.
-
-                    </p>
-
-                    <span class="tool-footer">
-
-                        Coming soon
-
-                    </span>
-
-                </article>
-
-                <article class="tool-card soon">
-
-                    <div class="icon-box">
-
-                        <svg fill="none" stroke="currentColor"
-
-                             stroke-width="1.7">
-
-                            <use href="#i-users"/>
-
-                        </svg>
-
-                    </div>
-
-                    <h3>Kuppiya Sessions</h3>
-
-                    <p>
-
-                        Support student-led teaching sessions
-
-                        and collaborative learning.
-
-                    </p>
-
-                    <span class="tool-footer">
-
-                        Coming soon
-
-                    </span>
-
-                </article>
-
-                <article class="tool-card soon">
-
-                    <div class="icon-box">
-
-                        <svg fill="none" stroke="currentColor"
-
-                             stroke-width="1.7">
-
-                            <use href="#i-settings"/>
-
-                        </svg>
-
-                    </div>
-
+                <a class="tool-card" href="<?= e(url('admin/platform-settings.php')) ?>">
+                    <div class="icon-box"><svg fill="none" stroke="currentColor" stroke-width="1.7"><use href="#i-settings"/></svg></div>
                     <h3>Platform Settings</h3>
-
-                    <p>
-
-                        Configure platform preferences and
-
-                        administrative controls.
-
-                    </p>
-
-                    <span class="tool-footer">
-
-                        Coming soon
-
-                    </span>
-
-                </article>
+                    <p>Review platform configuration, manage your appearance and access administration tools.</p>
+                    <span class="tool-footer">Open Platform Settings ↗</span>
+                </a>
 
             </div>
 

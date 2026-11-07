@@ -1,0 +1,2 @@
+<?php
+declare(strict_types=1);require_once __DIR__.'/common.php';$user=qa_require_user();qa_post();$qid=(int)($_POST['question_id']??0);$aid=(int)($_POST['answer_id']??0);$pdo=db();$st=$pdo->prepare('SELECT q.user_id FROM qa_questions q JOIN qa_answers a ON a.question_id=q.id WHERE q.id=? AND a.id=?');$st->execute([$qid,$aid]);$row=$st->fetch();if(!$row||(int)$row['user_id']!==(int)$user['id'])exit('Not allowed.');$pdo->prepare('UPDATE qa_questions SET is_solved=1,solved_answer_id=? WHERE id=?')->execute([$aid,$qid]);qa_redirect('view.php?id='.$qid);

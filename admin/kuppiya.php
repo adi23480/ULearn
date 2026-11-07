@@ -1,0 +1,25 @@
+<?php
+declare(strict_types=1);
+require_once __DIR__.'/../config/bootstrap.php';
+$u=require_login();
+if (!in_array((string)$u['role'],['admin','main_admin'],true)) {http_response_code(403);exit('Admin access required.');}
+$pdo=db();
+$filter=(string)($_GET['status']??'all');
+$allowed=['all','scheduled','cancelled','completed'];
+if(!in_array($filter,$allowed,true))$filter='all';
+$page=max(1,min(10000,(int)($_GET['page']??1)));$size=25;$offset=($page-1)*$size;
+$error='';$rows=[];$total=0;
+try {
+ $where=$filter==='all'?'':' WHERE status=:status';
+ $count=$pdo->prepare('SELECT COUNT(*) FROM (SELECT ks.id,ks.title,ks.status,ks.starts_at AS event_at,ks.created_at,u.full_name AS owner_name,CAST((SELECT COUNT(*) FROM kuppiya_members km WHERE km.session_id=ks.id) AS CHAR) AS second_name FROM kuppiya_sessions ks JOIN users u ON u.id=ks.host_user_id) t'.$where);
+ if($filter!=='all')$count->bindValue(':status',$filter);
+ $count->execute();$total=(int)$count->fetchColumn();
+ $stmt=$pdo->prepare('SELECT * FROM (SELECT ks.id,ks.title,ks.status,ks.starts_at AS event_at,ks.created_at,u.full_name AS owner_name,CAST((SELECT COUNT(*) FROM kuppiya_members km WHERE km.session_id=ks.id) AS CHAR) AS second_name FROM kuppiya_sessions ks JOIN users u ON u.id=ks.host_user_id) t'.$where.' ORDER BY event_at DESC,id DESC LIMIT :lim OFFSET :off');
+ if($filter!=='all')$stmt->bindValue(':status',$filter);
+ $stmt->bindValue(':lim',$size,PDO::PARAM_INT);$stmt->bindValue(':off',$offset,PDO::PARAM_INT);$stmt->execute();$rows=$stmt->fetchAll(PDO::FETCH_ASSOC);
+} catch(Throwable $ex) {error_log('ULearn admin feature: '.$ex->getMessage());$error='Could not load records. Verify that the feature migration is installed.';}
+function h($v):string{return htmlspecialchars((string)$v,ENT_QUOTES,'UTF-8');}
+?><!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>ULearn Admin · Kuppiya Sessions</title>
+<style>:root{--bg:#f4f7fa;--card:#fff;--fg:#132239;--sub:#5b6b80;--line:#dae4eb;--green:#087f63}html[data-theme=dark]{--bg:#0d1422;--card:#172234;--fg:#f0f5fc;--sub:#a4b4c9;--line:#334259;--green:#40cfa2}*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.5 system-ui,Segoe UI,sans-serif}.wrap{max-width:1150px;margin:auto;padding:30px 18px}a{color:var(--green)}nav{display:flex;gap:12px;align-items:center;justify-content:space-between;margin-bottom:26px}nav a,.filters a{border:1px solid var(--line);border-radius:11px;padding:9px 13px;text-decoration:none;color:var(--fg)}header{padding:28px;border-radius:22px;background:linear-gradient(120deg,#065846,#0a927b);color:#fff;margin-bottom:20px}h1{margin:0;font-size:clamp(27px,4vw,39px)}header p{margin-bottom:0;opacity:.9}.panel{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:22px;margin:16px 0}.filters{display:flex;flex-wrap:wrap;gap:8px}.filters a.on{background:var(--green);color:white}.muted{color:var(--sub)}.tablewrap{overflow-x:auto}table{width:100%;border-collapse:collapse;min-width:700px}th{text-align:left;font-size:12px;text-transform:uppercase;color:var(--sub);letter-spacing:.06em}td,th{padding:13px 10px;border-bottom:1px solid var(--line)}.pill{border-radius:99px;padding:5px 10px;background:color-mix(in srgb,var(--green) 14%,transparent);color:var(--green);font-weight:700}.pages{display:flex;gap:12px;justify-content:flex-end;margin-top:16px}</style><link rel="stylesheet" href="<?= e(url('assets/css/admin-unified-v1.css?v=1')) ?>">
+</head><body><div class="wrap"><nav><strong>ULearn · Admin workspace</strong><a href="<?=h(url('admin/index.php'))?>">← Admin dashboard</a></nav><header><h1>Kuppiya Sessions</h1><p>Peer-led study sessions · Read-only oversight of existing student activity</p></header><section class="panel"><strong><?=number_format($total)?> records</strong><p class="muted">This view shows actual records without changing student or lecturer workflows.</p><div class="filters">
+<?php foreach($allowed as $s):?><a class="<?=$s===$filter?'on':''?>" href="?status=<?=h($s)?>"><?=h(ucwords(str_replace('_',' ',$s)))?></a><?php endforeach;?></div></section><section class="panel"><?php if($error):?><p><?=h($error)?></p><?php elseif(!$rows):?><p class="muted">No records found for this filter.</p><?php else:?><div class="tablewrap"><table><thead><tr><th>ID</th><th>Title / topic</th><th>Host · Members</th><th>Status</th><th>Scheduled</th><th>Created</th></tr></thead><tbody><?php foreach($rows as $r):?><tr><td>#<?=h($r['id'])?></td><td><strong><?=h($r['title'])?></strong></td><td><?=h($r['owner_name'])?> · <?=h($r['second_name'])?></td><td><span class="pill"><?=h($r['status'])?></span></td><td><?=h($r['event_at'])?></td><td><?=h($r['created_at'])?></td></tr><?php endforeach;?></tbody></table></div><?php endif;?><div class="pages"><?php if($page>1):?><a href="?status=<?=h($filter)?>&page=<?=$page-1?>">← Previous</a><?php endif;?><?php if($page*$size<$total):?><a href="?status=<?=h($filter)?>&page=<?=$page+1?>">Next →</a><?php endif;?></div></section></div></body></html>
