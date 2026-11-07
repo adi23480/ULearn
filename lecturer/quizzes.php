@@ -15,33 +15,32 @@ $profileStmt->execute([(int)$user['id']]);
 $lecturerId = (int)$profileStmt->fetchColumn();
 if ($lecturerId < 1) { http_response_code(403); exit('Your lecturer profile is not active.'); }
 
-// An active curriculum assignment is required for every quiz action.
-$assignedStmt = $pdo->prepare('SELECT DISTINCT m.id, m.module_code, m.module_name FROM lecturer_module_assignments a JOIN academic_curriculum c ON c.id = a.curriculum_id JOIN academic_modules m ON m.id = c.module_id JOIN academic_degrees d ON d.id = c.degree_id JOIN academic_batches b ON b.id = c.batch_id WHERE a.lecturer_id = ? AND a.is_active = 1 AND c.is_active = 1 AND m.is_active = 1 AND d.is_active = 1 AND b.is_active = 1 ORDER BY m.module_code');
-$assignedStmt->execute([$lecturerId]);
-$assignedModules = $assignedStmt->fetchAll(PDO::FETCH_ASSOC);
-$allowedModuleIds = array_map('intval', array_column($assignedModules, 'id'));
-
-function lecturerQuizOwned(PDO $pdo, int $quizId, int $userId, array $allowedModuleIds): array {
-    $stmt = $pdo->prepare('SELECT id, module_id, is_published FROM quizzes WHERE id = ? AND created_by = ? LIMIT 1');
-    $stmt->execute([$quizId, $userId]);
-    $quiz = $stmt->fetch(PDO::FETCH_ASSOC);
-    if (!$quiz || !in_array((int)$quiz['module_id'], $allowedModuleIds, true)) {
-        throw new RuntimeException('Quiz not found or you are no longer assigned to its module.');
-    }
+// Quiz publishing is scoped to the lecturer's active degree/intake assignments, not modules.
+$assignedModules = []; $allowedModuleIds = [];
+$scopeStmt = $pdo->prepare('SELECT DISTINCT lda.degree_id, lda.batch_id, d.name AS degree_name, b.batch_code FROM lecturer_degree_assignments lda JOIN academic_degrees d ON d.id=lda.degree_id JOIN academic_batches b ON b.id=lda.batch_id WHERE lda.lecturer_id=? AND lda.is_active=1 AND d.is_active=1 AND b.is_active=1 ORDER BY d.name,b.batch_code');
+$scopeStmt->execute([$lecturerId]);
+$quizScopes = $scopeStmt->fetchAll(PDO::FETCH_ASSOC);
+function quizScopeKey(array $r): string { return (int)$r['degree_id'].':'.(int)$r['batch_id']; }
+function saveLecturerQuizTargets(PDO $pdo, int $quizId, int $moduleId, array $selected, array $scopes): void {
+    $allowed=[]; foreach ($scopes as $scope) $allowed[quizScopeKey($scope)]=$scope;
+    $selected=array_values(array_unique(array_map('strval',$selected)));
+    if (!$selected) throw new RuntimeException('Select at least one degree programme and intake.');
+    foreach ($selected as $key) if (!isset($allowed[$key])) throw new RuntimeException('You are not assigned to one of the selected programme/intake groups.');
+    $pdo->prepare('DELETE FROM quiz_teaching_targets WHERE quiz_id=?')->execute([$quizId]);
+    $add=$pdo->prepare('INSERT INTO quiz_teaching_targets (quiz_id,degree_id,batch_id,study_year,semester) VALUES (?,?,?,0,0)');
+    foreach ($selected as $key) { $r=$allowed[$key]; $add->execute([$quizId,$r['degree_id'],$r['batch_id']]); }
+}
+function lecturerQuizOwned(PDO $pdo, int $quizId, int $userId, array $unused): array {
+    $stmt=$pdo->prepare('SELECT id,module_id,is_published FROM quizzes WHERE id=? AND created_by=? LIMIT 1');
+    $stmt->execute([$quizId,$userId]); $quiz=$stmt->fetch(PDO::FETCH_ASSOC);
+    if (!$quiz) throw new RuntimeException('Quiz not found or access denied.');
     return $quiz;
 }
-
-
-/** Notify enrolled students when a quiz becomes published or its published details change.
- * Must be called inside the transaction that changes the quiz.
- */
-function lecturerQuizNotifyStudents(PDO $pdo, int $moduleId, int $actorId, int $quizId, string $quizTitle, bool $updated = false): void {
-    $type = $updated ? 'quiz_updated' : 'quiz_published';
-    $title = $updated ? 'Quiz updated' : 'New quiz available';
-    $message = ($updated ? 'A published quiz was updated: ' : 'A new quiz was published: ') . $quizTitle;
-    $target = url('dashboard/quizzes.php');
-    $stmt = $pdo->prepare("INSERT INTO notifications (user_id, actor_user_id, type, title, message, target_url) SELECT DISTINCT sme.user_id, ?, ?, ?, ?, ? FROM student_module_enrollments sme INNER JOIN users u ON u.id=sme.user_id AND u.role='student' WHERE sme.module_id=?");
-    $stmt->execute([$actorId, $type, $title, $message, $target, $moduleId]);
+function lecturerQuizNotifyStudents(PDO $pdo, int $moduleId, int $actorId, int $quizId, string $quizTitle, bool $updated=false): void {
+    $type=$updated?'quiz_updated':'quiz_published'; $title=$updated?'Quiz updated':'New quiz available';
+    $message=($updated?'A published quiz was updated: ':'A new quiz was published: ').$quizTitle;
+    $stmt=$pdo->prepare("INSERT INTO notifications (user_id,actor_user_id,type,title,message,target_url) SELECT DISTINCT se.student_id,?,?,?,?,? FROM student_enrollments se JOIN users u ON u.id=se.student_id AND u.role='student' JOIN quiz_teaching_targets qt ON qt.degree_id=se.degree_id AND qt.batch_id=se.batch_id AND qt.quiz_id=? WHERE se.is_active=1");
+    $stmt->execute([$actorId,$type,$title,$message,url('dashboard/quizzes.php'),$quizId]);
 }
 
 $error = '';
@@ -199,13 +198,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if ($action === 'create_quiz' || $action === 'update_quiz') {
             $title = trim((string)($_POST['title'] ?? ''));
             $description = trim((string)($_POST['description'] ?? ''));
-            $moduleId = filter_var($_POST['module_id'] ?? null, FILTER_VALIDATE_INT);
-            $newModuleCode = strtoupper(trim((string)($_POST['new_module_code'] ?? '')));
-            $newModuleName = trim((string)($_POST['new_module_name'] ?? ''));
+            $moduleId = null; // Programme-level quiz: no module is required.
             $quizType = (string)($_POST['quiz_type'] ?? 'topic');
             $duration = filter_var($_POST['duration_minutes'] ?? null, FILTER_VALIDATE_INT);
             $points = filter_var($_POST['points_per_question'] ?? null, FILTER_VALIDATE_INT);
             $availabilityMode = (string)($_POST['availability_mode'] ?? 'unlimited');
+            $selectedScopes = is_array($_POST['teaching_scopes'] ?? null) ? $_POST['teaching_scopes'] : [];
             $rawAvailableFrom = trim((string)($_POST['available_from'] ?? ''));
             $rawAvailableUntil = trim((string)($_POST['available_until'] ?? ''));
             if (!in_array($availabilityMode, ['unlimited', 'scheduled', 'open_until'], true)) {
@@ -231,15 +229,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if ($title === '' || strlen($title) > 200) {
                 throw new RuntimeException('Enter a quiz title of no more than 200 characters.');
             }
-            if ((!$moduleId || $moduleId < 1) && ($newModuleCode === '' || $newModuleName === '')) {
-                throw new RuntimeException('Choose one of your assigned modules.');
-            }
-            if ($newModuleCode !== '' && (strlen($newModuleCode) > 30 || !preg_match('/^[A-Z0-9._-]+$/', $newModuleCode))) {
-                throw new RuntimeException('Module code must be 1–30 characters and use only letters, numbers, dots, underscores or hyphens.');
-            }
-            if ($newModuleName !== '' && strlen($newModuleName) > 200) {
-                throw new RuntimeException('Module name must be no longer than 200 characters.');
-            }
             if (!in_array($quizType, ['topic', 'general', 'exam'], true)) {
                 throw new RuntimeException('Choose a valid quiz type.');
             }
@@ -253,9 +242,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 throw new RuntimeException('Description must be no longer than 5,000 characters.');
             }
 
-            if (!$moduleId || !in_array((int)$moduleId, $allowedModuleIds, true)) {
-                throw new RuntimeException('Choose a module currently assigned to you.');
-            }
             if ($action === 'update_quiz') {
                 $quizId = (int)($_POST['quiz_id'] ?? 0);
                 lecturerQuizOwned($pdo, $quizId, (int)$user['id'], $allowedModuleIds);
@@ -267,6 +253,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 );
                 $stmt->execute([$moduleId, (int)$user['id'], $title, $description, $quizType, $duration, $points, $availableFrom, $availableUntil]);
                 $newId = (int)$pdo->lastInsertId();
+                try { saveLecturerQuizTargets($pdo, $newId, (int)$moduleId, $selectedScopes, $quizScopes); } catch (Throwable $ex) { $pdo->prepare('DELETE FROM quizzes WHERE id=?')->execute([$newId]); throw $ex; }
                 $_SESSION['quiz_notice'] = 'Quiz created as a draft. Add questions before publishing.';
                 quizRedirect('quiz=' . $newId);
             }
@@ -280,8 +267,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $previousStmt->execute([$quizId, (int)$user['id']]);
             $previous = $previousStmt->fetch(PDO::FETCH_ASSOC);
             if (!$previous) throw new RuntimeException('Quiz not found.');
+            if ((int)$previous['is_published'] === 1) { $availableFrom=$previous['available_from']; $availableUntil=$previous['available_until']; }
             $stmt = $pdo->prepare('UPDATE quizzes SET module_id = ?, title = ?, description = ?, quiz_type = ?, duration_minutes = ?, points_per_question = ?, available_from = ?, available_until = ? WHERE id = ? AND created_by = ?');
             $stmt->execute([$moduleId, $title, $description, $quizType, $duration, $points, $availableFrom, $availableUntil, $quizId, (int)$user['id']]);
+            saveLecturerQuizTargets($pdo, $quizId, (int)$moduleId, $selectedScopes, $quizScopes);
             $changed = (int)$previous['module_id'] !== (int)$moduleId || (string)$previous['title'] !== $title
                 || (string)($previous['description'] ?? '') !== $description || (string)$previous['quiz_type'] !== $quizType
                 || (int)$previous['duration_minutes'] !== (int)$duration || (int)$previous['points_per_question'] !== (int)$points
@@ -307,6 +296,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $parsed = parseBulkQuizText($bulkText);
             $bulkPreview = $parsed['questions'];
             $bulkErrors = $parsed['errors'];
+            // Keep parsed data across the POST/redirect/GET boundary, avoiding a browser resubmit.
+            $_SESSION['quiz_import_preview'] = [
+                'quiz_id' => (int)$quizId,
+                'questions' => $bulkPreview,
+                'errors' => $bulkErrors,
+            ];
+            quizRedirect('quiz=' . (int)$quizId . '&import_preview=1');
             $selectedQuizId = (int)$quizId;
         }
 
@@ -322,7 +318,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if ($parsed['errors']) throw new RuntimeException('Import stopped: ' . implode(' ', array_slice($parsed['errors'], 0, 5)));
             if (!$parsed['questions']) throw new RuntimeException('No valid questions were found to import.');
             $optionExplanationColumn = $pdo->query("SHOW COLUMNS FROM quiz_options LIKE 'explanation'")->fetch();
-            if (!$optionExplanationColumn) throw new RuntimeException('Run the supplied quiz_options_explanation_migration.sql once in phpMyAdmin before importing option-specific reasons.');
+            if (!$optionExplanationColumn) throw new RuntimeException('Run database/migrations/013_quiz_option_reasons.sql in phpMyAdmin before importing questions.');
 
             $pdo->beginTransaction();
             $questionStmt = $pdo->prepare('INSERT INTO quiz_questions (quiz_id, question_text, explanation, topic, difficulty) VALUES (?, ?, ?, ?, ?)');
@@ -438,6 +434,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $countStmt = $pdo->prepare('SELECT COUNT(*) FROM quiz_questions WHERE quiz_id = ?');
                 $countStmt->execute([$quizId]);
                 if ((int)$countStmt->fetchColumn() < 1) throw new RuntimeException('Add at least one question before publishing this quiz.');
+                $targetsCheck=$pdo->prepare('SELECT COUNT(*) FROM quiz_teaching_targets WHERE quiz_id=?');
+                $targetsCheck->execute([$quizId]);
+                if ((int)$targetsCheck->fetchColumn()===0) throw new RuntimeException('Select at least one teaching group before publishing.');
+                // Publication starts the fixed two-calendar-month availability window.
+                $pdo->prepare('UPDATE quizzes SET available_from=NOW(), available_until=DATE_ADD(NOW(), INTERVAL 2 MONTH) WHERE id=?')->execute([$quizId]);
             }
             $stmt = $pdo->prepare('UPDATE quizzes SET is_published = ? WHERE id = ? AND created_by = ?');
             $stmt->execute([$currentlyPublished ? 0 : 1, $quizId, (int)$user['id']]);
@@ -503,7 +504,7 @@ try {
         'SELECT q.id, q.module_id, q.title, q.description, q.quiz_type, q.duration_minutes, q.points_per_question, q.available_from, q.available_until, q.is_published, q.created_at, m.module_code, m.module_name, (SELECT COUNT(*) FROM quiz_questions qq WHERE qq.quiz_id = q.id) AS question_count FROM quizzes q LEFT JOIN academic_modules m ON m.id = q.module_id WHERE q.created_by = ? ORDER BY q.created_at DESC, q.id DESC'
     );
     $quizStmt->execute([(int)$user['id']]);
-    $quizzes = array_values(array_filter($quizStmt->fetchAll(), static fn($q) => in_array((int)$q['module_id'], $allowedModuleIds, true)));
+    $quizzes = $quizStmt->fetchAll(PDO::FETCH_ASSOC);
 
     if ($selectedQuizId > 0) {
         lecturerQuizOwned($pdo, $selectedQuizId, (int)$user['id'], $allowedModuleIds);
@@ -543,6 +544,16 @@ try {
     $error = $error ?: ($exception instanceof RuntimeException ? $exception->getMessage() : 'Could not load quiz data. Check the database structure.');
 }
 
+$isImportPreviewPage = isset($_GET['import_preview']) && (string)$_GET['import_preview'] === '1';
+if ($isImportPreviewPage) {
+    $savedPreview = $_SESSION['quiz_import_preview'] ?? null;
+    if (is_array($savedPreview) && (int)($savedPreview['quiz_id'] ?? 0) === (int)($selectedQuizId ?? 0)) {
+        $bulkPreview = $savedPreview['questions'] ?? [];
+        $bulkErrors = $savedPreview['errors'] ?? [];
+    }
+    unset($_SESSION['quiz_import_preview']);
+}
+
 $fullName = (string)($user['full_name'] ?? 'Administrator');
 $theme = (string)($user['theme'] ?? 'system');
 $publishedCount = count(array_filter($quizzes, static fn($q) => (int)$q['is_published'] === 1));
@@ -562,8 +573,12 @@ document.addEventListener('DOMContentLoaded',()=>{const b=document.getElementByI
 <style>
 :root{color-scheme:light;--bg:#f7f8fc;--surface:#fff;--surface-alt:#f1f2f8;--text:#171927;--muted:#777b90;--border:#e7e8f0;--accent:#6756e8;--accent-light:#f0edff;--shadow:0 10px 40px rgba(30,30,60,.04);--green:#18794e;--green-bg:#e9f8f0;--red:#b4233c;--red-bg:#fff0f2}
 :root[data-theme="dark"]{color-scheme:dark;--bg:#0c0e16;--surface:#161924;--surface-alt:#202431;--text:#f4f4fa;--muted:#a0a4b6;--border:#2b2e3c;--accent:#a99aff;--accent-light:#292440;--shadow:none;--green:#8ee0b8;--green-bg:#173127;--red:#ffb1bf;--red-bg:#351e28}
-*{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0;background:var(--bg);color:var(--text);font-family:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif;line-height:1.6}a{color:inherit;text-decoration:none}button,input,select,textarea{font:inherit}button{cursor:pointer}.layout{display:grid;grid-template-columns:250px minmax(0,1fr);min-height:100vh}.sidebar{background:var(--surface);border-right:1px solid var(--border);padding:28px 15px;display:flex;flex-direction:column;gap:30px}.brand{font-size:27px;font-weight:850;letter-spacing:-1.7px;padding:0 14px}.brand span,.accent-dot{color:var(--accent)}.nav-label{padding:0 14px;color:var(--muted);font-size:10px;letter-spacing:1.7px;font-weight:850;text-transform:uppercase}.nav{display:grid;gap:7px}.nav a{display:flex;align-items:center;gap:12px;padding:12px 14px;border-radius:13px;color:var(--muted);font-size:13px;font-weight:700;transition:.2s}.nav a:hover,.nav a.active{background:var(--accent-light);color:var(--accent)}.nav .ico{width:19px;text-align:center;font-size:16px}.sidebar-foot{margin-top:auto;padding:16px 14px;border:1px solid var(--border);border-radius:15px;color:var(--muted);font-size:11px}.main{min-width:0;padding:28px clamp(18px,4vw,54px) 60px}.topbar{display:flex;justify-content:space-between;align-items:center;gap:15px;margin-bottom:52px}.crumb{font-size:11px;letter-spacing:1.6px;text-transform:uppercase;color:var(--muted);font-weight:850}.top-actions{display:flex;align-items:center;gap:12px}.role{font-size:10px;color:var(--muted);font-weight:850;letter-spacing:1.2px;text-transform:uppercase}.theme-btn{width:42px;height:42px;border:1px solid var(--border);border-radius:12px;background:var(--surface);color:var(--text);font-size:18px}.logout{font-size:12px;color:var(--muted);font-weight:750}.intro{margin-bottom:30px;animation:rise .4s ease both}.eyebrow{font-size:11px;letter-spacing:1.7px;text-transform:uppercase;color:var(--muted);font-weight:850}h1{font-size:clamp(38px,5vw,62px);line-height:1.08;letter-spacing:-.06em;margin:14px 0;font-weight:820}h1 span{color:var(--accent)}.subtitle{color:var(--muted);font-size:16px;max-width:700px;margin:0;line-height:1.8}.stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px;margin:28px 0}.stat{background:var(--surface);border:1px solid var(--border);border-radius:19px;padding:20px 22px;box-shadow:var(--shadow)}.stat-label{color:var(--muted);font-size:12px;font-weight:700}.stat-number{font-size:30px;letter-spacing:-1px;font-weight:820;margin-top:8px}.stat-foot{color:var(--muted);font-size:11px;margin-top:3px}.columns{display:grid;grid-template-columns:minmax(300px,.9fr) minmax(0,1.35fr);gap:20px;align-items:start}.card{background:var(--surface);border:1px solid var(--border);border-radius:22px;padding:25px;box-shadow:var(--shadow);min-width:0;animation:rise .45s ease both}.card-head{display:flex;justify-content:space-between;align-items:flex-start;gap:14px;margin-bottom:20px}.kicker{color:var(--accent);font-size:10px;letter-spacing:1.5px;font-weight:850;text-transform:uppercase}.card h2{font-size:20px;letter-spacing:-.6px;margin:4px 0 7px}.hint{font-size:12px;color:var(--muted);margin:0;line-height:1.7}.field{margin-top:16px}label{display:block;font-size:12px;font-weight:750;margin-bottom:7px}input,select,textarea{width:100%;background:var(--surface-alt);color:var(--text);border:1px solid var(--border);border-radius:12px;padding:12px 13px;outline:none;transition:border-color .2s,box-shadow .2s}input,select{min-height:46px}textarea{min-height:82px;resize:vertical}input:focus,select:focus,textarea:focus{border-color:var(--accent);box-shadow:0 0 0 3px color-mix(in srgb,var(--accent) 18%,transparent)}.two{display:grid;grid-template-columns:1fr 1fr;gap:12px}.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;padding:11px 15px;border-radius:12px;border:1px solid var(--border);background:var(--surface-alt);color:var(--text);font-size:12px;font-weight:800;transition:transform .18s,border-color .18s}.btn:hover{transform:translateY(-1px);border-color:var(--accent)}.btn-primary{background:linear-gradient(110deg,#5d4ae0,#8571fa);border-color:transparent;color:#fff;box-shadow:0 9px 22px rgba(103,86,232,.2)}.btn-small{padding:8px 10px;font-size:11px}.btn-danger{color:var(--red)}.full{width:100%;margin-top:20px}.message{padding:13px 15px;border-radius:12px;margin-bottom:18px;font-size:13px}.success{background:var(--green-bg);color:var(--green)}.error{background:var(--red-bg);color:var(--red)}.badge{display:inline-flex;align-items:center;gap:6px;padding:6px 10px;border-radius:999px;background:var(--accent-light);color:var(--accent);font-size:10px;font-weight:850;white-space:nowrap}.badge.published{background:var(--green-bg);color:var(--green)}.badge.draft{background:var(--surface-alt);color:var(--muted)}.quiz-list{display:grid;gap:12px}.quiz-item{padding:16px;border:1px solid var(--border);border-radius:16px;background:var(--surface);transition:border-color .2s,transform .2s}.quiz-item:hover{border-color:color-mix(in srgb,var(--accent) 55%,var(--border));transform:translateY(-1px)}.quiz-title{font-size:15px;font-weight:800;letter-spacing:-.3px}.quiz-meta{font-size:11px;color:var(--muted);margin-top:7px;display:flex;gap:8px;flex-wrap:wrap}.quiz-actions{display:flex;gap:7px;flex-wrap:wrap;margin-top:13px}.empty{border:1px dashed var(--border);border-radius:16px;padding:30px 18px;text-align:center;color:var(--muted);font-size:12px}.empty strong{display:block;color:var(--text);font-size:14px;margin-bottom:6px}.section-gap{margin-top:20px}.question-item{border:1px solid var(--border);border-radius:15px;padding:16px;margin-top:12px}.question-text{font-size:13px;font-weight:750;white-space:pre-wrap;overflow-wrap:anywhere}.options{display:grid;gap:7px;margin-top:12px}.option{font-size:11px;color:var(--muted);padding:8px 10px;border-radius:9px;background:var(--surface-alt);overflow-wrap:anywhere}.option.correct{color:var(--green);background:var(--green-bg)}.topline{display:flex;justify-content:space-between;gap:12px;align-items:flex-start}.separator{height:1px;background:var(--border);margin:20px 0}.back-link{display:inline-flex;color:var(--accent);font-size:12px;font-weight:800;margin-bottom:14px}.fine{font-size:11px;color:var(--muted);margin-top:9px}@keyframes rise{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}@media(max-width:1100px){.layout{grid-template-columns:210px minmax(0,1fr)}.columns{grid-template-columns:1fr}.sidebar{padding-inline:10px}}@media(max-width:720px){.layout{grid-template-columns:1fr}.sidebar{padding:14px;gap:14px;border-right:0;border-bottom:1px solid var(--border)}.sidebar .nav{display:flex;overflow:auto}.sidebar .nav a{white-space:nowrap}.sidebar-foot,.nav-label{display:none}.main{padding:20px 15px 42px}.topbar{margin-bottom:34px}.stats{grid-template-columns:1fr 1fr}.stat:last-child{grid-column:1/-1}.card{padding:19px}.two{grid-template-columns:1fr}.top-actions{gap:8px}}@media(prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;transition-duration:.01ms!important;scroll-behavior:auto!important}}
+*{box-sizing:border-box}html{scroll-behavior:auto}body{margin:0;background:var(--bg);color:var(--text);font-family:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif;line-height:1.6}a{color:inherit;text-decoration:none}button,input,select,textarea{font:inherit}button{cursor:pointer}.layout{display:grid;grid-template-columns:250px minmax(0,1fr);min-height:100vh}.sidebar{background:var(--surface);border-right:1px solid var(--border);padding:28px 15px;display:flex;flex-direction:column;gap:30px}.brand{font-size:27px;font-weight:850;letter-spacing:-1.7px;padding:0 14px}.brand span,.accent-dot{color:var(--accent)}.nav-label{padding:0 14px;color:var(--muted);font-size:10px;letter-spacing:1.7px;font-weight:850;text-transform:uppercase}.nav{display:grid;gap:7px}.nav a{display:flex;align-items:center;gap:12px;padding:12px 14px;border-radius:13px;color:var(--muted);font-size:13px;font-weight:700;transition:.2s}.nav a:hover,.nav a.active{background:var(--accent-light);color:var(--accent)}.nav .ico{width:19px;text-align:center;font-size:16px}.nav a.subnav{margin-left:15px;font-size:12px;border-left:2px solid var(--border);border-radius:0 10px 10px 0}.sidebar-foot{margin-top:auto;padding:16px 14px;border:1px solid var(--border);border-radius:15px;color:var(--muted);font-size:11px}.main{min-width:0;padding:28px clamp(18px,4vw,54px) 60px}.topbar{display:flex;justify-content:space-between;align-items:center;gap:15px;margin-bottom:52px}.crumb{font-size:11px;letter-spacing:1.6px;text-transform:uppercase;color:var(--muted);font-weight:850}.top-actions{display:flex;align-items:center;gap:12px}.role{font-size:10px;color:var(--muted);font-weight:850;letter-spacing:1.2px;text-transform:uppercase}.theme-btn{width:42px;height:42px;border:1px solid var(--border);border-radius:12px;background:var(--surface);color:var(--text);font-size:18px}.logout{font-size:12px;color:var(--muted);font-weight:750}.intro{margin-bottom:30px;animation:rise .4s ease both}.eyebrow{font-size:11px;letter-spacing:1.7px;text-transform:uppercase;color:var(--muted);font-weight:850}h1{font-size:clamp(38px,5vw,62px);line-height:1.08;letter-spacing:-.06em;margin:14px 0;font-weight:820}h1 span{color:var(--accent)}.subtitle{color:var(--muted);font-size:16px;max-width:700px;margin:0;line-height:1.8}.stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px;margin:28px 0}.stat{background:var(--surface);border:1px solid var(--border);border-radius:19px;padding:20px 22px;box-shadow:var(--shadow)}.stat-label{color:var(--muted);font-size:12px;font-weight:700}.stat-number{font-size:30px;letter-spacing:-1px;font-weight:820;margin-top:8px}.stat-foot{color:var(--muted);font-size:11px;margin-top:3px}.columns{display:grid;grid-template-columns:minmax(300px,.9fr) minmax(0,1.35fr);gap:20px;align-items:start}.card{background:var(--surface);border:1px solid var(--border);border-radius:22px;padding:25px;box-shadow:var(--shadow);min-width:0;animation:rise .45s ease both}.card-head{display:flex;justify-content:space-between;align-items:flex-start;gap:14px;margin-bottom:20px}.kicker{color:var(--accent);font-size:10px;letter-spacing:1.5px;font-weight:850;text-transform:uppercase}.card h2{font-size:20px;letter-spacing:-.6px;margin:4px 0 7px}.hint{font-size:12px;color:var(--muted);margin:0;line-height:1.7}.field{margin-top:16px}label{display:block;font-size:12px;font-weight:750;margin-bottom:7px}input,select,textarea{width:100%;background:var(--surface-alt);color:var(--text);border:1px solid var(--border);border-radius:12px;padding:12px 13px;outline:none;transition:border-color .2s,box-shadow .2s}input,select{min-height:46px}textarea{min-height:82px;resize:vertical}input:focus,select:focus,textarea:focus{border-color:var(--accent);box-shadow:0 0 0 3px color-mix(in srgb,var(--accent) 18%,transparent)}.two{display:grid;grid-template-columns:1fr 1fr;gap:12px}.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;padding:11px 15px;border-radius:12px;border:1px solid var(--border);background:var(--surface-alt);color:var(--text);font-size:12px;font-weight:800;transition:transform .18s,border-color .18s}.btn:hover{transform:translateY(-1px);border-color:var(--accent)}.btn-primary{background:linear-gradient(110deg,#5d4ae0,#8571fa);border-color:transparent;color:#fff;box-shadow:0 9px 22px rgba(103,86,232,.2)}.btn-small{padding:8px 10px;font-size:11px}.btn-danger{color:var(--red)}.full{width:100%;margin-top:20px}.message{padding:13px 15px;border-radius:12px;margin-bottom:18px;font-size:13px}.success{background:var(--green-bg);color:var(--green)}.error{background:var(--red-bg);color:var(--red)}.badge{display:inline-flex;align-items:center;gap:6px;padding:6px 10px;border-radius:999px;background:var(--accent-light);color:var(--accent);font-size:10px;font-weight:850;white-space:nowrap}.badge.published{background:var(--green-bg);color:var(--green)}.badge.draft{background:var(--surface-alt);color:var(--muted)}.quiz-list{display:grid;gap:12px}.quiz-item{padding:16px;border:1px solid var(--border);border-radius:16px;background:var(--surface);transition:border-color .2s,transform .2s}.quiz-item:hover{border-color:color-mix(in srgb,var(--accent) 55%,var(--border));transform:translateY(-1px)}.quiz-title{font-size:15px;font-weight:800;letter-spacing:-.3px}.quiz-meta{font-size:11px;color:var(--muted);margin-top:7px;display:flex;gap:8px;flex-wrap:wrap}.quiz-actions{display:flex;gap:7px;flex-wrap:wrap;margin-top:13px}.empty{border:1px dashed var(--border);border-radius:16px;padding:30px 18px;text-align:center;color:var(--muted);font-size:12px}.empty strong{display:block;color:var(--text);font-size:14px;margin-bottom:6px}.section-gap{margin-top:20px}.question-item{border:1px solid var(--border);border-radius:15px;padding:16px;margin-top:12px}.question-text{font-size:13px;font-weight:750;white-space:pre-wrap;overflow-wrap:anywhere}.options{display:grid;gap:7px;margin-top:12px}.option{font-size:11px;color:var(--muted);padding:8px 10px;border-radius:9px;background:var(--surface-alt);overflow-wrap:anywhere}.option.correct{color:var(--green);background:var(--green-bg)}.topline{display:flex;justify-content:space-between;gap:12px;align-items:flex-start}.separator{height:1px;background:var(--border);margin:20px 0}.back-link{display:inline-flex;color:var(--accent);font-size:12px;font-weight:800;margin-bottom:14px}.fine{font-size:11px;color:var(--muted);margin-top:9px}@keyframes rise{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}@media(max-width:1100px){.layout{grid-template-columns:210px minmax(0,1fr)}.columns{grid-template-columns:1fr}.sidebar{padding-inline:10px}}@media(max-width:720px){.layout{grid-template-columns:1fr}.sidebar{padding:14px;gap:14px;border-right:0;border-bottom:1px solid var(--border)}.sidebar .nav{display:flex;overflow:auto}.sidebar .nav a{white-space:nowrap}.sidebar-foot,.nav-label{display:none}.main{padding:20px 15px 42px}.topbar{margin-bottom:34px}.stats{grid-template-columns:1fr 1fr}.stat:last-child{grid-column:1/-1}.card{padding:19px}.two{grid-template-columns:1fr}.top-actions{gap:8px}}@media(prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;transition-duration:.01ms!important;scroll-behavior:auto!important}}
 </style>
+
+<script src="<?= htmlspecialchars(url('assets/js/theme-global.js?v=20261107-2'), ENT_QUOTES, 'UTF-8') ?>"></script>
+<link rel="stylesheet" href="<?= e(url('assets/css/lecturer-premium-v5.css?v=1')) ?>">
+<script defer src="<?= e(url('assets/js/lecturer-premium-v5.js?v=1')) ?>"></script>
 </head>
 <body>
 <div class="layout">
@@ -575,6 +590,7 @@ document.addEventListener('DOMContentLoaded',()=>{const b=document.getElementByI
         <a href="<?= e(url('lecturer/index.php#modules')) ?>"><span class="ico">▤</span> My modules</a>
         <a href="<?= e(url('lecturer/materials.php')) ?>"><span class="ico">♧</span> Study materials</a>
         <a class="active" href="<?= e(url('lecturer/quizzes.php')) ?>"><span class="ico">▣</span> Quiz management</a>
+        <a class="subnav" href="<?= e(url('lecturer/gemini-test.php')) ?>"><span class="ico">✦</span> Generate quiz with AI</a>
     </nav>
     <div class="sidebar-foot">ULearn lecturer workspace<br>Manage your assigned modules with care.</div>
 </aside>
@@ -590,28 +606,28 @@ document.addEventListener('DOMContentLoaded',()=>{const b=document.getElementByI
 </section>
 <?php if ($notice !== ''): ?><div class="message success" role="status"><?= e($notice) ?></div><?php endif; ?>
 <?php if ($error !== ''): ?><div class="message error" role="alert"><?= e($error) ?></div><?php endif; ?>
+<nav class="ul-workspace-actions" aria-label="Assessment actions"><a href="#quiz-create">Create quiz draft →</a><a href="#quiz-library">Your quiz library</a><a href="<?= e(url('lecturer/gemini-test.php')) ?>">Generate with AI</a></nav>
 <div class="stats">
     <div class="stat"><div class="stat-label">Total quizzes</div><div class="stat-number"><?= count($quizzes) ?></div><div class="stat-foot">Drafts and published quizzes</div></div>
     <div class="stat"><div class="stat-label">Published</div><div class="stat-number"><?= $publishedCount ?></div><div class="stat-foot">Available for student delivery</div></div>
     <div class="stat"><div class="stat-label">Questions created</div><div class="stat-number"><?= $totalQuestions ?></div><div class="stat-foot">Across all quizzes</div></div>
 </div>
 <div class="columns">
-<section class="card">
+<section class="card" id="quiz-create">
     <div class="card-head"><div><div class="kicker"><?= $editingQuiz ? 'Quiz settings' : 'Build an assessment' ?></div><h2><?= $editingQuiz ? 'Edit quiz details' : 'Create a quiz' ?></h2><p class="hint">Start with the module, format and timing. New quizzes remain drafts until published.</p></div></div>
     <form method="post">
         <input type="hidden" name="csrf" value="<?= e(csrf()) ?>">
         <input type="hidden" name="action" value="<?= $editingQuiz ? 'update_quiz' : 'create_quiz' ?>">
         <?php if ($editingQuiz): ?><input type="hidden" name="quiz_id" value="<?= (int)$editingQuiz['id'] ?>"><?php endif; ?>
         <div class="field"><label for="title">Quiz title</label><input id="title" name="title" maxlength="200" required placeholder="e.g. Sorting Algorithms — Practice 01" value="<?= e((string)($editingQuiz['title'] ?? '')) ?>"></div>
-        <div class="field">
-            <label for="module_id">Assigned module</label>
-            <select id="module_id" name="module_id">
-                <option value="">Choose an assigned module</option>
-                <?php foreach ($modules as $module): ?>
-                <option value="<?= (int)$module['id'] ?>" <?= (int)($editingQuiz['module_id'] ?? 0) === (int)$module['id'] ? 'selected' : '' ?>><?= e((string)$module['module_code']) ?> — <?= e((string)$module['module_name']) ?></option>
-                <?php endforeach; ?>
-            </select>
-            <p class="fine">Only modules actively assigned to you are available.</p>
+        <div class="field"><label>Publish to degree programmes and intakes</label><p class="fine">Select all authorized programme/intake groups that should receive this quiz. No module assignment is required.</p>
+            <?php $savedTargets=[]; if ($editingQuiz) { $t=$pdo->prepare('SELECT degree_id,batch_id FROM quiz_teaching_targets WHERE quiz_id=?'); $t->execute([(int)$editingQuiz['id']]); foreach ($t->fetchAll(PDO::FETCH_ASSOC) as $r) $savedTargets[]=(int)$r['degree_id'].':'.(int)$r['batch_id']; } ?>
+            <div style="max-height:230px;overflow:auto;border:1px solid var(--border);border-radius:12px;padding:12px;display:grid;gap:9px">
+            <?php foreach ($quizScopes as $scope): $key=quizScopeKey($scope); ?>
+            <label style="display:flex;align-items:center;gap:10px;margin:0;font-weight:550;font-size:12px"><input style="width:16px;min-height:16px;accent-color:var(--accent)" type="checkbox" name="teaching_scopes[]" value="<?= e($key) ?>" <?= in_array($key,$savedTargets,true)?'checked':'' ?>><?= e((string)$scope['degree_name']) ?> · Intake <?= e((string)$scope['batch_code']) ?></label>
+            <?php endforeach; ?>
+            <?php if (!$quizScopes): ?><p class="fine">No active degree/intake assignments. Ask an administrator to assign your teaching groups.</p><?php endif; ?>
+            </div>
         </div>
         <div class="field"><label for="description">Description <span style="color:var(--muted);font-weight:500">(optional)</span></label><textarea id="description" name="description" maxlength="5000" placeholder="What should students practise or learn?"><?= e((string)($editingQuiz['description'] ?? '')) ?></textarea></div>
         <div class="two">
@@ -624,7 +640,7 @@ document.addEventListener('DOMContentLoaded',()=>{const b=document.getElementByI
             $savedUntil = !empty($editingQuiz['available_until']) ? date('Y-m-d\TH:i', strtotime((string)$editingQuiz['available_until'])) : '';
             $savedAvailabilityMode = ($savedFrom !== '' && $savedUntil !== '') ? 'scheduled' : (($savedFrom === '' && $savedUntil !== '') ? 'open_until' : 'unlimited');
         ?>
-        <div class="field">
+        <div class="field" style="display:none">
             <label for="availability_mode">Quiz availability <span style="color:var(--muted);font-weight:500">(optional)</span></label>
             <select id="availability_mode" name="availability_mode" onchange="updateAvailabilityFields()">
                 <option value="unlimited" <?= $savedAvailabilityMode === 'unlimited' ? 'selected' : '' ?>>Unlimited — stays available until I close it</option>
@@ -636,7 +652,7 @@ document.addEventListener('DOMContentLoaded',()=>{const b=document.getElementByI
             <div class="field" id="available_from_wrap"><label for="available_from">Opens</label><input id="available_from" name="available_from" type="datetime-local" value="<?= e($savedFrom) ?>"></div>
             <div class="field" id="available_until_wrap"><label for="available_until">Closes <span style="color:var(--muted);font-weight:500">(optional for open)</span></label><input id="available_until" name="available_until" type="datetime-local" value="<?= e($savedUntil) ?>"></div>
         </div>
-        <p class="fine" id="availability_help">Unlimited availability is selected by default. Leave dates unset to keep the quiz available until you manually close or unpublish it.</p>
+        <p class="fine">Once published, this quiz automatically closes after two calendar months. Students see the remaining time.</p>
         <button class="btn btn-primary full" type="submit"><?= $editingQuiz ? 'Save quiz details' : 'Create quiz draft' ?> <span>→</span></button>
         <?php if ($editingQuiz): ?><a class="btn full" href="<?= e(url('lecturer/quizzes.php?quiz=' . (int)$editingQuiz['id'])) ?>">Cancel edit</a><?php endif; ?>
     </form>
@@ -667,17 +683,52 @@ document.addEventListener('DOMContentLoaded',()=>{const b=document.getElementByI
     <div class="separator"></div>
     <div class="kicker">Faster workflow</div><h2>Bulk import questions</h2>
     <p class="hint">Paste all questions at once. ULearn separates the options, correct answer, explanation, topic and optional reason for each option. Students will not see answer keys during the quiz.</p>
-    <form method="post" enctype="multipart/form-data" class="section-gap">
+    <form method="post" enctype="multipart/form-data" class="section-gap" id="quiz-upload-form">
         <input type="hidden" name="csrf" value="<?= e(csrf()) ?>"><input type="hidden" name="action" value="preview_bulk"><input type="hidden" name="quiz_id" value="<?= (int)$editingQuiz['id'] ?>">
-        <div class="field"><label for="source_file">Or upload a .txt / .docx file</label><input id="source_file" name="source_file" type="file" accept=".txt,.docx"><p class="fine">If you choose a file, its text is used for preview. Otherwise paste below.</p></div><div class="field"><label for="bulk_text">Paste question set</label><textarea id="bulk_text" name="bulk_text" style="min-height:280px" placeholder="Q1: What is the time complexity of binary search?&#10;A) O(n)&#10;B) O(log n)&#10;C) O(n²)&#10;D) O(1)&#10;Correct: B&#10;Topic: Searching&#10;Explanation: Binary search halves the search interval at each step.&#10;Reason A: A linear scan is O(n), not binary search.&#10;Reason B: Each step halves the interval, so this is correct.&#10;Reason C: This is not the complexity of binary search.&#10;Reason D: The search is not constant time in general."><?= e($bulkText) ?></textarea></div>
+        <div class="field quiz-upload-field">
+          <label for="source_file">Upload your question document</label>
+          <div class="quiz-upload-zone" id="quiz-upload-zone">
+            <div class="quiz-upload-symbol" aria-hidden="true">&#8593;</div>
+            <strong>Drop a question file here</strong>
+            <span class="quiz-upload-description">Word DOCX or plain TXT · Select a file to automatically open the review page</span>
+            <label for="source_file" class="quiz-file-picker">Choose a file</label>
+            <input id="source_file" name="source_file" type="file" accept=".txt,.docx" aria-describedby="quiz-upload-status">
+            <div id="quiz-upload-status" class="quiz-upload-status" role="status" aria-live="polite">No file selected</div>
+          </div>
+          <button class="btn btn-primary full" type="submit" id="quiz-upload-button" disabled>Upload file &amp; review questions &rarr;</button>
+          <p class="fine">Selecting a file starts validation automatically. The button is available as a fallback. Your quiz remains a draft until you publish it.</p>
+        </div><p><a class="btn btn-primary" href="<?= e(url('lecturer/gemini-test.php')) ?>">✨ Generate questions with Gemini AI</a></p><div class="field"><label for="bulk_text">Paste question set</label><textarea id="bulk_text" name="bulk_text" style="min-height:280px" placeholder="Q1: What is the time complexity of binary search?&#10;A) O(n)&#10;B) O(log n)&#10;C) O(n²)&#10;D) O(1)&#10;Correct: B&#10;Topic: Searching&#10;Explanation: Binary search halves the search interval at each step.&#10;Reason A: A linear scan is O(n), not binary search.&#10;Reason B: Each step halves the interval, so this is correct.&#10;Reason C: This is not the complexity of binary search.&#10;Reason D: The search is not constant time in general."><?= e($bulkText) ?></textarea></div>
         <p class="fine">Use Q1: / Q2: headers; A)–D) options; Correct: B; optional Topic:, Difficulty:, Explanation:, and Reason A:–Reason D: lines. One blank line between questions is recommended. Word .docx and text .txt files are supported where PHP ZipArchive is enabled.</p>
-        <button class="btn btn-primary full" type="submit">Preview and validate questions →</button>
+        <button class="btn full" type="submit" id="quiz-paste-preview-button">Preview pasted questions &rarr;</button>
     </form>
     <?php if ($bulkPreview): ?>
+    <div id="import-preview-content">
         <div class="separator"></div><div class="topline"><div><div class="kicker">Import preview</div><h2><?= count($bulkPreview) ?> question block(s) detected</h2></div><span class="badge <?= $bulkErrors ? 'draft' : 'published' ?>"><?= $bulkErrors ? count($bulkErrors) . ' issue(s)' : 'Ready to import' ?></span></div>
         <?php foreach ($bulkErrors as $bulkIssue): ?><div class="message error"><?= e($bulkIssue) ?></div><?php endforeach; ?>
-        <?php foreach ($bulkPreview as $pi => $pq): ?><article class="question-item"><div class="question-text"><?= ($pi + 1) ?>. <?= e($pq['question_text']) ?></div><div class="options"><?php foreach (['A','B','C','D'] as $letter): ?><div class="option <?= $pq['correct'] === $letter ? 'correct' : '' ?>"><?= $letter ?>. <?= e($pq['options'][$letter]) ?><?= $pq['correct'] === $letter ? ' · Correct answer' : '' ?><?php if ($pq['option_explanations'][$letter] !== ''): ?><div class="fine"><?= e($pq['option_explanations'][$letter]) ?></div><?php endif; ?></div><?php endforeach; ?></div><p class="hint" style="margin-top:10px">Topic: <?= e($pq['topic']) ?><?= $pq['difficulty'] !== '' ? ' · Difficulty: ' . e($pq['difficulty']) : '' ?></p><?php if ($pq['explanation'] !== ''): ?><p class="hint"><strong>Explanation:</strong> <?= e($pq['explanation']) ?></p><?php endif; ?></article><?php endforeach; ?>
-        <?php if (!$bulkErrors): ?><form method="post" class="section-gap" onsubmit="return confirm('Import all <?= count($bulkPreview) ?> questions into this draft?')"><input type="hidden" name="csrf" value="<?= e(csrf()) ?>"><input type="hidden" name="action" value="import_bulk"><input type="hidden" name="quiz_id" value="<?= (int)$editingQuiz['id'] ?>"><textarea name="bulk_text" hidden><?= e($bulkText) ?></textarea><button class="btn btn-primary full" type="submit">Confirm &amp; import <?= count($bulkPreview) ?> questions</button></form><?php endif; ?>
+        <p class="hint" style="margin:12px 0">Review every question below. Edit the wording, answers, explanations, and reasons, or remove unwanted questions. Your edits are validated again before saving.</p>
+        <form method="post" class="section-gap" id="bulk-import-editor">
+          <input type="hidden" name="csrf" value="<?= e(csrf()) ?>">
+          <input type="hidden" name="action" value="import_bulk">
+          <input type="hidden" name="quiz_id" value="<?= (int)$editingQuiz['id'] ?>">
+          <textarea name="bulk_text" hidden id="edited-bulk-text"></textarea>
+          <div id="bulk-editable-list">
+          <?php foreach ($bulkPreview as $pi => $pq): ?>
+            <article class="question-item bulk-edit-question">
+              <div class="topline"><strong class="bulk-question-number">Question <?= $pi + 1 ?></strong><button type="button" class="btn btn-small btn-danger bulk-remove-question">Delete question</button></div>
+              <div class="field"><label>Question text</label><textarea data-field="question" required maxlength="10000"><?= e($pq['question_text']) ?></textarea></div>
+              <div class="two"><div class="field"><label>Topic</label><input data-field="topic" required maxlength="150" value="<?= e($pq['topic']) ?>"></div><div class="field"><label>Difficulty</label><select data-field="difficulty"><option value="">Not set</option><?php foreach (['Easy','Medium','Advanced'] as $level): ?><option value="<?= e($level) ?>" <?= strcasecmp((string)$pq['difficulty'],$level)===0?'selected':'' ?>><?= e($level) ?></option><?php endforeach; ?></select></div></div>
+              <?php foreach (['A','B','C','D'] as $letter): ?>
+                <div class="field"><label>Option <?= $letter ?></label><textarea data-field="option-<?= $letter ?>" required><?= e($pq['options'][$letter]) ?></textarea></div>
+                <div class="field"><label>Reason <?= $letter ?></label><textarea data-field="reason-<?= $letter ?>"><?= e($pq['option_explanations'][$letter]) ?></textarea></div>
+              <?php endforeach; ?>
+              <div class="field"><label>Correct answer</label><select data-field="correct" required><?php foreach (['A','B','C','D'] as $letter): ?><option value="<?= $letter ?>" <?= $pq['correct']===$letter?'selected':'' ?>><?= $letter ?></option><?php endforeach; ?></select></div>
+              <div class="field"><label>Overall explanation</label><textarea data-field="explanation"><?= e($pq['explanation']) ?></textarea></div>
+            </article>
+          <?php endforeach; ?>
+          </div>
+          <button class="btn btn-primary full" type="submit">Validate edits &amp; import questions</button>
+        </form>
+    </div>
     <?php endif; ?>
     <div class="separator"></div><div class="kicker">Or add one question manually</div>
     <form method="post">
@@ -718,9 +769,9 @@ document.addEventListener('DOMContentLoaded',()=>{const b=document.getElementByI
     </article>
     <?php endforeach; endif; ?>
 <?php else: ?>
-    <div class="card-head"><div><div class="kicker">Assessment library</div><h2>Your quizzes</h2><p class="hint">Open a quiz to manage its questions, review answers, or change publication status.</p></div></div>
+    <div class="card-head"><div><div class="kicker" id="quiz-library">Assessment library</div><h2>Your quizzes</h2><p class="hint">Open a quiz to manage its questions, review answers, or change publication status.</p></div></div>
     <?php if (!$quizzes): ?><div class="empty"><strong>Your quiz library is ready</strong>No quizzes have been created yet. Use the form to create your first draft.</div><?php else: ?>
-    <div class="quiz-list">
+    <div class="ul-library-tools" role="search" aria-label="Filter your quizzes"><input type="search" id="ul-quiz-search" placeholder="Search quiz title, module or description…" aria-label="Search quizzes"><select id="ul-quiz-filter" aria-label="Filter publication status"><option value="all">All quizzes</option><option value="published">Published</option><option value="draft">Drafts</option></select><span id="ul-quiz-count" class="ul-library-count" aria-live="polite"></span></div><div id="ul-quiz-empty" class="ul-library-empty" hidden>No quizzes match your search or filter.</div><div class="quiz-list">
     <?php foreach ($quizzes as $quiz): ?><article class="quiz-item">
         <div class="topline"><div class="quiz-title"><?= e((string)$quiz['title']) ?></div><span class="badge <?= (int)$quiz['is_published'] === 1 ? 'published' : 'draft' ?>"><?= (int)$quiz['is_published'] === 1 ? 'Published' : 'Draft' ?></span></div>
         <div class="quiz-meta"><span><?= e((string)($quiz['module_code'] ?? 'No module')) ?></span><span>·</span><span><?= (int)$quiz['question_count'] ?> questions</span><span>·</span><span><?= (int)$quiz['duration_minutes'] ?> min</span><span>·</span><span><?= e(ucfirst((string)$quiz['quiz_type'])) ?></span><?php if (!empty($quiz['available_from'])): ?><span>· Opens <?= e(date('d M Y H:i', strtotime((string)$quiz['available_from']))) ?></span><?php endif; ?><?php if (!empty($quiz['available_until'])): ?><span>· Closes <?= e(date('d M Y H:i', strtotime((string)$quiz['available_until']))) ?></span><?php endif; ?></div>
@@ -768,6 +819,115 @@ document.querySelectorAll('form').forEach(function(form){
         });
     }
 });
+</script>
+<script>
+
+</script><script>
+(function(){
+ const form=document.getElementById('bulk-import-editor');
+ if(!form)return;
+ const list=document.getElementById('bulk-editable-list');
+ const renumber=()=>[...list.querySelectorAll('.bulk-edit-question')].forEach((card,i)=>card.querySelector('.bulk-question-number').textContent='Question '+(i+1));
+ list.addEventListener('click',e=>{const btn=e.target.closest('.bulk-remove-question');if(!btn)return;if(!confirm('Remove this question from the import preview?'))return;btn.closest('.bulk-edit-question').remove();renumber();});
+ form.addEventListener('submit',e=>{
+   const cards=[...list.querySelectorAll('.bulk-edit-question')];
+   if(!cards.length){e.preventDefault();alert('Keep at least one question to import.');return;}
+   const get=(card,key)=>card.querySelector('[data-field="'+key+'"]')?.value.trim()||'';
+   const lines=[];
+   for(let i=0;i<cards.length;i++){
+     const c=cards[i], q=get(c,'question');
+     if(!q){e.preventDefault();alert('Question '+(i+1)+' has no text.');return;}
+     lines.push('Q'+(i+1)+': '+q);
+     for(const letter of ['A','B','C','D']){
+       const option=get(c,'option-'+letter);
+       if(!option){e.preventDefault();alert('Question '+(i+1)+' is missing option '+letter);return;}
+       lines.push(letter+') '+option);
+     }
+     lines.push('Correct: '+get(c,'correct'),'Topic: '+(get(c,'topic')||'General'));
+     if(get(c,'difficulty'))lines.push('Difficulty: '+get(c,'difficulty'));
+     lines.push('Explanation: '+get(c,'explanation'));
+     for(const letter of ['A','B','C','D'])lines.push('Reason '+letter+': '+get(c,'reason-'+letter));
+     lines.push('');
+   }
+   document.getElementById('edited-bulk-text').value=lines.join('\n');
+   if(!confirm('Import '+cards.length+' reviewed question(s) into this draft quiz?'))e.preventDefault();
+ });
+})();
+</script>
+<script>
+(function(){
+  // Import preview is its own focused screen, not a section below the upload form.
+  const previewMode = <?= $isImportPreviewPage ? 'true' : 'false' ?>;
+  if (!previewMode) return;
+  document.addEventListener('DOMContentLoaded', function(){
+    const main = document.querySelector('main.main');
+    const preview = document.getElementById('import-preview-content');
+    if (!main) return;
+    const pane = document.createElement('section');
+    pane.className = 'card';
+    pane.style.cssText = 'max-width:940px;margin:0 auto;animation:none';
+    const header = document.createElement('div');
+    header.innerHTML = '<a class="back-link" href="quizzes.php?quiz=<?= (int)($selectedQuizId ?? 0) ?>">← Back to quiz editor</a><div class="kicker">Step 2 of 3 · Review imported questions</div><h1 style="font-size:clamp(28px,3vw,40px);margin:12px 0">Review &amp; edit questions</h1><p class="hint">Edit questions, answers, explanations and reasons, or delete unwanted questions. Nothing is published until you confirm the import and publish the quiz.</p>';
+    pane.appendChild(header);
+    if (preview) pane.appendChild(preview);
+    else { const msg=document.createElement('p');msg.className='message error';msg.textContent='Preview expired. Return to the quiz and upload the file again.';pane.appendChild(msg); }
+    Array.from(main.children).forEach(child=>child.remove());
+    main.appendChild(pane);
+    document.documentElement.style.scrollBehavior='auto';
+    window.scrollTo(0,0);
+  });
+})();
+</script>
+<style>
+.quiz-upload-zone{position:relative;border:1.5px dashed color-mix(in srgb,var(--accent) 48%,var(--border));border-radius:19px;padding:28px 18px;text-align:center;background:linear-gradient(135deg,var(--accent-light),var(--surface));display:flex;flex-direction:column;align-items:center;gap:9px;transition:border-color .2s,background .2s}
+.quiz-upload-zone.dragover{border-color:var(--accent);background:var(--accent-light)}
+.quiz-upload-symbol{display:grid;place-items:center;width:48px;height:48px;border-radius:15px;background:var(--surface);color:var(--accent);font-size:27px;font-weight:700;border:1px solid var(--border)}
+.quiz-upload-zone strong{font-size:15px;letter-spacing:-.3px}
+.quiz-upload-description{font-size:12px;color:var(--muted);max-width:360px}
+.quiz-file-picker{display:inline-flex;align-items:center;justify-content:center;cursor:pointer;border-radius:11px;background:var(--accent);color:#fff;padding:11px 22px;margin:6px 0 0;font-size:12px;font-weight:800;box-shadow:0 7px 20px rgba(103,86,232,.18)}
+.quiz-upload-zone input[type=file]{position:absolute;width:1px;height:1px;opacity:0;overflow:hidden;padding:0;min-height:0;pointer-events:none}
+.quiz-upload-status{font-size:12px;font-weight:650;color:var(--muted);overflow-wrap:anywhere}
+#quiz-upload-button:disabled{opacity:.5;cursor:not-allowed;transform:none}
+</style>
+<script>
+(function(){
+  const form=document.getElementById('quiz-upload-form');
+  if(!form)return;
+  const input=form.querySelector('#source_file'),zone=form.querySelector('#quiz-upload-zone');
+  const status=form.querySelector('#quiz-upload-status'),uploadButton=form.querySelector('#quiz-upload-button');
+  const pasteButton=form.querySelector('#quiz-paste-preview-button');
+  let submitting=false;
+  function checkFile(file){
+    if(!file)return false;
+    if(!/\.(docx|txt)$/i.test(file.name)){status.textContent='Please select a .docx or .txt file.';return false;}
+    if(file.size>10*1024*1024){status.textContent='File exceeds 10 MB. Please choose a smaller file.';return false;}
+    return true;
+  }
+  function upload(){
+    if(submitting||!checkFile(input.files&&input.files[0]))return;
+    submitting=true;status.textContent='Uploading and validating '+input.files[0].name+'…';
+    uploadButton.disabled=true;uploadButton.textContent='Processing document…';
+    pasteButton.disabled=true;
+    if(form.requestSubmit)form.requestSubmit();
+    else form.submit();
+  }
+  input.addEventListener('change',function(){
+    const file=input.files&&input.files[0];
+    uploadButton.disabled=!checkFile(file);
+    status.textContent=file?(uploadButton.disabled?status.textContent:file.name+' · Ready to review'):'No file selected';
+    if(file&&!uploadButton.disabled)upload();
+  });
+  uploadButton.addEventListener('click',function(e){if(submitting)e.preventDefault();});
+  pasteButton.addEventListener('click',function(){input.value='';});
+  for(const eventName of ['dragenter','dragover'])zone.addEventListener(eventName,function(e){e.preventDefault();zone.classList.add('dragover');});
+  for(const eventName of ['dragleave','drop'])zone.addEventListener(eventName,function(e){e.preventDefault();zone.classList.remove('dragover');});
+  zone.addEventListener('drop',function(e){
+    const file=e.dataTransfer&&e.dataTransfer.files&&e.dataTransfer.files[0];
+    if(!checkFile(file))return;
+    try{const dt=new DataTransfer();dt.items.add(file);input.files=dt.files;input.dispatchEvent(new Event('change',{bubbles:true}));}
+    catch(err){status.textContent='Drag-and-drop is unavailable here. Please use Choose a file.';}
+  });
+})();
 </script>
 </body>
 </html>

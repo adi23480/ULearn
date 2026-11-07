@@ -56,19 +56,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $noteToDelete = $stmt->fetch(PDO::FETCH_ASSOC);
 
             if ($noteToDelete) {
-                $storage = dirname(__DIR__, 3) . DIRECTORY_SEPARATOR . 'ulearn_private' . DIRECTORY_SEPARATOR . 'notes';
-                $storedName = (string)$noteToDelete['stored_filename'];
-                if ($storedName !== '' && basename($storedName) === $storedName) {
-                    $filePath = $storage . DIRECTORY_SEPARATOR . $storedName;
-                    if (is_file($filePath)) {
-                        @unlink($filePath);
-                    }
-                }
-
+                // Delete the database record first, only while it is still pending.
+                // An administrator may approve the note between the SELECT and DELETE.
                 $delStmt = $pdo->prepare("DELETE FROM student_notes WHERE id = ? AND uploaded_by = ? AND status = 'pending'");
                 $delStmt->execute([$noteId, $userId]);
-
-                $_SESSION['ulearn_notes_upload_success'] = 'Pending note successfully deleted.';
+                if ($delStmt->rowCount() === 1) {
+                    $storage = dirname(__DIR__, 3) . DIRECTORY_SEPARATOR . 'ulearn_private' . DIRECTORY_SEPARATOR . 'notes';
+                    $storedName = (string)$noteToDelete['stored_filename'];
+                    if ($storedName !== '' && basename($storedName) === $storedName) {
+                        $filePath = $storage . DIRECTORY_SEPARATOR . $storedName;
+                        if (is_file($filePath)) { @unlink($filePath); }
+                    }
+                    $_SESSION['ulearn_notes_upload_success'] = 'Pending note successfully deleted.';
+                    go('dashboard/notes.php' . ($selectedModule ? '?module_id=' . $selectedModule : ''));
+                }
+                $error = 'This note was already reviewed. Refresh to see its current status.';
             } else {
                 $error = 'Could not find the pending note to delete.';
             }
@@ -76,9 +78,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             error_log('ULearn note delete error: ' . $ex->getMessage());
             $error = 'Could not delete the note. Please try again.';
         }
-        go('dashboard/notes.php' . ($selectedModule ? '?module_id=' . $selectedModule : ''));
-    }
-
+    } else {
     $title = trim((string)($_POST['title'] ?? ''));
     $description = trim((string)($_POST['description'] ?? ''));
     $moduleId = filter_var($_POST['module_id'] ?? null, FILTER_VALIDATE_INT) ?: 0;
@@ -92,7 +92,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     } elseif (mb_strlen($description) > 3000) {
         $error = 'The description must be 3,000 characters or fewer.';
     } elseif (!is_array($upload) || is_array($upload['error'] ?? null) || (int)($upload['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK) {
-        $error = 'Choose a valid PDF, DOCX or PPTX file (up to 20 MB).';
+        $uploadError = is_array($upload) ? (int)($upload['error'] ?? UPLOAD_ERR_NO_FILE) : UPLOAD_ERR_NO_FILE;
+        $error = $uploadError === UPLOAD_ERR_INI_SIZE || $uploadError === UPLOAD_ERR_FORM_SIZE
+            ? 'The file exceeds the server upload limit. Ask your administrator to increase upload_max_filesize and post_max_size to at least 20 MB.'
+            : 'Choose a valid PDF, DOCX or PPTX file (up to 20 MB).';
     } else {
         $original = (string)($upload['name'] ?? '');
         $original = basename(str_replace('\\', '/', $original));
@@ -113,9 +116,31 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $error = 'The PDF file is invalid.';
                 }
             } else {
-                if (!in_array($extension, ['docx', 'pptx'], true)) {
-                    $error = 'Invalid Office document extension.';
+                // DOCX and PPTX are ZIP-based Office Open XML packages.
+                // Do not trust the extension or the MIME type supplied by the browser.
+                if (!class_exists('ZipArchive')) {
+                    $error = 'Office uploads are unavailable: enable the PHP zip extension in XAMPP.';
                 } else {
+                    $archive = new ZipArchive();
+                    $opened = $archive->open($tmp, ZipArchive::CHECKCONS);
+                    if ($opened !== true) {
+                        $error = 'This Office document is damaged or invalid.';
+                    } else {
+                        $requiredPart = $extension === 'docx' ? 'word/document.xml' : 'ppt/presentation.xml';
+                        if ($archive->locateName('[Content_Types].xml') === false || $archive->locateName($requiredPart) === false) {
+                            $error = 'The file does not contain a valid ' . strtoupper($extension) . ' document.';
+                        }
+                        $archive->close();
+                    }
+                }
+                if ($error === '') {
+                    $mime = $extension === 'docx'
+                        ? 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+                        : 'application/vnd.openxmlformats-officedocument.presentationml.presentation';
+                }
+            }
+
+            if ($error === '') {
                     $mime = $extension === 'docx'
                         ? 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
                         : 'application/vnd.openxmlformats-officedocument.presentationml.presentation';
@@ -224,7 +249,23 @@ $theme = (string)($user['theme'] ?? 'system');
 :root{color-scheme:light;--bg:#f7f8fc;--surface:#fff;--text:#171927;--muted:#777b90;--border:#e7e8f0;--accent:#6756e8;--soft:#f0edff;--input:#fff}
 :root[data-theme="dark"]{color-scheme:dark;--bg:#0c0e16;--surface:#161924;--text:#f4f4fa;--muted:#a0a4b6;--border:#2b2e3c;--accent:#a99aff;--soft:#292440;--input:#202431}
 *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font-family:Inter,-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif;line-height:1.6}a{color:inherit;text-decoration:none}.wrap{max-width:1050px;margin:auto;padding:32px 22px 80px}.top{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:32px}.eyebrow{font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);font-weight:800}.button,button{display:inline-flex;justify-content:center;align-items:center;border:1px solid var(--border);border-radius:11px;background:var(--surface);color:var(--text);padding:11px 16px;font:700 13px inherit;cursor:pointer}.button.primary,button.primary{background:var(--accent);color:#fff;border-color:var(--accent)}.button:hover,button:hover{border-color:var(--accent)}h1{font-size:clamp(30px,4vw,46px);letter-spacing:-.04em;margin:10px 0}h2{font-size:22px;letter-spacing:-.025em}.muted{color:var(--muted)}.hero,.panel,.note{background:var(--surface);border:1px solid var(--border);border-radius:19px;padding:25px}.hero{margin-bottom:20px}.grid{display:grid;grid-template-columns:1.15fr .85fr;gap:18px}.field{margin-bottom:18px}label{display:block;font-weight:700;font-size:13px;margin-bottom:7px}input,select,textarea{width:100%;padding:12px 13px;border:1px solid var(--border);border-radius:11px;background:var(--input);color:var(--text);font:inherit}textarea{min-height:105px;resize:vertical}.help{font-size:12px;color:var(--muted);margin-top:6px}.notice{padding:13px 16px;border-radius:12px;margin-bottom:18px}.notice.error{background:#ffedf0;color:#9d2440}.notice.success{background:#e9f9ef;color:#166b3b}.stat{font-size:38px;font-weight:800;color:var(--accent);line-height:1.1}.notes{display:grid;gap:12px}.note{display:flex;align-items:flex-start;justify-content:space-between;gap:18px}.note h3{font-size:17px;margin:5px 0}.note p{margin:0 0 8px}.badge{display:inline-block;padding:6px 10px;border-radius:99px;background:var(--soft);color:var(--accent);font-size:12px;font-weight:800;text-transform:capitalize}.status-rejected{color:#a32143;background:#ffedf0}.status-approved{color:#166b3b;background:#e9f9ef}.section{margin-top:35px}.small{font-size:12px}.file-meta{overflow-wrap:anywhere}@media(max-width:760px){.grid{grid-template-columns:1fr}.wrap{padding:20px 15px 55px}.note{flex-direction:column}.hero,.panel,.note{padding:20px}}
+
+/* ULearn Notes — premium visual refresh; no upload/approval logic changed */
+:root{--bg:#f5f8f7;--surface:#fff;--text:#10233a;--muted:#627386;--border:#dce7e5;--accent:#087b57;--soft:#eaf6f1;--input:#fff}
+:root[data-theme="dark"]{--bg:#0b1522;--surface:#142235;--text:#f1f7fa;--muted:#9eafbf;--border:#293d50;--accent:#43d5a1;--soft:#173b37;--input:#1b2b40}
+body{font-family:Inter,ui-sans-serif,system-ui,-apple-system,'Segoe UI',sans-serif;letter-spacing:-.008em}.wrap{max-width:1200px}
+.top{border-bottom:1px solid var(--border);padding-bottom:22px}.hero,.panel,.note{border-radius:20px;box-shadow:0 10px 30px rgba(14,40,57,.045)}.hero{border-left:4px solid var(--accent)}
+.button,button{transition:background .18s,border-color .18s,transform .18s;min-height:42px;font-weight:700}.button:hover,button:hover{transform:translateY(-1px)}.button.primary,button.primary{background:#087b57;border-color:#087b57;color:#fff}.button.primary:hover,button.primary:hover{background:#066447}
+input,select,textarea{transition:border-color .18s,box-shadow .18s;min-height:44px}input:focus-visible,select:focus-visible,textarea:focus-visible,.button:focus-visible,button:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+input[type=file]{padding:18px;border:2px dashed var(--border);background:var(--soft);border-radius:14px;cursor:pointer;min-height:86px}input[type=file]:hover{border-color:var(--accent)}input[type=file]::file-selector-button{border:0;border-radius:9px;background:#087b57;color:#fff;padding:10px 14px;margin-right:14px;font-weight:750;cursor:pointer}
+.panel h2,.section h2{letter-spacing:-.035em}.note{transition:border-color .18s,box-shadow .18s}.note:hover{border-color:var(--accent)}.badge{letter-spacing:.01em}.status-pending{background:#fff5dd;color:#9a6700}
+@media(max-width:650px){.wrap{padding:18px 15px 55px}.hero,.panel,.note{padding:20px}.note{flex-direction:column}.top>div:last-child{display:flex;flex-wrap:wrap;gap:8px}}
+@media(prefers-reduced-motion:reduce){.button,button,input,select,textarea,.note{transition:none!important}.button:hover,button:hover{transform:none}}
 </style>
+
+<script src="<?= htmlspecialchars(url('assets/js/theme-global.js?v=20261107-2'), ENT_QUOTES, 'UTF-8') ?>"></script>
+<link rel="stylesheet" href="<?= e(url('assets/css/ulearn-design-system.css?v=1')) ?>">
+<script defer src="<?= e(url('assets/js/ulearn-motion.js?v=1')) ?>"></script>
 </head>
 <body><main class="wrap">
 <div class="top"><div><div class="eyebrow">ULearn / Student workspace</div><strong>Notes Hub</strong></div><div><a class="button" href="<?= e(url('dashboard/index.php')) ?>">← Dashboard</a> <a class="button" href="<?= e(url('dashboard/profile.php')) ?>">My Profile</a></div></div>
@@ -244,7 +285,7 @@ $theme = (string)($user['theme'] ?? 'system');
 
 <aside class="panel">
 <div class="eyebrow">Contribution rewards</div><h2>Your points</h2><div class="stat"><?= number_format($points) ?></div><p class="muted small">Points are earned after an administrator approves a student-uploaded note, not when you submit it.</p><hr style="border:0;border-top:1px solid var(--border);margin:25px 0"><h2>What happens next?</h2>
-<p class="muted small">1. Submit your note.<br>2. An administrator reviews it.<br>3. Approved notes become visible in the public Notes Hub.<br>4. Other students can preview, download and rate them.</p><p class="muted small">Public browsing, document previews, ratings and the admin review queue will be added in the next steps.</p></aside></div>
+<p class="muted small">1. Submit your note.<br>2. An administrator reviews it.<br>3. Approved notes become visible in the public Notes Hub.<br>4. Other students can preview, download and rate them.</p><p class="muted small">Browse approved notes in the Notes Hub. Administrators review pending submissions, and students can rate approved resources.</p></aside></div>
 
 <section class="section"><h2>Your uploaded notes</h2>
 <?php if (!$myNotes): ?>
@@ -283,4 +324,4 @@ if (uploadForm) uploadForm.addEventListener('submit', function () {
     const button = document.getElementById('submitNote');
     if (button) { button.disabled = true; button.textContent = 'Submitting…'; }
 });
-</script></body></html>
+</script><?php require_once __DIR__ . '/../includes/student-bot.php'; ?></body></html>

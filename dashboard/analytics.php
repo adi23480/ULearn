@@ -40,58 +40,33 @@ try {
     $stmt->execute([$userId]);
     $profile = $stmt->fetch(PDO::FETCH_ASSOC);
 
-    if (!$profile) {
-        throw new RuntimeException(
-            'Please complete your academic profile first.'
-        );
-    }
-
     if ($moduleId !== null) {
+        // A student may analyse only a module with their own completed quiz history.
         $stmt = $pdo->prepare("
             SELECT m.module_code, m.module_name
-            FROM academic_curriculum c
-            JOIN academic_modules m ON m.id = c.module_id
-            WHERE c.degree_id = ?
-              AND c.batch_id = ?
-              AND c.module_id = ?
-              AND c.is_active = 1
-              AND m.is_active = 1
+            FROM quiz_attempts a
+            JOIN quizzes q ON q.id = a.quiz_id
+            JOIN academic_modules m ON m.id = q.module_id
+            WHERE a.user_id = ? AND q.module_id = ?
+              AND a.status IN ('submitted', 'timed_out')
             LIMIT 1
         ");
-        $stmt->execute([
-            $profile['degree_id'],
-            $profile['batch_id'],
-            $moduleId
-        ]);
-
-        $selected = $stmt->fetch(PDO::FETCH_ASSOC);
-
-        if (!$selected) {
-            http_response_code(403);
-            throw new RuntimeException(
-                'This module is not assigned to your profile.'
-            );
+        $stmt->execute([$userId, $moduleId]);
+        $historicalModule = $stmt->fetch(PDO::FETCH_ASSOC);
+        if (!$historicalModule) {
+            http_response_code(404);
+            throw new RuntimeException('No completed quiz history was found for this module.');
         }
-
-        $moduleLabel = $selected['module_code']
-            . ' · ' . $selected['module_name'];
+        $moduleLabel = $historicalModule['module_code'] . ' · ' . $historicalModule['module_name'];
     }
 
     $scope = "
         FROM quiz_attempts a
         JOIN quizzes q ON q.id = a.quiz_id
         JOIN academic_modules m ON m.id = q.module_id
-        JOIN academic_curriculum c
-          ON c.module_id = m.id
-        JOIN student_academic_profiles p
-          ON p.user_id = a.user_id
-         AND p.degree_id = c.degree_id
-         AND p.batch_id = c.batch_id
+
         WHERE a.user_id = ?
-          AND c.is_active = 1
-          AND m.is_active = 1
           AND a.status IN ('submitted', 'timed_out')
-          AND a.submitted_at IS NOT NULL
           AND (? IS NULL OR q.module_id = ?)
     ";
 
@@ -129,17 +104,9 @@ try {
         JOIN quiz_questions qq ON qq.id = aa.question_id
         JOIN quizzes q ON q.id = a.quiz_id
         JOIN academic_modules m ON m.id = q.module_id
-        JOIN academic_curriculum c
-          ON c.module_id = m.id
-        JOIN student_academic_profiles p
-          ON p.user_id = a.user_id
-         AND p.degree_id = c.degree_id
-         AND p.batch_id = c.batch_id
+
         WHERE a.user_id = ?
-          AND c.is_active = 1
-          AND m.is_active = 1
           AND a.status IN ('submitted', 'timed_out')
-          AND a.submitted_at IS NOT NULL
           AND qq.quiz_id = q.id
           AND (? IS NULL OR q.module_id = ?)
     ";
@@ -185,7 +152,7 @@ try {
 
     $knownErrors = [
         'Please complete your academic profile first.',
-        'This module is not assigned to your profile.'
+        'No completed quiz history was found for this module.'
     ];
 
     $error = in_array(
@@ -530,7 +497,7 @@ $topicUrl = url('dashboard/topic-analysis.php')
     align-items: flex-end;
     justify-content: space-around;
     gap: 12px;
-    height: 195px;
+    height: 110px;
     border-bottom: 1px solid var(--line);
     padding: 12px 8px 0;
 }
@@ -657,7 +624,23 @@ $topicUrl = url('dashboard/topic-analysis.php')
         scroll-behavior: auto !important;
     }
 }
+
+/* Compact learning insights: avoids tall panels for small datasets */
+.ula-grid{align-items:start;gap:14px;margin-bottom:14px}
+.ula-grid>.ula-panel{padding:18px!important;min-height:0!important;height:auto!important}
+.ula-chart{height:115px!important;max-height:115px;justify-content:center;gap:16px;padding-top:8px}
+.ula-chart-column{flex:0 1 65px;max-width:75px}
+.ula-panel-desc{margin:5px 0 12px!important}
+.ula-row{padding:9px 0!important;margin:0!important}
+.ula-row-head{margin-bottom:5px!important}
+.ula-small{margin:5px 0!important}
+.ula-panel h2{margin:4px 0!important}
+.ula-actions{gap:8px;flex-wrap:wrap}
+@media(max-width:760px){.ula-grid{grid-template-columns:1fr!important}}
 </style>
+
+<script src="<?= htmlspecialchars(url('assets/js/theme-global.js?v=20261107-2'), ENT_QUOTES, 'UTF-8') ?>"></script>
+<link rel="stylesheet" href="<?= e(url('assets/css/learning-ui-v2.css?v=2')) ?>">
 </head>
 
 <body>
@@ -779,6 +762,17 @@ $topicUrl = url('dashboard/topic-analysis.php')
                 Complete a quiz to start tracking progress.
             </div>
         <?php else: ?>
+            <?php if (count($trend) === 1):
+                $onlyScore = max(0, min(100, (float)$trend[0]['percentage']));
+            ?>
+                <div class="ula-one-result">
+                    <strong><?= number_format($onlyScore, 0) ?>%</strong>
+                    <div style="flex:1">
+                        <p>First recorded attempt — complete more quizzes to see a trend.</p>
+                        <div class="ula-progress"><div class="ula-progress-fill" style="width:<?= $onlyScore ?>%"></div></div>
+                    </div>
+                </div>
+            <?php else: ?>
             <div class="ula-chart">
                 <?php foreach ($trend as $i => $attempt):
                     $score = max(
@@ -799,9 +793,8 @@ $topicUrl = url('dashboard/topic-analysis.php')
                 <?php endforeach; ?>
             </div>
 
-            <p class="ula-small">
-                Older attempts → Most recent
-            </p>
+            <p class="ula-small">Older attempts → Most recent</p>
+            <?php endif; ?>
         <?php endif; ?>
     </article>
 
@@ -817,7 +810,7 @@ $topicUrl = url('dashboard/topic-analysis.php')
                 Topic insights appear after quiz submissions.
             </div>
         <?php else: ?>
-            <?php foreach ($topics as $topic):
+            <?php foreach (array_slice($topics, 0, 5) as $topic):
                 $value = max(
                     0,
                     min(100, (float)$topic['accuracy'])
@@ -849,7 +842,8 @@ $topicUrl = url('dashboard/topic-analysis.php')
             <?php endforeach; ?>
         <?php endif; ?>
 
-        <div class="ula-actions" style="margin-top:20px">
+        <div class="ula-actions" style="margin-top:12px">
+            <a class="ula-btn" href="<?= e(url('dashboard/learning-insights.php')) ?>">Quiz-by-quiz insights ↗</a>
             <a class="ula-btn" href="<?= e($topicUrl) ?>">
                 Explore topic weaknesses ↗
             </a>
@@ -963,7 +957,8 @@ $topicUrl = url('dashboard/topic-analysis.php')
             <?php endforeach; ?>
         <?php endif; ?>
 
-        <div class="ula-actions" style="margin-top:20px">
+        <div class="ula-actions" style="margin-top:12px">
+            <a class="ula-btn" href="<?= e(url('dashboard/learning-insights.php')) ?>">Quiz-by-quiz insights ↗</a>
             <a class="ula-btn ula-btn-primary"
                href="<?= e(url('dashboard/quizzes.php')) ?>">
                 Go to Quiz Arena ↗
@@ -978,5 +973,5 @@ $topicUrl = url('dashboard/topic-analysis.php')
 </footer>
 
 </main>
-</body>
+<?php require_once __DIR__ . '/../includes/student-bot.php'; ?></body>
 </html>

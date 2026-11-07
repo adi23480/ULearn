@@ -170,6 +170,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         $_SESSION['dev_verification_code']
                     );
 
+                    // The code was verified in the original pending-registration session.
+                    // Establish a login only after successful verification.
+                    $verifiedUser = db()->prepare(
+                        "SELECT id, role, session_version, account_status, email_verified_at
+                         FROM users WHERE id = ? LIMIT 1"
+                    );
+                    $verifiedUser->execute([$userId]);
+                    $verifiedAccount = $verifiedUser->fetch();
+                    if ($verifiedAccount && $verifiedAccount['role'] === 'student'
+                        && $verifiedAccount['account_status'] !== 'suspended'
+                        && !empty($verifiedAccount['email_verified_at'])) {
+                        session_regenerate_id(true);
+                        $_SESSION['uid'] = (int)$verifiedAccount['id'];
+                        $_SESSION['session_version'] = (int)$verifiedAccount['session_version'];
+                        go('dashboard/index.php');
+                    }
                     $success = true;
                 } else {
                     $pdo->rollBack();

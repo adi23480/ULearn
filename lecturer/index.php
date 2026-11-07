@@ -122,6 +122,20 @@ $stmt->execute([(int)$lecturer['id']]);
 
 $modules = $stmt->fetchAll();
 
+// Teaching groups exist independently of module assignments.
+$groupStmt = $pdo->prepare("
+    SELECT lda.id AS group_id, d.name AS degree_name, b.batch_code,
+           lda.study_year, lda.semester
+    FROM lecturer_degree_assignments lda
+    INNER JOIN academic_degrees d ON d.id = lda.degree_id
+    INNER JOIN academic_batches b ON b.id = lda.batch_id
+    WHERE lda.lecturer_id = ? AND lda.is_active = 1
+    ORDER BY d.name, b.batch_code, lda.study_year, lda.semester
+");
+$groupStmt->execute([(int)$lecturer['id']]);
+$teachingGroups = $groupStmt->fetchAll(PDO::FETCH_ASSOC);
+
+
 
 
 $fullName = (string)$user['full_name'];
@@ -835,6 +849,10 @@ if (!in_array($theme, ['light', 'dark', 'system'], true)) {
 
     </script>
 
+
+<script src="<?= htmlspecialchars(url('assets/js/theme-global.js?v=20261107-2'), ENT_QUOTES, 'UTF-8') ?>"></script>
+<link rel="stylesheet" href="<?= e(url('assets/css/lecturer-premium-v5.css?v=1')) ?>">
+<script defer src="<?= e(url('assets/js/lecturer-premium-v5.js?v=1')) ?>"></script>
 </head>
 
 
@@ -872,8 +890,9 @@ if (!in_array($theme, ['light', 'dark', 'system'], true)) {
             <a href="<?= e(url('lecturer/materials.php')) ?>">▣ Study Materials</a>
 
             <a href="<?= e(url('lecturer/quizzes.php')) ?>">☷ Quiz Management</a>
+            <a href="<?= e(url('lecturer/gemini-test.php')) ?>" style="margin-left:18px;font-size:12px">✦ Generate quiz with AI</a>
 
-            <a href="#consultations">◷ Consultations</a>
+            <a href="<?= e(url('lecturer/consultations.php')) ?>">◷ Consultations</a>
 
             <a href="<?= e(url('dashboard/notifications.php')) ?>">♧ Notifications</a>
 
@@ -1009,7 +1028,8 @@ if (!in_array($theme, ['light', 'dark', 'system'], true)) {
 
 
 
-        <section class="stats">
+        <nav class="ul-workspace-actions" aria-label="Quick lecturer actions"><a href="<?= e(url('lecturer/quizzes.php')) ?>">Create or manage quizzes →</a><a href="<?= e(url('lecturer/materials.php')) ?>">Study materials</a><a href="<?= e(url('lecturer/performance.php')) ?>">Student performance</a><a href="<?= e(url('lecturer/consultations.php')) ?>">Consultations</a></nav>
+<section class="stats">
 
 
 
@@ -1069,7 +1089,28 @@ if (!in_array($theme, ['light', 'dark', 'system'], true)) {
 
 
 
-        <section id="modules">
+        <section id="teaching-groups">
+    <h2 class="section-title">My Teaching Groups</h2>
+    <?php if (!$teachingGroups): ?>
+        <div class="empty">No programme or intake teaching groups are currently assigned. Contact your administrator.</div>
+    <?php else: ?>
+        <div class="module-grid">
+            <?php foreach ($teachingGroups as $group): ?>
+                <a class="card" href="<?= e(url('lecturer/teaching-group.php')) ?>?id=<?= (int)$group['group_id'] ?>" style="display:block;text-decoration:none;color:var(--text);cursor:pointer;transition:transform .18s ease,border-color .18s ease" onmouseover="this.style.transform='translateY(-3px)'" onmouseout="this.style.transform=''">
+                    <div class="module-name"><?= e($group['degree_name']) ?></div>
+                    <div class="module-meta">
+                        Intake <?= e($group['batch_code']) ?><br>
+                        Year <?= (int)$group['study_year'] ?> ·
+                        <?= (int)$group['semester'] === 0 ? 'All semesters' : 'Semester ' . (int)$group['semester'] ?>
+                    </div>
+                    <div style="margin-top:15px;color:var(--accent);font-weight:700">Open teaching group →</div>
+                </a>
+            <?php endforeach; ?>
+        </div>
+    <?php endif; ?>
+</section>
+
+<section id="modules">
 
 
 
@@ -1215,6 +1256,8 @@ if (!in_array($theme, ['light', 'dark', 'system'], true)) {
 
 
 
+    <script src="<?= e(url('assets/js/scroll-position.js')) ?>" defer></script>
+<script src="<?= e(url('assets/js/notifications-live.js')) ?>" data-base="<?= e(rtrim(url(), '/')) ?>" defer></script>
 </body>
 
 </html>

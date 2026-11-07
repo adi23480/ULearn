@@ -3,6 +3,9 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/../config/bootstrap.php';
 
+// University-local scheduling; do not rely on the operating system default timezone.
+date_default_timezone_set('Asia/Colombo');
+
 $user = require_login();
 
 if (($user['role'] ?? '') !== 'student') {
@@ -11,6 +14,8 @@ if (($user['role'] ?? '') !== 'student') {
 }
 
 $pdo = db();
+// Keep MySQL NOW() aligned with PHP's Sri Lanka-local DATETIME values.
+$pdo->exec("SET time_zone = '+05:30'");
 $uid = (int)$user['id'];
 $error = '';
 $notice = (string)($_GET['notice'] ?? '');
@@ -103,7 +108,7 @@ function kpNotify(
         $type,
         $title,
         $message,
-        url('dashboard/kuppiya.php?room=' . $sessionId)
+        url('dashboard/kuppiya-room.php?id=' . $sessionId)
     ]);
 }
 
@@ -329,9 +334,15 @@ try {
 
             $q->execute([$id, $uid, $message]);
 
+            kpNotifyMembers(
+                $pdo, $id, $uid, 'kuppiya_message',
+                'New Kuppiya message',
+                ($user['full_name'] ?? 'A member') . ' sent a message in ' . $s['title'] . '.'
+            );
+
             $pdo->commit();
 
-            kpRedirect('Message sent.', $id);
+            go('dashboard/kuppiya.php?room=' . $id . '#kuppiya-chat');
         }
 
 
@@ -1473,8 +1484,40 @@ textarea::placeholder {
 
 }
 
+
+/* Premium Kuppiya scheduler */
+.kp-scheduler{min-width:0}.kp-schedule-heading,.kp-calendar-head,.kp-times-head{display:flex;align-items:center;justify-content:space-between;gap:12px}.kp-schedule-heading{margin-bottom:18px}.kp-schedule-heading label{font-weight:750;font-size:16px}.kp-schedule-heading p{margin:4px 0 0}.kp-zone{font-size:11px;color:var(--muted);border:1px solid var(--border);padding:8px 10px;border-radius:999px;white-space:nowrap}.kp-schedule-layout{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,1fr);gap:16px}.kp-calendar,.kp-times{border:1px solid var(--border);border-radius:18px;padding:17px;background:var(--surface);min-width:0}.kp-calendar-head{margin-bottom:15px}.kp-calendar-head strong,.kp-times-head strong{font-size:14px}.kp-nav{border:1px solid var(--border);background:var(--surface);color:var(--text);width:32px;height:32px;border-radius:10px;font-size:24px;line-height:1;cursor:pointer}.kp-nav:disabled{opacity:.3;cursor:not-allowed}.kp-day-names,.kp-calendar-days{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:5px;text-align:center}.kp-day-names{margin-bottom:7px}.kp-day-names span{font-size:11px;color:var(--muted);padding:7px 0}.kp-date{border:1px solid transparent;background:transparent;color:var(--text);border-radius:10px;min-height:39px;cursor:pointer;font:inherit;font-size:13px;transition:background .15s,border-color .15s}.kp-date:hover:not(:disabled),.kp-time:hover:not(:disabled){background:var(--soft);border-color:var(--accent)}.kp-date:disabled,.kp-time:disabled{opacity:.25;cursor:not-allowed}.kp-date.kp-picked,.kp-time.kp-picked{background:var(--accent);color:#fff;border-color:var(--accent);font-weight:700}.kp-date.kp-today:not(.kp-picked){border-color:var(--accent)}.kp-times-head{align-items:start;margin-bottom:13px;flex-wrap:wrap}.kp-times-head .meta{font-size:11px}.kp-time-choices{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;max-height:270px;overflow-y:auto;align-content:start;padding-right:3px}.kp-time{border:1px solid var(--border);background:var(--surface);color:var(--text);border-radius:10px;padding:11px 3px;font:inherit;font-size:12px;cursor:pointer;transition:background .15s,border-color .15s}.kp-selection{margin-top:12px;border-radius:11px;background:var(--soft);color:var(--accent);padding:11px 14px;font-size:12px;font-weight:650}@media(max-width:760px){.kp-schedule-layout{grid-template-columns:1fr}.kp-zone{display:none}.kp-calendar,.kp-times{padding:13px}.kp-time-choices{max-height:205px}}
+
+
+/* Stage 7: refined session discovery */
+.kp-toolbar{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin:18px 0 22px}
+.kp-search{flex:1;min-width:220px;position:relative}
+.kp-search input{width:100%;padding:13px 16px 13px 42px;border:1px solid var(--border);border-radius:14px;background:var(--surface);color:var(--text);font:inherit;outline:none;transition:border-color .2s,box-shadow .2s}
+.kp-search input:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--soft)}
+.kp-search:before{content:'⌕';position:absolute;left:16px;top:6px;font-size:25px;color:var(--muted)}
+.kp-filters{display:flex;gap:6px;flex-wrap:wrap}
+.kp-filter{border:1px solid var(--border);background:var(--surface);color:var(--muted);padding:10px 14px;border-radius:12px;font:inherit;font-size:13px;cursor:pointer;transition:all .2s}
+.kp-filter[aria-pressed="true"]{background:var(--soft);color:var(--accent);border-color:var(--accent);font-weight:700}
+.kp-session-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,300px),1fr));gap:16px}
+.kp-session-card{border:1px solid var(--border);background:var(--surface);border-radius:20px;padding:22px;display:flex;flex-direction:column;gap:14px;min-width:0;transition:transform .2s,border-color .2s,box-shadow .2s}
+.kp-session-card:hover{transform:translateY(-3px);border-color:var(--accent);box-shadow:0 12px 32px rgba(20,20,40,.07)}
+.kp-session-top,.kp-session-bottom{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.kp-tag{font-size:11px;font-weight:750;letter-spacing:.02em;padding:5px 10px;border-radius:99px;background:var(--soft);color:var(--accent)}
+.kp-tag.neutral{background:var(--bg);color:var(--muted)}
+.kp-session-card h3{font-size:18px;line-height:1.3;letter-spacing:-.35px;margin:0;overflow-wrap:anywhere}
+.kp-session-details{display:grid;gap:8px;font-size:13px;color:var(--muted)}
+.kp-session-details span{display:flex;align-items:center;gap:8px}
+.kp-session-bottom{margin-top:auto;padding-top:16px;border-top:1px solid var(--border)}
+.kp-session-bottom .btn{border-radius:11px;font-size:13px;padding:9px 13px}
+.kp-empty-filter{padding:32px 20px;border:1px dashed var(--border);border-radius:16px;text-align:center;color:var(--muted)}
+.kp-session-card[hidden],.kp-empty-filter[hidden]{display:none!important}
+@media(max-width:600px){.kp-toolbar{align-items:stretch}.kp-search{min-width:100%}.kp-filters{width:100%}.kp-filter{flex:1}.kp-session-card{padding:18px}}
+
 </style>
 
+
+<script src="<?= htmlspecialchars(url('assets/js/theme-global.js?v=20261107-2'), ENT_QUOTES, 'UTF-8') ?>"></script>
+<link rel="stylesheet" href="<?= e(url('assets/css/ulearn-community-phase4.css?v=1')) ?>">
 </head>
 
 
@@ -1563,160 +1606,7 @@ Maximum 12 students per group.
 <?php endif; ?>
 
 
-<?php if (!$sessionId && $view === 'discover'): ?>
 
-<section class="section">
-
-<h2>Create a Kuppiya</h2>
-
-<div class="card">
-
-<form method="post">
-
-<input type="hidden" name="csrf" value="<?= e(csrf()) ?>">
-
-<input type="hidden" name="action" value="create">
-
-<div class="grid">
-
-
-<div class="field full">
-
-<label for="title">What are we studying?</label>
-
-<input
-    id="title"
-    name="title"
-    maxlength="180"
-    required
-    placeholder="e.g. Algorithm Sorting Revision">
-
-</div>
-
-
-<div class="field">
-
-<label for="session_date">Session date</label>
-
-<input
-    id="session_date"
-    name="session_date"
-    type="date"
-    min="<?= e(date('Y-m-d')) ?>"
-    required>
-
-<span class="meta">Click the calendar icon to choose a date.</span>
-
-</div>
-
-
-<div class="field">
-
-<label for="start_time">Start time</label>
-
-<select id="start_time" name="start_time" required>
-
-<option value="">Choose a start time</option>
-
-<?php
-for ($hour = 7; $hour <= 22; $hour++):
-    for ($minute = 0; $minute < 60; $minute += 30):
-        $value = sprintf('%02d:%02d', $hour, $minute);
-?>
-
-<option value="<?= e($value) ?>">
-    <?= e(date('g:i A', strtotime($value))) ?>
-</option>
-
-<?php
-    endfor;
-endfor;
-?>
-
-</select>
-
-</div>
-
-
-<div class="field">
-
-<label for="duration_minutes">How long?</label>
-
-<select id="duration_minutes" name="duration_minutes" required>
-
-<option value="30">30 minutes</option>
-<option value="60" selected>1 hour</option>
-<option value="90">1 hour 30 minutes</option>
-<option value="120">2 hours</option>
-<option value="180">3 hours</option>
-
-</select>
-
-<span class="meta">End time is calculated automatically.</span>
-
-</div>
-
-
-<div class="field">
-
-<label for="location_type">Meeting type</label>
-
-<select id="location_type" name="location_type">
-
-<option value="online">Online</option>
-<option value="in_person">In person</option>
-
-</select>
-
-</div>
-
-
-<div class="field full">
-
-<label for="meeting_details">Meeting link or location (members only)</label>
-
-<input
-    id="meeting_details"
-    name="meeting_details"
-    maxlength="500"
-    placeholder="Zoom link or study room">
-
-</div>
-
-
-<div class="field full">
-
-<label for="description">Description (optional)</label>
-
-<textarea
-    id="description"
-    name="description"
-    maxlength="3000"
-    placeholder="Topics we'll cover"></textarea>
-
-</div>
-
-</div>
-
-
-<p>
-<button class="btn primary" type="submit">
-    Create Kuppiya →
-</button>
-</p>
-
-<div class="meta">
-The host counts as member 1. At least 2 members are needed when the session begins.
-No module selection needed.
-</div>
-
-</form>
-
-</div>
-
-</section>
-
-<?php endif; ?>
 
 
 <div class="tabs" role="navigation" aria-label="Kuppiya pages">
@@ -1814,6 +1704,7 @@ Hosted by <?= e($selected['host_name']) ?>
 </div>
 
 
+<div id="kuppiya-chat"></div>
 <div class="chat" id="roomChat" aria-label="Group messages">
 
 
@@ -2203,55 +2094,28 @@ Discover a session →
 <?php else: ?>
 
 
-<div class="stack">
-
-
-<?php foreach ($mine as $s): ?>
-
-
-<div class="card flex" style="justify-content:space-between">
-
-
-<div>
-
-<strong>
-<?= e($s['title']) ?>
-</strong>
-
-
-<div class="meta">
-
-<?= e($s['starts_at']) ?>
-
-·
-
-<?= e(
-    $s['status'] === 'cancelled'
-        ? 'Cancelled'
-        : (strtotime($s['ends_at']) <= time() ? 'Finished' : 'Upcoming')
-) ?>
-
+<div class="kp-toolbar" data-kp-scope="mine">
+  <div class="kp-search"><input type="search" data-kp-search placeholder="Search your sessions…" aria-label="Search my Kuppiyas"></div>
+  <div class="kp-filters" aria-label="Filter my Kuppiyas">
+    <button class="kp-filter" type="button" data-kp-filter="all" aria-pressed="true">All</button>
+    <button class="kp-filter" type="button" data-kp-filter="upcoming" aria-pressed="false">Upcoming</button>
+    <button class="kp-filter" type="button" data-kp-filter="completed" aria-pressed="false">Completed</button>
+    <button class="kp-filter" type="button" data-kp-filter="cancelled" aria-pressed="false">Cancelled</button>
+  </div>
 </div>
-
-</div>
-
-
-<a
-    class="btn primary"
-    href="<?= e($base . '?room=' . (int)$s['id']) ?>">
-
-Open Group Chat →
-
-</a>
-
-
-</div>
-
-
+<div class="kp-session-grid" data-kp-cards>
+<?php foreach ($mine as $s):
+    $mineState = $s['status'] === 'cancelled' ? 'cancelled' : (($s['status'] === 'completed' || strtotime($s['ends_at']) <= time()) ? 'completed' : 'upcoming');
+?>
+<article class="kp-session-card" data-kp-card data-state="<?= e($mineState) ?>" data-search="<?= e(strtolower($s['title'])) ?>">
+  <div class="kp-session-top"><span class="kp-tag"><?= e(ucfirst($mineState)) ?></span><span class="kp-tag neutral">My session</span></div>
+  <h3><?= e($s['title']) ?></h3>
+  <div class="kp-session-details"><span>◷ <?= e(date('D, M j · g:i A', strtotime($s['starts_at']))) ?></span></div>
+  <div class="kp-session-bottom"><span class="meta">Session details & chat</span><a class="btn primary" href="<?= e(url('dashboard/kuppiya-room.php?id=' . (int)$s['id'])) ?>">Open →</a></div>
+</article>
 <?php endforeach; ?>
-
-
 </div>
+<div class="kp-empty-filter" data-kp-empty hidden>No sessions match this filter.</div>
 
 
 <?php endif; ?>
@@ -2283,69 +2147,168 @@ No upcoming sessions yet. Create the first one!
 <?php else: ?>
 
 
-<div class="grid">
-
-
-<?php foreach ($upcoming as $s): ?>
-
-
-<article class="card session">
-
-
-<span class="pill">
-<?= (int)$s['member_count'] ?> / 12 members
-</span>
-
-
-<h3 style="margin-top:12px">
-<?= e($s['title']) ?>
-</h3>
-
-
-<p class="meta">
-
-<?= e($s['starts_at']) ?>
-
-to
-
-<?= e($s['ends_at']) ?>
-
-</p>
-
-
-<p class="meta">
-Host: <?= e($s['host_name']) ?>
-</p>
-
-
-<a
-    class="btn"
-    href="<?= e(
-        $base .
-        ((int)$s['is_member'] === 1 ? '?room=' : '?session=') .
-        (int)$s['id']
-    ) ?>">
-
-<?= (int)$s['is_member'] === 1
-    ? 'Open my room'
-    : 'View & join' ?>
-
-</a>
-
-
-</article>
-
-
-<?php endforeach; ?>
-
-
+<div class="kp-toolbar" data-kp-scope="discover">
+  <div class="kp-search"><input type="search" data-kp-search placeholder="Search Kuppiyas or hosts…" aria-label="Search upcoming Kuppiyas"></div>
+  <div class="kp-filters" aria-label="Filter upcoming Kuppiyas">
+    <button class="kp-filter" type="button" data-kp-filter="all" aria-pressed="true">All sessions</button>
+    <button class="kp-filter" type="button" data-kp-filter="joined" aria-pressed="false">Joined</button>
+    <button class="kp-filter" type="button" data-kp-filter="available" aria-pressed="false">Available</button>
+  </div>
 </div>
+<div class="kp-session-grid" data-kp-cards>
+<?php foreach ($upcoming as $s):
+    $joined = (int)$s['is_member'] === 1;
+    $full = (int)$s['member_count'] >= 12;
+?>
+<article class="kp-session-card" data-kp-card data-state="<?= $joined ? 'joined' : 'available' ?>" data-search="<?= e(strtolower($s['title'].' '.$s['host_name'])) ?>">
+  <div class="kp-session-top"><span class="kp-tag"><?= $joined ? 'Joined' : ($full ? 'Full' : 'Open to join') ?></span><span class="kp-tag neutral"><?= (int)$s['member_count'] ?> / 12 seats</span></div>
+  <h3><?= e($s['title']) ?></h3>
+  <div class="kp-session-details">
+    <span>◷ <?= e(date('D, M j · g:i A', strtotime($s['starts_at']))) ?></span>
+    <span>⌁ <?= e(date('g:i A', strtotime($s['ends_at']))) ?> end</span>
+    <span>♙ Hosted by <?= e($s['host_name']) ?></span>
+  </div>
+  <div class="kp-session-bottom"><span class="meta"><?= $joined ? 'Your study group' : ($full ? 'All seats taken' : 'Peer study session') ?></span>
+    <a class="btn <?= $joined ? 'primary' : '' ?>" href="<?= e(($joined ? url('dashboard/kuppiya-room.php?id=' . (int)$s['id']) : $base . '?session=' . (int)$s['id'])) ?>"><?= $joined ? 'Open room →' : 'View details →' ?></a>
+  </div>
+</article>
+<?php endforeach; ?>
+</div>
+<div class="kp-empty-filter" data-kp-empty hidden>No sessions match your search.</div>
 
 
 <?php endif; ?>
 
 
 </section>
+
+
+<?php if (!$sessionId && $view === 'discover'): ?>
+
+<section class="section">
+
+<h2>Create a Kuppiya</h2>
+
+<div class="card">
+
+<form method="post">
+
+<input type="hidden" name="csrf" value="<?= e(csrf()) ?>">
+
+<input type="hidden" name="action" value="create">
+
+<div class="grid">
+
+
+<div class="field full">
+
+<label for="title">What are we studying?</label>
+
+<input
+    id="title"
+    name="title"
+    maxlength="180"
+    required
+    placeholder="e.g. Algorithm Sorting Revision">
+
+</div>
+
+
+<div class="field full kp-scheduler">
+  <div class="kp-schedule-heading"><div><label>When is your Kuppiya?</label><p class="meta">Pick a date, then a start time.</p></div><span class="kp-zone">Sri Lanka time · GMT+5:30</span></div>
+  <div class="kp-schedule-layout">
+    <div class="kp-calendar" aria-label="Session calendar">
+      <div class="kp-calendar-head"><button type="button" id="kpPrevMonth" class="kp-nav" aria-label="Previous month">‹</button><strong id="kpMonthTitle"></strong><button type="button" id="kpNextMonth" class="kp-nav" aria-label="Next month">›</button></div>
+      <div class="kp-day-names"><span>Mo</span><span>Tu</span><span>We</span><span>Th</span><span>Fr</span><span>Sa</span><span>Su</span></div>
+      <div id="kpCalendarDays" class="kp-calendar-days" role="group" aria-label="Choose date"></div>
+    </div>
+    <div class="kp-times"><div class="kp-times-head"><strong>Start time</strong><span id="kpDateSummary" class="meta">Select a date</span></div><div id="kpTimeChoices" class="kp-time-choices" role="group" aria-label="Choose start time"></div></div>
+  </div>
+  <div class="kp-selection" id="kpSelection" aria-live="polite">Choose your date and time</div>
+  <input id="session_date" name="session_date" type="hidden" required>
+  <input id="start_time" name="start_time" type="hidden" required>
+</div>
+
+
+<div class="field">
+
+<label for="duration_minutes">How long?</label>
+
+<select id="duration_minutes" name="duration_minutes" required>
+
+<option value="30">30 minutes</option>
+<option value="60" selected>1 hour</option>
+<option value="90">1 hour 30 minutes</option>
+<option value="120">2 hours</option>
+<option value="180">3 hours</option>
+
+</select>
+
+<span class="meta">End time is calculated automatically.</span>
+
+</div>
+
+
+<div class="field">
+
+<label for="location_type">Meeting type</label>
+
+<select id="location_type" name="location_type">
+
+<option value="online">Online</option>
+<option value="in_person">In person</option>
+
+</select>
+
+</div>
+
+
+<div class="field full">
+
+<label for="meeting_details">Meeting link or location (members only)</label>
+
+<input
+    id="meeting_details"
+    name="meeting_details"
+    maxlength="500"
+    placeholder="Zoom link or study room">
+
+</div>
+
+
+<div class="field full">
+
+<label for="description">Description (optional)</label>
+
+<textarea
+    id="description"
+    name="description"
+    maxlength="3000"
+    placeholder="Topics we'll cover"></textarea>
+
+</div>
+
+</div>
+
+
+<p>
+<button class="btn primary" type="submit">
+    Create Kuppiya →
+</button>
+</p>
+
+<div class="meta">
+The host counts as member 1. At least 2 members are needed when the session begins.
+No module selection needed.
+</div>
+
+</form>
+
+</div>
+
+</section>
+
+<?php endif; ?>
 
 
 <?php endif; ?>
@@ -2364,6 +2327,66 @@ Only members can access group chat and meeting details.
 </div>
 
 
+<script>
+
+// Kuppiya date/time picker. Hidden inputs retain the existing PHP POST contract.
+document.addEventListener('DOMContentLoaded', function () {
+    const dateInput = document.getElementById('session_date');
+    const timeInput = document.getElementById('start_time');
+    if (!dateInput || !timeInput) return;
+    const daysEl = document.getElementById('kpCalendarDays');
+    const timesEl = document.getElementById('kpTimeChoices');
+    const titleEl = document.getElementById('kpMonthTitle');
+    const summaryEl = document.getElementById('kpDateSummary');
+    const selectionEl = document.getElementById('kpSelection');
+    const prev = document.getElementById('kpPrevMonth');
+    const next = document.getElementById('kpNextMonth');
+    const formatDate = d => [d.getFullYear(),String(d.getMonth()+1).padStart(2,'0'),String(d.getDate()).padStart(2,'0')].join('-');
+    const today = new Date(); today.setHours(0,0,0,0);
+    let month = new Date(today.getFullYear(),today.getMonth(),1);
+    let chosenDate = ''; let chosenTime = '';
+    const pretty = d => d.toLocaleDateString('en-LK',{weekday:'short',month:'short',day:'numeric',year:'numeric'});
+    function renderTimes(){
+        timesEl.replaceChildren();
+        if (!chosenDate){summaryEl.textContent='Select a date';return;}
+        const parts=chosenDate.split('-').map(Number);
+        const chosen=new Date(parts[0],parts[1]-1,parts[2]);
+        summaryEl.textContent=pretty(chosen);
+        for(let h=7;h<=22;h++)for(let m=0;m<60;m+=30){
+            const value=String(h).padStart(2,'0')+':'+String(m).padStart(2,'0');
+            const label=(h%12||12)+':'+String(m).padStart(2,'0')+' '+(h<12?'AM':'PM');
+            const btn=document.createElement('button');btn.type='button';btn.className='kp-time'+(value===chosenTime?' kp-picked':'');btn.textContent=label;
+            // Only enable future times on the current date.
+            const now=new Date();
+            if(formatDate(chosen)===formatDate(now) && (h*60+m)<=now.getHours()*60+now.getMinutes())btn.disabled=true;
+            btn.setAttribute('aria-pressed',String(value===chosenTime));
+            btn.addEventListener('click',()=>{chosenTime=value;timeInput.value=value;renderTimes();selectionEl.textContent=pretty(chosen)+' · '+label;});
+            timesEl.append(btn);
+        }
+    }
+    function renderCalendar(){
+        daysEl.replaceChildren();titleEl.textContent=month.toLocaleDateString('en-LK',{month:'long',year:'numeric'});
+        prev.disabled=month.getFullYear()===today.getFullYear()&&month.getMonth()===today.getMonth();
+        const first=(month.getDay()+6)%7;
+        for(let i=0;i<first;i++){const empty=document.createElement('span');daysEl.append(empty);}
+        const count=new Date(month.getFullYear(),month.getMonth()+1,0).getDate();
+        for(let day=1;day<=count;day++){
+            const d=new Date(month.getFullYear(),month.getMonth(),day);const value=formatDate(d);
+            const btn=document.createElement('button');btn.type='button';btn.className='kp-date'+(value===chosenDate?' kp-picked':'')+(value===formatDate(today)?' kp-today':'');btn.textContent=String(day);btn.disabled=d<today;
+            btn.setAttribute('aria-label',pretty(d));btn.setAttribute('aria-pressed',String(value===chosenDate));
+            btn.addEventListener('click',()=>{chosenDate=value;chosenTime='';dateInput.value=value;timeInput.value='';selectionEl.textContent='Choose a start time';renderCalendar();renderTimes();});
+            daysEl.append(btn);
+        }
+    }
+    prev.addEventListener('click',()=>{month=new Date(month.getFullYear(),month.getMonth()-1,1);renderCalendar();});
+    next.addEventListener('click',()=>{month=new Date(month.getFullYear(),month.getMonth()+1,1);renderCalendar();});
+    const form=dateInput.closest('form');
+    form.addEventListener('submit',e=>{if(!dateInput.value||!timeInput.value){e.preventDefault();selectionEl.textContent='Please choose both a date and a start time.';selectionEl.scrollIntoView({behavior:'smooth',block:'center'});}});
+    renderCalendar();renderTimes();
+});
+
+</script>
+
 <!-- CHAT JAVASCRIPT -->
 
 <script>
@@ -2376,6 +2399,11 @@ document.addEventListener('DOMContentLoaded', function () {
 
     if (chat) {
         chat.scrollTop = chat.scrollHeight;
+        if (window.location.hash === '#kuppiya-chat') {
+            requestAnimationFrame(function () {
+                document.getElementById('kuppiya-chat').scrollIntoView({block: 'start'});
+            });
+        }
     }
 
 
@@ -2399,6 +2427,13 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
 
+    field.form.addEventListener('submit', function () {
+        if (field.form.dataset.sending === 'submitted') return;
+        field.form.dataset.sending = 'submitted';
+        var send = field.form.querySelector('button[type="submit"]');
+        if (send) { send.disabled = true; send.textContent = 'Sending…'; }
+    });
+
     field.addEventListener('input', resize);
 
     resize();
@@ -2417,7 +2452,10 @@ document.addEventListener('DOMContentLoaded', function () {
             e.preventDefault();
 
             if (field.value.trim()) {
-                field.form.requestSubmit();
+                if (!field.form.dataset.sending) {
+                    field.form.dataset.sending = '1';
+                    field.form.requestSubmit();
+                }
             }
 
         }
@@ -2429,5 +2467,36 @@ document.addEventListener('DOMContentLoaded', function () {
 </script>
 
 
-</body>
+
+<script>
+// Local filtering only: no additional database requests or session changes.
+document.querySelectorAll('[data-kp-scope]').forEach(function(toolbar){
+  var scope = toolbar.parentElement;
+  var search = toolbar.querySelector('[data-kp-search]');
+  var filters = Array.from(toolbar.querySelectorAll('[data-kp-filter]'));
+  var cards = Array.from(scope.querySelectorAll('[data-kp-card]'));
+  var empty = scope.querySelector('[data-kp-empty]');
+  var active = 'all';
+  function refresh(){
+    var query = (search.value || '').trim().toLocaleLowerCase();
+    var visible = 0;
+    cards.forEach(function(card){
+      var match = (active === 'all' || card.dataset.state === active) && (!query || (card.dataset.search || '').includes(query));
+      card.hidden = !match;
+      if(match) visible++;
+    });
+    if(empty) empty.hidden = visible !== 0;
+  }
+  filters.forEach(function(button){button.addEventListener('click',function(){
+    active = button.dataset.kpFilter;
+    filters.forEach(function(b){b.setAttribute('aria-pressed',String(b === button));});
+    refresh();
+  });});
+  search.addEventListener('input',refresh);
+  refresh();
+});
+</script>
+
+<script src="<?= e(url('assets/js/notifications-live.js?v=20261107-profile-only-2')) ?>" data-base="<?= e(rtrim(url(), '/')) ?>" defer></script>
+<?php require_once __DIR__ . '/../includes/student-bot.php'; ?></body>
 </html>

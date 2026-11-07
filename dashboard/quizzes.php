@@ -179,17 +179,12 @@ try {
 
 
 
-                JOIN academic_modules m ON m.id=q.module_id
+                LEFT JOIN academic_modules m ON m.id=q.module_id
+                WHERE q.id=? AND q.is_published=1 AND (q.module_id IS NULL AND EXISTS (SELECT 1 FROM quiz_teaching_targets qt JOIN student_enrollments se ON se.degree_id=qt.degree_id AND se.batch_id=qt.batch_id WHERE qt.quiz_id=q.id AND se.student_id=? AND se.is_active=1) OR q.module_id IS NOT NULL AND EXISTS (SELECT 1 FROM student_module_enrollments sme WHERE sme.module_id=q.module_id AND sme.user_id=? AND (NOT EXISTS (SELECT 1 FROM quiz_teaching_targets qt0 WHERE qt0.quiz_id=q.id) OR EXISTS (SELECT 1 FROM quiz_teaching_targets qt JOIN student_enrollments se ON se.student_id=sme.user_id AND se.degree_id=qt.degree_id AND se.batch_id=qt.batch_id AND (qt.study_year=0 OR qt.study_year=se.study_year) AND (qt.semester=0 OR qt.semester=se.semester) AND se.is_active=1 WHERE qt.quiz_id=q.id)))) LIMIT 1");
 
 
 
-                JOIN student_module_enrollments sme ON sme.module_id=m.id AND sme.user_id=?
-
-                 WHERE q.id=? AND q.is_published=1 AND m.is_active=1 LIMIT 1");
-
-
-
-            $stmt->execute([$userId, $quizId]);
+            $stmt->execute([$quizId, $userId, $userId]);
 
 
 
@@ -418,6 +413,14 @@ try {
 
 
                 $pdo->commit();
+                // XP awards are idempotent. Quiz results must remain saved even if scoring fails.
+                try {
+                    require_once __DIR__ . '/../scoring/scoring_engine.php';
+                    awardQuizXp($pdo, $userId, $attemptId);
+                } catch (Throwable $xpError) {
+                    error_log('ULearn leaderboard XP: '.$xpError->getMessage());
+                }
+
 
 
 
@@ -473,7 +476,7 @@ try {
 
 
 
-            FROM quiz_attempts a JOIN quizzes q ON q.id=a.quiz_id JOIN academic_modules m ON m.id=q.module_id
+            FROM quiz_attempts a JOIN quizzes q ON q.id=a.quiz_id LEFT JOIN academic_modules m ON m.id=q.module_id
 
 
 
@@ -565,7 +568,7 @@ try {
 
 
 
-            FROM quiz_attempts a JOIN quizzes q ON q.id=a.quiz_id JOIN academic_modules m ON m.id=q.module_id
+            FROM quiz_attempts a JOIN quizzes q ON q.id=a.quiz_id LEFT JOIN academic_modules m ON m.id=q.module_id
 
 
 
@@ -683,13 +686,12 @@ try {
 
 
 
-            FROM quizzes q JOIN academic_modules m ON m.id=q.module_id
+            FROM quizzes q LEFT JOIN academic_modules m ON m.id=q.module_id
 
 
 
-            JOIN student_module_enrollments sme ON sme.module_id=m.id AND sme.user_id=?
-
-              WHERE q.is_published=1 AND m.is_active=1" . ($moduleFilterId !== null ? " AND m.id=?" : "") . "
+            WHERE ((q.module_id IS NULL AND EXISTS (SELECT 1 FROM quiz_teaching_targets qt JOIN student_enrollments se ON se.degree_id=qt.degree_id AND se.batch_id=qt.batch_id WHERE qt.quiz_id=q.id AND se.student_id=? AND se.is_active=1)) OR (q.module_id IS NOT NULL AND EXISTS (SELECT 1 FROM student_module_enrollments sme WHERE sme.module_id=q.module_id AND sme.user_id=? AND (NOT EXISTS (SELECT 1 FROM quiz_teaching_targets qt0 WHERE qt0.quiz_id=q.id) OR EXISTS (SELECT 1 FROM quiz_teaching_targets qt JOIN student_enrollments se ON se.student_id=sme.user_id AND se.degree_id=qt.degree_id AND se.batch_id=qt.batch_id AND (qt.study_year=0 OR qt.study_year=se.study_year) AND (qt.semester=0 OR qt.semester=se.semester) AND se.is_active=1 WHERE qt.quiz_id=q.id)))))
+            AND q.is_published=1 AND (q.module_id IS NULL OR m.is_active=1)" . ($moduleFilterId !== null ? " AND m.id=?" : "") . "
 
 
 
@@ -697,7 +699,7 @@ try {
 
 
 
-        $stmt->execute($moduleFilterId !== null ? [$userId, $moduleFilterId] : [$userId]);
+        $stmt->execute($moduleFilterId !== null ? [$userId, $userId, $moduleFilterId] : [$userId, $userId]);
 
 
 
@@ -813,15 +815,27 @@ body{background:var(--quiz-bg);color:var(--quiz-text)}.quiz-wrap{max-width:1080p
 
  .review-details{margin:12px 0;padding:0;overflow:hidden}.review-details summary{display:flex;flex-direction:column;gap:7px;position:relative;cursor:pointer;padding:20px 160px 20px 20px;list-style:none}.review-details summary::-webkit-details-marker{display:none}.review-details summary:focus-visible{outline:3px solid var(--quiz-accent);outline-offset:-3px}.review-question{font-size:17px;font-weight:700;white-space:pre-wrap}.review-toggle{position:absolute;right:20px;top:50%;transform:translateY(-50%);border:1px solid var(--quiz-border);border-radius:10px;padding:7px 10px;color:var(--quiz-accent);font-size:13px;font-weight:700}.review-details[open] .review-toggle{font-size:0}.review-details[open] .review-toggle::after{content:"Hide answers";font-size:13px}.review-body{padding:0 20px 20px;border-top:1px solid var(--quiz-border)}@media(max-width:640px){.review-details summary{padding:18px 18px 58px}.review-toggle{top:auto;bottom:12px;left:18px;right:auto;transform:none}}
 
+
+/* ULearn contextual AI answer review */
+.ai-review-panel{margin-top:20px;padding:20px;border:1px solid #ddd9fa;background:linear-gradient(145deg,#faf9ff,#fff);border-radius:17px}
+.ai-review-heading{display:flex;align-items:flex-start;gap:12px}.ai-review-heading strong{display:block;font-size:15px;color:#302b59}.ai-review-heading span:not(.ai-review-symbol){display:block;font-size:13px;color:#6f7190;margin-top:5px;line-height:1.6}
+.ai-review-symbol{display:grid;place-items:center;flex-shrink:0;width:36px;height:36px;border-radius:11px;background:#eeeaff;color:#6552d5;font-size:21px}
+.ai-review-actions{display:flex;flex-wrap:wrap;gap:10px;margin-top:17px}.ai-review-actions .quiz-btn{font-size:13px}.ai-youtube{color:#b52e3d!important;background:#fff!important}.ai-youtube:hover{border-color:#e5a3aa}
+.ai-review-output{margin-top:17px;border-top:1px solid #e7e3f6;padding-top:16px;white-space:pre-wrap;overflow-wrap:anywhere;font-size:14px;line-height:1.8;color:#343650}.ai-review-output[hidden]{display:none}.ai-review-trigger:disabled{opacity:.65;cursor:wait}
 </style>
 
 
 
+
+<script src="<?= htmlspecialchars(url('assets/js/theme-global.js?v=20261107-2'), ENT_QUOTES, 'UTF-8') ?>"></script>
+<link rel="stylesheet" href="<?= e(url('assets/css/ulearn-design-system.css?v=1')) ?>">
+<script defer src="<?= e(url('assets/js/ulearn-motion.js?v=1')) ?>"></script>
+<link rel="stylesheet" href="<?= e(url('assets/css/ulearn-student-workspaces.css?v=3')) ?>">
 </head>
 
 
 
-<body>
+<body class="ul3-quizzes">
 
 
 
@@ -845,7 +859,7 @@ body{background:var(--quiz-bg);color:var(--quiz-text)}.quiz-wrap{max-width:1080p
 
 
 
-<section class="quiz-hero"><div class="topline"><?= e((string)$attempt['module_code']) ?> · <?= e((string)$attempt['module_name']) ?></div><h1><?= e((string)$attempt['title']) ?></h1><p class="muted"><?= e((string)($attempt['description'] ?? 'Answer each question, then submit to see your score and explanations.')) ?></p><div class="quiz-meta"><span class="pill"><?= count($questions) ?> questions</span><span class="pill"><?= (int)$attempt['duration_minutes'] ?> minutes</span><span>Time remaining: <span class="timer" id="quizTimer"><?= gmdate('i:s', $remainingSeconds) ?></span></span></div></section>
+<section class="quiz-hero"><div class="topline"><?= e((string)($attempt['module_code'] ?? 'PROGRAMME')) ?> · <?= e((string)($attempt['module_name'] ?? 'Degree programme quiz')) ?></div><h1><?= e((string)$attempt['title']) ?></h1><p class="muted"><?= e((string)($attempt['description'] ?? 'Answer each question, then submit to see your score and explanations.')) ?></p><div class="quiz-meta"><span class="pill"><?= count($questions) ?> questions</span><span class="pill"><?= (int)$attempt['duration_minutes'] ?> minutes</span><span>Time remaining: <span class="timer" id="quizTimer"><?= gmdate('i:s', $remainingSeconds) ?></span></span></div></section>
 
 
 
@@ -869,15 +883,32 @@ body{background:var(--quiz-bg);color:var(--quiz-text)}.quiz-wrap{max-width:1080p
 
 
 
-<section class="quiz-hero"><div class="topline">Quiz results · <?= e((string)$result['module_code']) ?></div><h1><?= e((string)$result['title']) ?></h1><div class="result-score"><?= e(rtrim(rtrim(number_format((float)$result['score'],2,'.',''),'0'),'.')) ?> <span class="muted" style="font-size:20px">/ <?= e(rtrim(rtrim(number_format((float)$result['max_score'],2,'.',''),'0'),'.')) ?></span></div><p class="muted"><?= $result['max_score'] > 0 ? (int)round(((float)$result['score']/(float)$result['max_score'])*100) : 0 ?>% · <?= $result['status'] === 'timed_out' ? 'Time expired' : 'Submitted' ?> · <?= !empty($result['submitted_at']) ? e(date('d M Y, H:i', strtotime((string)$result['submitted_at']))) : '' ?></p><div class="btn-row"><a class="quiz-btn primary" href="quiz-history.php">Back to Quiz History</a><a class="quiz-btn" href="quizzes.php">Quiz Arena</a></div></section>
+<section class="quiz-hero"><div class="topline">Quiz results · <?= e((string)($result['module_code'] ?? 'PROGRAMME')) ?></div><h1><?= e((string)$result['title']) ?></h1><div class="result-score"><?= e(rtrim(rtrim(number_format((float)$result['score'],2,'.',''),'0'),'.')) ?> <span class="muted" style="font-size:20px">/ <?= e(rtrim(rtrim(number_format((float)$result['max_score'],2,'.',''),'0'),'.')) ?></span></div><p class="muted"><?= $result['max_score'] > 0 ? (int)round(((float)$result['score']/(float)$result['max_score'])*100) : 0 ?>% · <?= $result['status'] === 'timed_out' ? 'Time expired' : 'Submitted' ?> · <?= !empty($result['submitted_at']) ? e(date('d M Y, H:i', strtotime((string)$result['submitted_at']))) : '' ?></p><div class="btn-row"><a class="quiz-btn primary" href="quiz-history.php">Back to Quiz History</a><a class="quiz-btn" href="quizzes.php">Quiz Arena</a></div></section>
 
 
 
+<p style="margin:16px 0"><a class="quiz-btn primary" href="<?= e(url('dashboard/ai-study.php')) ?>">✦ Ask AI to explain a question</a></p>
 <h2>Review your answers</h2><p class="muted">Select a question to show or hide its answers and explanations.</p>
 
 
 
-<?php foreach ($resultQuestions as $i => $rq): ?><details class="result-card review-details"><summary><span class="topline">Question <?= $i+1 ?> · <?= e((string)($rq['topic'] ?: 'General')) ?></span><span class="review-question"><?= e((string)$rq['question_text']) ?></span><span class="review-toggle">Show answers</span></summary><div class="review-body"><?php foreach ($rq['options'] as $opt): $isCorrect=(int)$opt['is_correct']===1; $isChosen=(int)$opt['id']===(int)($rq['selected_option_id'] ?? 0); ?><div class="review-option <?= $isCorrect?'correct':($isChosen?'chosen-wrong':'') ?>"><strong><?= $isCorrect?'Correct answer':($isChosen?'Your answer':'Option') ?><?= $isCorrect||$isChosen?':':'' ?></strong> <?= e((string)$opt['option_text']) ?><?php if (!empty($opt['explanation'])): ?><div class="muted" style="margin-top:5px;font-size:14px"><?= e((string)$opt['explanation']) ?></div><?php endif; ?></div><?php endforeach; ?><?php if (!empty($rq['question_explanation'])): ?><p><strong>Explanation:</strong> <?= e((string)$rq['question_explanation']) ?></p><?php endif; ?><p class="muted">Points earned: <?= e(rtrim(rtrim(number_format((float)$rq['points_awarded'],2,'.',''),'0'),'.')) ?></p></div></details><?php endforeach; ?>
+<?php foreach ($resultQuestions as $i => $rq):
+$needsHelp = (int)($rq['is_correct'] ?? 0) !== 1;
+$topicSearch = trim((string)($rq['topic'] ?? ''));
+if ($topicSearch === '' || strcasecmp($topicSearch, 'General') === 0) $topicSearch = mb_substr((string)$rq['question_text'], 0, 120);
+$youtubeSearchUrl = 'https://www.youtube.com/results?search_query=' . rawurlencode($topicSearch . ' tutorial');
+?><details class="result-card review-details"><summary><span class="topline">Question <?= $i+1 ?> · <?= e((string)($rq['topic'] ?: 'General')) ?></span><span class="review-question"><?= e((string)$rq['question_text']) ?></span><span class="review-toggle">Show answers</span></summary><div class="review-body"><?php foreach ($rq['options'] as $opt): $isCorrect=(int)$opt['is_correct']===1; $isChosen=(int)$opt['id']===(int)($rq['selected_option_id'] ?? 0); ?><div class="review-option <?= $isCorrect?'correct':($isChosen?'chosen-wrong':'') ?>"><strong><?= $isCorrect?'Correct answer':($isChosen?'Your answer':'Option') ?><?= $isCorrect||$isChosen?':':'' ?></strong> <?= e((string)$opt['option_text']) ?><?php if (!empty($opt['explanation'])): ?><div class="muted" style="margin-top:5px;font-size:14px"><?= e((string)$opt['explanation']) ?></div><?php endif; ?></div><?php endforeach; ?><?php if (!empty($rq['question_explanation'])): ?><p><strong>Explanation:</strong> <?= e((string)$rq['question_explanation']) ?></p><?php endif; ?>
+<?php if ($needsHelp): ?>
+<div class="ai-review-panel" data-ai-review>
+  <div class="ai-review-heading"><span class="ai-review-symbol">✦</span><div><strong>Understand your mistake</strong><span>Get a clear explanation, then explore this topic on YouTube.</span></div></div>
+  <div class="ai-review-actions">
+    <button type="button" class="quiz-btn primary ai-review-trigger" data-attempt="<?= (int)$result['id'] ?>" data-question="<?= (int)$rq['id'] ?>">✦ Ask AI to explain</button>
+    <a class="quiz-btn ai-youtube" href="<?= e($youtubeSearchUrl) ?>" target="_blank" rel="noopener noreferrer" aria-label="Search YouTube tutorials about <?= e($topicSearch) ?>">▶ YouTube tutorials ↗</a>
+  </div>
+  <div class="ai-review-output" role="status" aria-live="polite" hidden></div>
+</div>
+<?php endif; ?>
+<p class="muted">Points earned: <?= e(rtrim(rtrim(number_format((float)$rq['points_awarded'],2,'.',''),'0'),'.')) ?></p></div></details><?php endforeach; ?>
 
 
 
@@ -894,7 +925,7 @@ body{background:var(--quiz-bg);color:var(--quiz-text)}.quiz-wrap{max-width:1080p
 
 
 
-<?php else: ?><div class="quiz-grid"><?php foreach ($availableQuizzes as $quiz): ?><article class="quiz-card"><div class="topline"><?= e((string)$quiz['module_code']) ?> · <?= e((string)$quiz['module_name']) ?></div><h2><?= e((string)$quiz['title']) ?></h2><p class="muted"><?= e((string)($quiz['description'] ?: 'Practice questions for this module.')) ?></p><div class="quiz-meta"><span class="pill"><?= (int)$quiz['question_count'] ?> questions</span><span><?= (int)$quiz['duration_minutes'] ?> min</span><span><?= e(ucfirst((string)$quiz['quiz_type'])) ?></span></div><?php if (!empty($quiz['available_until'])): ?><p class="muted" style="font-size:13px">Available until <?= e(date('d M Y H:i', strtotime((string)$quiz['available_until']))) ?></p><?php endif; ?><form method="post"><input type="hidden" name="csrf" value="<?= e(csrf()) ?>"><input type="hidden" name="action" value="start"><input type="hidden" name="quiz_id" value="<?= (int)$quiz['id'] ?>"><button class="quiz-btn primary" type="submit">Start quiz →</button></form></article><?php endforeach; ?></div><?php endif; ?>
+<?php else: ?><div class="quiz-grid"><?php foreach ($availableQuizzes as $quiz): ?><article class="quiz-card"><div class="topline"><?= e((string)($quiz['module_code'] ?? 'PROGRAMME')) ?> · <?= e((string)($quiz['module_name'] ?? 'Degree programme quiz')) ?></div><h2><?= e((string)$quiz['title']) ?></h2><p class="muted"><?= e((string)($quiz['description'] ?: 'Practice questions for this module.')) ?></p><div class="quiz-meta"><span class="pill"><?= (int)$quiz['question_count'] ?> questions</span><span><?= (int)$quiz['duration_minutes'] ?> min</span><span><?= e(ucfirst((string)$quiz['quiz_type'])) ?></span></div><?php if (!empty($quiz['available_until'])): ?><p class="muted" style="font-size:13px">Closes <?= e(date('d M Y H:i', strtotime((string)$quiz['available_until']))) ?> · <strong class="quiz-countdown" data-until="<?= e(date('c',strtotime((string)$quiz['available_until']))) ?>">Calculating…</strong></p><?php endif; ?><form method="post"><input type="hidden" name="csrf" value="<?= e(csrf()) ?>"><input type="hidden" name="action" value="start"><input type="hidden" name="quiz_id" value="<?= (int)$quiz['id'] ?>"><button class="quiz-btn primary" type="submit">Start quiz →</button></form></article><?php endforeach; ?></div><?php endif; ?>
 
 
 
@@ -910,4 +941,30 @@ body{background:var(--quiz-bg);color:var(--quiz-text)}.quiz-wrap{max-width:1080p
 
 
 
+<script>
+(function(){function update(){document.querySelectorAll('.quiz-countdown').forEach(function(el){let left=Math.max(0,Math.floor((new Date(el.dataset.until).getTime()-Date.now())/1000));if(!left){el.textContent='Expired';return;}const days=Math.floor(left/86400);left%=86400;const h=Math.floor(left/3600),m=Math.floor(left%3600/60),sec=left%60;el.textContent=days+'d '+String(h).padStart(2,'0')+'h '+String(m).padStart(2,'0')+'m '+String(sec).padStart(2,'0')+'s remaining';});}update();setInterval(update,1000);})();
+</script>
+<script>
+(function(){
+  const endpoint = <?= json_encode(url('dashboard/ai-explain.php')) ?>;
+  const csrfToken = <?= json_encode(csrf()) ?>;
+  document.querySelectorAll('.ai-review-trigger').forEach(function(button){
+    button.addEventListener('click', async function(){
+      const panel=button.closest('[data-ai-review]');
+      const output=panel.querySelector('.ai-review-output');
+      button.disabled=true;button.textContent='✦ Generating explanation…';
+      output.hidden=false;output.textContent='Your AI tutor is preparing a summary…';
+      try {
+        const body=new URLSearchParams({csrf:csrfToken,attempt_id:button.dataset.attempt,question_id:button.dataset.question});
+        const response=await fetch(endpoint,{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/x-www-form-urlencoded','Accept':'application/json'},body:body.toString()});
+        const payload=await response.json();
+        if(!response.ok || !payload.explanation) throw new Error(payload.error||'Unable to generate an explanation right now.');
+        output.textContent=payload.explanation;
+        button.textContent='↻ Regenerate explanation';
+      }catch(error){output.textContent=error.message||'AI service unavailable. Please try again later.';button.textContent='✦ Try again';}
+      finally{button.disabled=false;}
+    });
+  });
+})();
+</script>
 </body></html>

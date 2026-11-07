@@ -62,110 +62,35 @@ try {
 
     $profile = $stmt->fetch(PDO::FETCH_ASSOC);
 
-    if (!$profile) {
-
-        throw new RuntimeException(
-
-            'Please complete your academic profile first.'
-
-        );
-
-    }
-
     if ($moduleId !== null) {
-
+        // A student may analyse only a module with their own completed quiz history.
         $stmt = $pdo->prepare("
-
             SELECT m.module_code, m.module_name
-
-            FROM academic_curriculum c
-
-            JOIN academic_modules m ON m.id = c.module_id
-
-            WHERE c.degree_id = ?
-
-              AND c.batch_id = ?
-
-              AND c.module_id = ?
-
-              AND c.is_active = 1
-
-              AND m.is_active = 1
-
+            FROM quiz_attempts a
+            JOIN quizzes q ON q.id = a.quiz_id
+            JOIN academic_modules m ON m.id = q.module_id
+            WHERE a.user_id = ? AND q.module_id = ?
+              AND a.status IN ('submitted', 'timed_out')
             LIMIT 1
-
         ");
-
-        $stmt->execute([
-
-            $profile['degree_id'],
-
-            $profile['batch_id'],
-
-            $moduleId
-
-        ]);
-
-        $module = $stmt->fetch(PDO::FETCH_ASSOC);
-
-        if (!$module) {
-
-            http_response_code(403);
-
-            throw new RuntimeException(
-
-                'This module is not assigned to your academic profile.'
-
-            );
-
+        $stmt->execute([$userId, $moduleId]);
+        $historicalModule = $stmt->fetch(PDO::FETCH_ASSOC);
+        if (!$historicalModule) {
+            http_response_code(404);
+            throw new RuntimeException('No completed quiz history was found for this module.');
         }
-
-        $moduleName = $module['module_code']
-
-            . ' · ' . $module['module_name'];
-
+        $moduleName = $historicalModule['module_code'] . ' · ' . $historicalModule['module_name'];
     }
 
     $scope = "
-
         FROM quiz_attempt_answers aa
-
         JOIN quiz_attempts a ON a.id = aa.attempt_id
-
         JOIN quizzes q ON q.id = a.quiz_id
-
-        JOIN quiz_questions qq
-
-          ON qq.id = aa.question_id
-
-         AND qq.quiz_id = q.id
-
+        JOIN quiz_questions qq ON qq.id = aa.question_id AND qq.quiz_id = q.id
         JOIN academic_modules m ON m.id = q.module_id
-
-        JOIN academic_curriculum c
-
-          ON c.module_id = m.id
-
-        JOIN student_academic_profiles p
-
-          ON p.user_id = a.user_id
-
-         AND p.degree_id = c.degree_id
-
-         AND p.batch_id = c.batch_id
-
         WHERE a.user_id = ?
-
-          AND c.is_active = 1
-
-          AND m.is_active = 1
-
           AND a.status IN ('submitted', 'timed_out')
-
-          AND a.submitted_at IS NOT NULL
-
           AND (? IS NULL OR q.module_id = ?)
-
     ";
 
     $params = [$userId, $moduleId, $moduleId];
@@ -243,15 +168,6 @@ try {
 
         JOIN academic_modules m ON m.id = q.module_id
 
-        JOIN academic_curriculum c ON c.module_id = m.id
-
-        JOIN student_academic_profiles p
-
-          ON p.user_id = a.user_id
-
-         AND p.degree_id = c.degree_id
-
-         AND p.batch_id = c.batch_id
 
         LEFT JOIN quiz_options selected
 
@@ -261,13 +177,8 @@ try {
 
         WHERE a.user_id = ?
 
-          AND c.is_active = 1
-
-          AND m.is_active = 1
-
           AND a.status IN ('submitted', 'timed_out')
 
-          AND a.submitted_at IS NOT NULL
 
           AND aa.option_id IS NOT NULL
 
@@ -295,7 +206,7 @@ try {
 
         'Please complete your academic profile first.',
 
-        'This module is not assigned to your academic profile.'
+        'No completed quiz history was found for this module.'
 
     ];
 
@@ -761,8 +672,24 @@ function topicPriority(array $topic): string {
 
 }
 
+
+/* Compact layout: explanations and mistakes expand only when needed */
+.ult-panel{padding:18px!important;min-height:0!important}
+.ult-panel-desc{margin:5px 0 12px!important}
+.ult-mistake{padding:13px!important;margin-top:9px!important}
+.ult-question{margin:7px 0!important;line-height:1.45!important}
+.ult-answer{line-height:1.5!important;margin:4px 0!important}
+.ult-explanation{padding:10px 12px!important;margin-top:7px!important;line-height:1.5!important;white-space:normal!important}
+.ult-explanation strong{display:block;margin-bottom:4px}
+.ult-mistake details summary{cursor:pointer;font-size:12px;font-weight:750;color:var(--accent)}
+.ult-mistake details[open] summary{margin-bottom:6px}
+.ult-mistake details .ult-explanation{margin-top:0!important}
+.ult-actions{gap:8px;flex-wrap:wrap}
 </style>
 
+
+<script src="<?= htmlspecialchars(url('assets/js/theme-global.js?v=20261107-2'), ENT_QUOTES, 'UTF-8') ?>"></script>
+<link rel="stylesheet" href="<?= e(url('assets/css/learning-ui-v2.css?v=2')) ?>">
 </head>
 
 <body>
@@ -780,6 +707,7 @@ function topicPriority(array $topic): string {
   </a>
 
   <nav class="ult-actions">
+    <a class="ult-btn" href="<?= e(url('dashboard/ai-study.php')) ?>">✦ AI Study Assistant</a>
 
     <a class="ult-btn" href="<?= e($analyticsUrl) ?>">
 
@@ -1163,13 +1091,13 @@ function topicPriority(array $topic): string {
 
         <?php if (trim((string)$mistake['explanation']) !== ''): ?>
 
-          <div class="ult-explanation">
+          <details><summary>Show explanation</summary><div class="ult-explanation">
 
             <strong>Explanation</strong>
 
             <?= e((string)$mistake['explanation']) ?>
 
-          </div>
+          </div></details>
 
         <?php endif; ?>
 
@@ -1179,7 +1107,8 @@ function topicPriority(array $topic): string {
 
   <?php endif; ?>
 
-  <div class="ult-actions" style="margin-top:22px">
+  <div class="ult-actions" style="margin-top:12px">
+    <a class="ult-btn" href="<?= e(url('dashboard/learning-insights.php')) ?>">Quiz-by-quiz insights ↗</a>
 
     <a class="ult-btn"
 
@@ -1209,6 +1138,6 @@ function topicPriority(array $topic): string {
 
 </main>
 
-</body>
+<?php require_once __DIR__ . '/../includes/student-bot.php'; ?></body>
 
 </html>

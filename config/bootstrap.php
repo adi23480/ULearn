@@ -41,10 +41,18 @@ function csrf(): string {return $_SESSION['csrf'] ??= bin2hex(random_bytes(32));
 function csrf_check(): void {if (!hash_equals(csrf(),(string)($_POST['csrf']??''))) {http_response_code(419);exit('Form expired. Refresh the page and try again.');}}
 function me(): ?array {
     if (!isset($_SESSION['uid'])) return null;
-    $q=db()->prepare('SELECT id,full_name,email,role,theme,email_verified_at FROM users WHERE id=?');
-    $q->execute([$_SESSION['uid']]);return $q->fetch() ?: null;
+    $q=db()->prepare('SELECT id,full_name,email,role,theme,email_verified_at,student_number,account_status,session_version FROM users WHERE id=?');
+    $q->execute([$_SESSION['uid']]);
+    $u=$q->fetch() ?: null;
+    if (!$u || $u['account_status']==='suspended' || empty($u['email_verified_at']) || (int)($u['session_version']??0)!==(int)($_SESSION['session_version']??0)) {
+        unset($_SESSION['uid'],$_SESSION['session_version']); return null;
+    }
+    return $u;
 }
-function require_login(): array {$u=me();if (!$u) go('auth/login.php');return $u;}
+function require_login(): array {
+    $u=me();if (!$u) go('auth/login.php');
+    return $u;
+}
 function too_many_attempts(string $key,int $limit,int $seconds): bool {
     $now=time();$times=array_filter($_SESSION['attempts'][$key]??[],fn($t)=>$t>$now-$seconds);
     $_SESSION['attempts'][$key]=array_values($times);
