@@ -81,6 +81,7 @@ function historyScore($value): string {
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>My Quiz History — ULearn</title>
+<meta name="theme-color" content="#0a7258">
 <script>(function(){try{const saved=localStorage.getItem('ulearn-theme');const theme=saved==='light'||saved==='dark'?saved:(window.matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light');document.documentElement.dataset.theme=theme;}catch(e){}})();</script>
 <style>
 :root{color-scheme:light;--bg:#f7f8fc;--surface:#fff;--text:#171927;--muted:#777b90;--border:#e7e8f0;--accent:#6756e8;--soft:#f0edff}
@@ -89,36 +90,42 @@ function historyScore($value): string {
 </style>
 
 <script src="../assets/js/theme-global.js?v=20261107-2"></script>
+<link rel="stylesheet" href="../assets/css/ulearn-quiz-history-advanced.css?v=1">
+<script defer src="../assets/js/ulearn-quiz-history-advanced.js?v=1"></script>
 </head>
-<body>
+<body class="qh-page">
+<div class="qh-progress" aria-hidden="true"></div><div class="qh-page-wipe" aria-hidden="true"></div>
 <main class="wrap">
-<div class="top">
-    <div><div class="eyebrow">ULearn / Student workspace</div><strong>My Quiz History</strong></div>
-    <div style="display:flex;gap:9px;flex-wrap:wrap"><a class="button" href="quizzes.php">Quiz Arena</a><a class="button" href="index.php">← Dashboard</a></div>
-</div>
+<header class="top qh-top">
+    <a class="qh-brand" href="index.php" aria-label="ULearn Dashboard"><img src="../assets/images/nsbm-shield-only.png" width="39" height="44" alt=""><span><b>u</b>Learn<i>.</i></span></a>
+    <nav class="qh-topnav" aria-label="Main navigation"><a class="button" href="quizzes.php">✦ Quiz Arena</a><a class="button" href="index.php">← Dashboard</a><button type="button" class="button qh-theme" id="qh-theme" aria-label="Toggle dark mode"><span id="qh-theme-icon">☾</span> <span id="qh-theme-text">Dark mode</span></button></nav>
+</header>
 <?php if ($error !== ''): ?><div class="error" role="alert"><?= e($error) ?></div><?php endif; ?>
 <?php if ($selectedModule): ?>
-    <section class="hero">
+    <section class="hero qh-hero">
         <a class="button" href="quiz-history.php">← All modules</a>
         <div class="eyebrow" style="margin-top:22px"><?= e((string)$selectedModule['module_code']) ?></div>
         <h1><?= e((string)$selectedModule['module_name']) ?></h1>
         <p class="muted">Your completed quiz attempts in this module. Choose one to review its answers and explanations.</p>
         <span class="pill"><?= $totalAttempts ?> completed <?= $totalAttempts === 1 ? 'attempt' : 'attempts' ?></span>
     </section>
-    <h2 class="section-title">Completed quizzes</h2>
-    <div class="attempts">
+    <div class="qh-detail-summary"><div><span class="qh-mini-icon">✓</span><strong><?= $totalAttempts ?></strong><span>Completed attempts in this module</span></div><div><span class="qh-mini-icon">▦</span><strong><?= (int)$selectedModule['quiz_count'] ?></strong><span>Different quizzes completed</span></div></div>
+    <div class="qh-section-head"><div><div class="eyebrow">REVIEW YOUR JOURNEY</div><h2 class="section-title">Completed quizzes</h2></div><span class="pill">Page <?= $page ?> / <?= $totalPages ?></span></div>
+    <div class="qh-tools"><label class="qh-search-label" for="qh-search"><span aria-hidden="true">⌕</span><input type="search" id="qh-search" placeholder="Find a quiz on this page..." autocomplete="off"></label><label class="qh-sort-label" for="qh-sort">Sort <select id="qh-sort"><option value="recent">Latest first</option><option value="score">Highest score %</option><option value="low-score">Lowest score %</option><option value="name">Quiz title</option></select></label><button class="button" type="button" id="qh-clear">Clear</button></div>
+    <p class="qh-page-scope">Search and sorting apply to the <?= count($attempts) ?> attempts loaded on this page.</p>
+    <div class="attempts qh-attempts" id="qh-attempts">
     <?php foreach ($attempts as $attempt): ?>
-        <article class="attempt">
+        <article class="attempt qh-attempt" data-search="<?= e(mb_strtolower((string)$attempt['title'].' '.(string)$attempt['quiz_type'])) ?>" data-name="<?= e(mb_strtolower((string)$attempt['title'])) ?>" data-score="<?= (float)$attempt['max_score'] > 0 ? round(100 * (float)$attempt['score'] / (float)$attempt['max_score'], 4) : 0 ?>" data-recent="<?= e((string)($attempt['submitted_at'] ?? '')) ?>">
             <div class="details">
                 <div class="eyebrow"><?= e((string)($attempt['status'] === 'timed_out' ? 'Time expired' : 'Completed')) ?> · <?= e((string)ucfirst((string)$attempt['quiz_type'])) ?></div>
                 <h2><?= e((string)$attempt['title']) ?></h2>
                 <div class="muted" style="font-size:13px"><?= !empty($attempt['submitted_at']) ? e(date('d M Y, H:i', strtotime((string)$attempt['submitted_at']))) : 'Date unavailable' ?> · Attempt #<?= (int)$attempt['id'] ?></div>
             </div>
-            <div><div class="score"><?= e(historyScore($attempt['score'])) ?> / <?= e(historyScore($attempt['max_score'])) ?></div><div class="muted" style="font-size:12px">Score</div></div>
+            <div class="qh-score-block"><div class="score"><?= e(historyScore($attempt['score'])) ?> <span>/ <?= e(historyScore($attempt['max_score'])) ?></span></div><div class="muted" style="font-size:12px">Score · <?= (float)$attempt['max_score'] > 0 ? e(historyScore(100 * (float)$attempt['score'] / (float)$attempt['max_score'])) . '%' : 'N/A' ?></div><div class="qh-score-track"><span style="--qh-score-width:<?= (float)$attempt['max_score'] > 0 ? max(0,min(100,100 * (float)$attempt['score'] / (float)$attempt['max_score'])) : 0 ?>%"></span></div></div>
             <div class="attempt-actions"><a class="button primary" href="learning-insights.php?attempt_id=<?= (int)$attempt['id'] ?>">Learning insights →</a><a class="button" href="quizzes.php?result=<?= (int)$attempt['id'] ?>">Review answers</a></div>
         </article>
     <?php endforeach; ?>
-    </div>
+    </div><div class="qh-no-match" id="qh-no-match" hidden><strong>No matching quizzes</strong><p>Try a different title or clear the search.</p></div>
     <?php if ($totalPages > 1): ?>
     <nav class="pager" aria-label="Quiz history pages">
         <?php if ($page > 1): ?><a class="button" href="quiz-history.php?module_id=<?= (int)$moduleId ?>&amp;page=<?= $page - 1 ?>">← Previous</a><?php endif; ?>
@@ -127,22 +134,26 @@ function historyScore($value): string {
     </nav>
     <?php endif; ?>
 <?php else: ?>
-    <section class="hero"><div class="eyebrow">Your learning progress</div><h1>My Completed Quizzes</h1><p class="muted">Your results are organized by module. Open a module to see its completed quizzes, then choose an attempt to review. No questions are loaded on this page.</p></section>
+    <section class="hero qh-hero"><div class="qh-hero-copy"><div class="eyebrow"><span class="qh-pulse"></span> YOUR LEARNING JOURNEY</div><h1>Every attempt.<br><span class="qh-gradient">Real progress.</span></h1><p class="muted">Track your completed quizzes across modules, revisit explanations and celebrate every step forward.</p><a class="button primary qh-hero-cta" href="quizzes.php">Continue learning <span aria-hidden="true">↗</span></a></div><div class="qh-hero-art" aria-hidden="true"><div class="qh-orbit qh-orbit-one"></div><div class="qh-orbit qh-orbit-two"></div><div class="qh-orb">★</div><div class="qh-floating qh-float-a">↗ Keep growing</div><div class="qh-floating qh-float-b">✓ Quiz completed</div></div></section>
+<?php $allAttempts = array_sum(array_map(static fn(array $m): int => (int)$m['attempt_count'], $modules)); $allQuizzes = array_sum(array_map(static fn(array $m): int => (int)$m['quiz_count'], $modules)); ?>
+<section class="qh-stats" aria-label="Learning activity overview"><div class="qh-stat"><span class="qh-stat-icon">▦</span><span class="qh-stat-value" data-count="<?= count($modules) ?>"><?= count($modules) ?></span><span class="qh-stat-label">Modules explored</span></div><div class="qh-stat"><span class="qh-stat-icon">✓</span><span class="qh-stat-value" data-count="<?= $allAttempts ?>"><?= $allAttempts ?></span><span class="qh-stat-label">Completed attempts</span></div><div class="qh-stat"><span class="qh-stat-icon">✦</span><span class="qh-stat-value" data-count="<?= $allQuizzes ?>"><?= $allQuizzes ?></span><span class="qh-stat-label">Module quiz counts*</span></div></section>
+<p class="qh-stat-note">*Quiz counts are summed per module; they represent distinct quizzes within each module.</p>
     <?php if (!$modules && $error === ''): ?>
         <div class="empty"><h2>No completed quizzes yet</h2><p class="muted">Once you submit a quiz, its result will appear here under the relevant module.</p><a class="button primary" href="quizzes.php">Go to Quiz Arena →</a></div>
     <?php else: ?>
-        <h2 class="section-title">Modules with completed quizzes</h2>
-        <div class="grid">
+        <div class="qh-section-head"><div><div class="eyebrow">YOUR LEARNING LIBRARY</div><h2 class="section-title">Modules with completed quizzes</h2></div><span class="pill" id="qh-visible-count"><?= count($modules) ?> modules</span></div>
+        <div class="qh-tools"><label class="qh-search-label" for="qh-search"><span aria-hidden="true">⌕</span><input type="search" id="qh-search" placeholder="Search module name or code..." autocomplete="off"></label><label class="qh-sort-label" for="qh-sort">Sort <select id="qh-sort"><option value="recent">Most recent</option><option value="name">Module name</option><option value="attempts">Most attempts</option><option value="quizzes">Most quizzes</option></select></label><button class="button" type="button" id="qh-clear">Clear</button></div>
+        <div class="grid qh-module-grid" id="qh-module-grid">
         <?php foreach ($modules as $module): ?>
-            <a class="module" href="quiz-history.php?module_id=<?= (int)$module['module_id'] ?>">
-                <div class="code"><?= e((string)$module['module_code']) ?></div>
+            <a class="module qh-module" href="quiz-history.php?module_id=<?= (int)$module['module_id'] ?>" data-search="<?= e(mb_strtolower((string)$module['module_code'].' '.(string)$module['module_name'])) ?>" data-name="<?= e(mb_strtolower((string)$module['module_name'])) ?>" data-attempts="<?= (int)$module['attempt_count'] ?>" data-quizzes="<?= (int)$module['quiz_count'] ?>" data-recent="<?= e((string)($module['last_completed'] ?? '')) ?>">
+                <div class="qh-module-top"><div class="qh-module-icon" aria-hidden="true">▤</div><span class="qh-module-arrow" aria-hidden="true">↗</span></div><div class="code"><?= e((string)$module['module_code']) ?></div>
                 <h2 style="margin-top:9px"><?= e((string)$module['module_name']) ?></h2>
                 <div class="stats"><span class="pill"><?= (int)$module['quiz_count'] ?> <?= (int)$module['quiz_count'] === 1 ? 'quiz' : 'quizzes' ?></span><span class="pill"><?= (int)$module['attempt_count'] ?> <?= (int)$module['attempt_count'] === 1 ? 'attempt' : 'attempts' ?></span></div>
                 <div class="muted" style="font-size:13px">Last completed: <?= !empty($module['last_completed']) ? e(date('d M Y', strtotime((string)$module['last_completed']))) : 'Unknown' ?></div>
                 <div style="color:var(--accent);font-weight:750;margin-top:18px;font-size:13px">View completed quizzes →</div>
             </a>
         <?php endforeach; ?>
-        </div>
+        </div><div class="qh-no-match" id="qh-no-match" hidden><strong>No matching modules</strong><p>Try another search term or clear the filters.</p></div>
     <?php endif; ?>
 <?php endif; ?>
 </main>
