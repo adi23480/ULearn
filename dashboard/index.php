@@ -1235,6 +1235,12 @@ $initial = strtoupper(substr($firstName, 0, 1));
 <script defer src="<?= e(url('assets/js/ulearn-motion.js?v=1')) ?>"></script>
 <link rel="stylesheet" href="<?= e(url('assets/css/ulearn-student-shell.css?v=2')) ?>">
 <script defer src="<?= e(url('assets/js/ulearn-student-shell.js?v=2')) ?>"></script>
+<link rel="stylesheet" href="<?= e(url('assets/css/ulearn-dashboard-v2.css?v=501')) ?>">
+<link rel="stylesheet" href="<?= e(url('assets/css/ulearn-dashboard-v5.css?v=511')) ?>">
+<script defer src="<?= e(url('assets/js/ulearn-dashboard-v5.js?v=511')) ?>"></script>
+<link rel="stylesheet" href="<?= e(url('assets/css/ulearn-dashboard-v51.css?v=511')) ?>">
+<link rel="stylesheet" href="<?= e(url('assets/css/ulearn-dashboard-v52.css?v=20261110')) ?>">
+<script defer src="<?= e(url('assets/js/ulearn-dashboard-v52.js?v=20261110')) ?>"></script>
 </head>
 
 <body>
@@ -1243,10 +1249,12 @@ $initial = strtoupper(substr($firstName, 0, 1));
 
     <aside class="sidebar" id="studentSidebar">
 
-        <a class="brand" href="<?= e(url()) ?>">
-
-            u learn<span>.</span>
-
+        <a class="brand ul-brand-lockup" href="<?= e(url()) ?>" aria-label="U Learn home">
+            <span class="ul-brand-name">u learn<span>.</span></span>
+            <span class="ul-nsbm-brand" aria-label="NSBM Green University">
+              <span class="ul-nsbm-emblem" aria-hidden="true"><svg viewBox="0 0 40 46" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M20 2 37 8v14c0 11-8 17-17 22C11 39 3 33 3 22V8L20 2Z" fill="#002147" stroke="#63D88B" stroke-width="2"/><path d="M20 34c-9-5-11-12-8-19 6 1 9 5 8 10 1-8 5-12 12-13 1 11-4 18-12 22Z" fill="#33CC33"/><path d="M20 36V17" stroke="#F7FFF9" stroke-width="2" stroke-linecap="round"/></svg></span>
+              <span class="ul-nsbm-wordmark"><strong>NSBM</strong><small>GREEN UNIVERSITY</small></span>
+            </span>
         </a>
 
         <nav aria-label="Student navigation">
@@ -1292,7 +1300,7 @@ $initial = strtoupper(substr($firstName, 0, 1));
 
             <span class="eyebrow">
 
-                U LEARN / STUDENT SPACE
+                STUDENT WORKSPACE <span class="ul-breadcrumb-separator">/</span> OVERVIEW
 
             </span>
 
@@ -1366,14 +1374,60 @@ $initial = strtoupper(substr($firstName, 0, 1));
 
         </header>
 
-        <section class="ul-welcome" aria-label="Welcome">
-            <div class="eyebrow">YOUR LEARNING SPACE</div>
-            <h1>Welcome back, <?= e($firstName) ?><span>.</span></h1>
-            <p class="lead">Everything you need to learn, practice and grow — in one place.</p>
-            <div class="ul-quick-actions">
-                <a class="ul-quick primary" href="<?= e(url('dashboard/explore.php')) ?>">Explore modules <span aria-hidden="true">→</span></a>
-                <a class="ul-quick" href="<?= e(url('dashboard/quiz-history.php')) ?>">My quiz history <span aria-hidden="true">→</span></a>
-                <a class="ul-quick" href="<?= e(url('dashboard/learning-insights.php')) ?>">Learning insights <span aria-hidden="true">→</span></a>
+        <section class="ul-welcome ul-hero-v2" aria-label="Welcome">
+            <div class="ul-hero-content">
+                <div class="ul-hero-kicker"><span class="ul-live-dot" aria-hidden="true"></span> YOUR PERSONAL LEARNING SPACE</div>
+                <p class="ul-hero-pretitle">A better way to learn, every day.</p>
+                <h1>Welcome back,<br><span><?= e($firstName) ?>.</span></h1>
+                <a class="ul52-student-chip" href="<?= e(url('dashboard/profile.php')) ?>" aria-label="View student profile">
+                    <span class="ul52-student-avatar"><?= e($initial) ?></span>
+                    <span><b><?= e($firstName) ?></b><small>ID: <?= e((string)($u['student_number'] ?? $userId)) ?></small></span>
+                </a>
+                <p class="lead">Your academic journey, learning resources and next steps — all in one place.</p>
+                <div class="ul-quick-actions">
+                    <a class="ul-quick primary" href="<?= e(url('dashboard/explore.php')) ?>">Explore modules <span aria-hidden="true">→</span></a>
+                    <a class="ul-quick" href="<?= e(url('dashboard/quiz-history.php')) ?>">Quiz history <span aria-hidden="true">→</span></a>
+                </div>
+            </div>
+            <div class="ul-hero-visual ul52-carousel" role="region" aria-label="NSBM campus photo slideshow">
+                <div class="ul52-photo is-active" style="background-image:url('<?= e(url('assets/images/ulearn-campus-hero.jpg')) ?>')"></div>
+                <div class="ul52-photo" style="background-image:url('https://library.nsbm.ac.lk/NSBM-Library/nsbm-pics/landscape-picture-of-the-library.jpg')"></div>
+                <div class="ul52-photo" style="background-image:url('https://upload.wikimedia.org/wikipedia/commons/9/92/NSBM_Green_University_-_Hostel.jpg')"></div>
+                <div class="ul-hero-visual-label">DISCOVER · PRACTICE · GROW</div>
+                <div class="ul52-dots" aria-label="Campus slideshow"><button class="is-active" type="button" data-ul52-slide="0" aria-label="Photo 1"></button><button type="button" data-ul52-slide="1" aria-label="Photo 2"></button><button type="button" data-ul52-slide="2" aria-label="Photo 3"></button></div>
+            </div>
+        </section>
+
+        <section class="ul-overview-grid" aria-label="Learning overview">
+            <a class="ul-overview-tile" href="#modules">
+                <span class="ul-tile-label">YOUR LEARNING</span>
+                <strong><?= count($enrolledModules) ?></strong>
+                <span class="ul-tile-bottom">Enrolled modules <span aria-hidden="true">↗</span></span>
+            </a>
+            <a class="ul-overview-tile" href="#curriculum">
+                <span class="ul-tile-label">ACADEMIC PATH</span>
+                <strong><?= count($modules) ?></strong>
+                <span class="ul-tile-bottom">Curriculum modules <span aria-hidden="true">↗</span></span>
+            </a>
+            <a class="ul-overview-tile" href="<?= e(url('dashboard/notes-library.php')) ?>">
+                <span class="ul-tile-label">YOUR CONTRIBUTION</span>
+                <strong><?= $notePoints ?></strong>
+                <span class="ul-tile-bottom">Note points <span aria-hidden="true">↗</span></span>
+            </a>
+            <a class="ul-overview-tile" href="<?= e(url('dashboard/notifications.php')) ?>">
+                <span class="ul-tile-label">STAY CONNECTED</span>
+                <strong><?= $unreadNotifications ?></strong>
+                <span class="ul-tile-bottom">Unread notifications <span aria-hidden="true">↗</span></span>
+            </a>
+        </section>
+
+        <section class="ul-launchpad" aria-label="Quick access">
+            <div class="ul-launchpad-head"><div><div class="eyebrow">QUICK ACCESS</div><h2>Jump back into learning</h2></div><a href="<?= e(url('dashboard/explore.php')) ?>">Browse modules →</a></div>
+            <div class="ul-launchpad-grid">
+                <a href="<?= e(url('dashboard/quizzes.php')) ?>"><span class="ul-launchpad-mark">◇</span><strong>Quiz Arena</strong><small>Practice what you've learned</small><span class="ul-launchpad-arrow" aria-hidden="true">↗</span></a>
+                <a href="<?= e(url('dashboard/notes-library.php')) ?>"><span class="ul-launchpad-mark">▤</span><strong>Notes Library</strong><small>Explore study resources</small><span class="ul-launchpad-arrow" aria-hidden="true">↗</span></a>
+                <a href="<?= e(url('dashboard/learning-insights.php')) ?>"><span class="ul-launchpad-mark">↗</span><strong>Learning Insights</strong><small>Understand your progress</small><span class="ul-launchpad-arrow" aria-hidden="true">↗</span></a>
+                <a href="<?= e(url('dashboard/ai-study.php')) ?>"><span class="ul-launchpad-mark">✧</span><strong>AI Study Assistant</strong><small>Get help when you need it</small><span class="ul-launchpad-arrow" aria-hidden="true">↗</span></a>
             </div>
         </section>
 
