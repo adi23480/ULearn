@@ -647,6 +647,13 @@ $initial = strtoupper(
     substr(trim((string)($user['full_name'] ?? 'S')), 0, 1)
 );
 
+$kpBatch = '';
+try {
+    $kpBatchStmt = $pdo->prepare("SELECT ab.batch_code FROM student_academic_profiles sap JOIN academic_batches ab ON ab.id=sap.batch_id WHERE sap.user_id=? LIMIT 1");
+    $kpBatchStmt->execute([$uid]);
+    $kpBatch = (string)($kpBatchStmt->fetchColumn() ?: '');
+} catch (Throwable $kpBatchError) { /* Batch badge is optional; preserve Kuppiya availability. */ }
+
 $base = url('dashboard/kuppiya.php');
 
 ?>
@@ -688,59 +695,6 @@ $base = url('dashboard/kuppiya.php');
     }
 
 })();
-
-
-function toggleTheme() {
-
-    let currentTheme =
-        document.documentElement.getAttribute('data-theme');
-
-    let newTheme =
-        currentTheme === 'dark' ? 'light' : 'dark';
-
-    document.documentElement.setAttribute('data-theme', newTheme);
-
-    try {
-
-        localStorage.setItem('ulearn-theme', newTheme);
-
-    } catch (e) {
-
-        console.log('Theme storage unavailable');
-
-    }
-
-    updateThemeButton();
-
-}
-
-
-function updateThemeButton() {
-
-    let button = document.getElementById('themeButton');
-
-    if (button) {
-
-        let dark =
-            document.documentElement.getAttribute('data-theme') === 'dark';
-
-        button.textContent = dark ? '☀' : '☾';
-
-        button.setAttribute(
-            'aria-label',
-            dark ? 'Switch to light mode' : 'Switch to dark mode'
-        );
-
-    }
-
-}
-
-
-document.addEventListener('DOMContentLoaded', function () {
-
-    updateThemeButton();
-
-});
 
 
 /* COPY INVITATION */
@@ -1516,24 +1470,25 @@ textarea::placeholder {
 </style>
 
 
-<script src="<?= htmlspecialchars(url('assets/js/theme-global.js?v=20261107-2'), ENT_QUOTES, 'UTF-8') ?>"></script>
 <link rel="stylesheet" href="<?= e(url('assets/css/ulearn-community-phase4.css?v=1')) ?>">
+<link rel="stylesheet" href="<?= e(url('assets/css/ulearn-kuppiya-premium.css?v=3-20261110')) ?>">
+<script defer src="<?= e(url('assets/js/ulearn-kuppiya-premium.js?v=3-20261110')) ?>"></script>
 </head>
 
 
-<body>
+<body class="kp-v2">
 
 <div class="layout">
 
 <aside class="sidebar">
 
 <a class="brand" href="<?= e(url('dashboard/index.php')) ?>">
-    u learn<span>.</span>
+    <img class="kp-nsbm-logo" src="<?= e(url('assets/images/nsbm-shield-only.png')) ?>" alt="NSBM shield" width="42" height="47" decoding="async"><span class="kp-wordmark">uLearn<span>.</span></span>
 </a>
 
-<div class="nav-label">YOUR WORKSPACE</div>
+<button type="button" class="kp-mobile-nav-toggle" id="kpMobileNavToggle" aria-expanded="false" aria-controls="kpSidebarNav">☰ <span>Workspace menu</span></button><div class="nav-label">YOUR WORKSPACE</div>
 
-<nav class="nav">
+<nav class="nav" id="kpSidebarNav">
 
 <a href="<?= e(url('dashboard/index.php')) ?>">◫ Overview</a>
 
@@ -1556,7 +1511,7 @@ textarea::placeholder {
 
 <header class="topbar">
 
-<div class="eyebrow">U LEARN / STUDENT SPACE</div>
+<div class="kp-top-identity"><div class="eyebrow">ULEARN / STUDENT SPACE</div><?php if ($kpBatch !== ''): ?><span class="kp-batch">MY BATCH <?= e($kpBatch) ?></span><?php endif; ?></div>
 
 <div class="right">
 
@@ -1564,7 +1519,7 @@ textarea::placeholder {
     id="themeButton"
     class="theme-button"
     type="button"
-    onclick="toggleTheme()"
+    
     aria-label="Toggle theme">☾</button>
 
 <a class="avatar"
@@ -1578,14 +1533,14 @@ textarea::placeholder {
 </header>
 
 
-<div class="eyebrow">STUDY TOGETHER</div>
+<div class="kp-hero"><div class="kp-hero-glow" aria-hidden="true"></div><div class="eyebrow">STUDY TOGETHER · PEER LEARNING</div>
 
 <h1>Kuppiya Sessions<span class="accent">.</span></h1>
 
 <p class="lead">
 Create private peer study groups, invite friends and chat with your members.
 Maximum 12 students per group.
-</p>
+</p><div class="kp-hero-highlights"><span>✦ Collaborative learning</span><span>◷ Flexible scheduling</span><span>♧ Private group chat</span></div></div>
 
 
 <?php if ($notice): ?>
