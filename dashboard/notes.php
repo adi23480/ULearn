@@ -266,34 +266,37 @@ input[type=file]{padding:18px;border:2px dashed var(--border);background:var(--s
 <script src="<?= htmlspecialchars(url('assets/js/theme-global.js?v=20261107-2'), ENT_QUOTES, 'UTF-8') ?>"></script>
 <link rel="stylesheet" href="<?= e(url('assets/css/ulearn-design-system.css?v=1')) ?>">
 <script defer src="<?= e(url('assets/js/ulearn-motion.js?v=1')) ?>"></script>
+<link rel="stylesheet" href="<?= e(url('assets/css/ulearn-my-notes-advanced.css?v=20261110-1')) ?>">
+<script defer src="<?= e(url('assets/js/ulearn-my-notes-advanced.js?v=20261110-1')) ?>"></script>
 </head>
-<body><main class="wrap">
-<div class="top"><div><div class="eyebrow">ULearn / Student workspace</div><strong>Notes Hub</strong></div><div><a class="button" href="<?= e(url('dashboard/index.php')) ?>">← Dashboard</a> <a class="button" href="<?= e(url('dashboard/profile.php')) ?>">My Profile</a></div></div>
-<section class="hero"><div class="eyebrow">Contribute & learn together</div><h1>My Notes<span style="color:var(--accent)">.</span></h1><p class="muted">Share useful study resources with your university community. Every student upload is reviewed by an administrator before it becomes public.</p><span class="badge">+10 points for each approved note</span></section>
+<body class="ul-my-notes"><div class="ul-progress" aria-hidden="true"></div><main class="wrap">
+<header class="top"><a class="ul-brand" href="<?= e(url('dashboard/index.php')) ?>" aria-label="ULearn dashboard"><img src="<?= e(url('assets/images/nsbm-shield-only.png')) ?>" alt="" width="40" height="44"><span><b>u</b>Learn<i>.</i></span></a><nav class="ul-actions" aria-label="Page navigation"><button class="button ul-theme" type="button" id="ul-theme-toggle" aria-label="Switch color theme"><span id="ul-theme-icon" aria-hidden="true">☾</span> <span id="ul-theme-text">Dark mode</span></button><a class="button" href="<?= e(url('dashboard/notes-library.php')) ?>">Explore notes</a><a class="button" href="<?= e(url('dashboard/index.php')) ?>">← Dashboard</a><a class="button" href="<?= e(url('dashboard/profile.php')) ?>">My Profile</a></nav></header>
+<section class="hero"><div class="eyebrow"><span class="ul-dot"></span> CONTRIBUTE & LEARN TOGETHER</div><h1>My Notes<span style="color:var(--accent)">.</span></h1><p class="muted">Share useful study resources with your university community. Every student upload is reviewed by an administrator before it becomes public.</p><span class="badge">+10 points for each approved note</span><div class="ul-hero-decoration" aria-hidden="true">✦</div></section>
 <?php if ($error !== ''): ?><div class="notice error" role="alert"><?= e($error) ?></div><?php endif; ?>
 <?php if ($success !== ''): ?><div class="notice success" role="status"><?= e($success) ?></div><?php endif; ?>
+<div class="ul-stats" aria-label="Your upload statistics"><div class="ul-stat"><span>Total uploads</span><strong data-count="<?= count($myNotes) ?>"><?= count($myNotes) ?></strong></div><div class="ul-stat"><span>Approved</span><strong data-count="<?= count(array_filter($myNotes, static fn($n) => $n['status'] === 'approved')) ?>"><?= count(array_filter($myNotes, static fn($n) => $n['status'] === 'approved')) ?></strong></div><div class="ul-stat"><span>Pending review</span><strong data-count="<?= count(array_filter($myNotes, static fn($n) => $n['status'] === 'pending')) ?>"><?= count(array_filter($myNotes, static fn($n) => $n['status'] === 'pending')) ?></strong></div><div class="ul-stat"><span>Contribution points</span><strong data-count="<?= $points ?>"><?= number_format($points) ?></strong></div></div>
 <div class="grid">
-<section class="panel"><h2>Upload a note</h2><p class="muted small">PDF, Word DOCX or PowerPoint PPTX · Maximum 20 MB</p>
+<section class="panel ul-upload-panel"><div class="ul-section-kicker">SHARE KNOWLEDGE</div><h2>Upload a note</h2><p class="muted small">PDF, Word DOCX or PowerPoint PPTX · Maximum 20 MB</p>
 <?php if (!$modules): ?><p class="muted">You must enroll in an academic module before uploading notes. <a href="<?= e(url('dashboard/explore.php')) ?>" style="color:var(--accent)">Explore modules →</a></p><?php else: ?>
 <form method="post" enctype="multipart/form-data" action="<?= e(url('dashboard/notes.php')) ?>">
 <input type="hidden" name="csrf" value="<?= e(csrf()) ?>">
 <div class="field"><label for="module_id">Academic module</label><select id="module_id" name="module_id" required><option value="">Select your enrolled module</option><?php foreach ($modules as $m): ?><option value="<?= (int)$m['id'] ?>" <?= $selectedModule === (int)$m['id'] ? 'selected' : '' ?>><?= e((string)$m['module_code'] . ' — ' . (string)$m['module_name']) ?></option><?php endforeach; ?></select></div>
-<div class="field"><label for="title">Note title</label><input id="title" name="title" maxlength="180" minlength="3" required placeholder="e.g. Python Functions — Revision Notes" value="<?= e((string)($_POST['title'] ?? '')) ?>"></div>
-<div class="field"><label for="description">Description (optional)</label><textarea id="description" name="description" maxlength="3000" placeholder="What topics does this note cover?"><?= e((string)($_POST['description'] ?? '')) ?></textarea></div>
-<div class="field"><label for="note_file">Choose document</label><input id="note_file" type="file" name="note_file" accept=".pdf,.docx,.pptx" required><div class="help">Only upload content you have permission to share. Your name will appear when the note is published.</div></div>
+<div class="field"><label for="title">Note title <span class="ul-counter" id="ul-title-count">0 / 180</span></label><input id="title" name="title" maxlength="180" minlength="3" required placeholder="e.g. Python Functions — Revision Notes" value="<?= e((string)($_POST['title'] ?? '')) ?>"></div>
+<div class="field"><label for="description">Description (optional) <span class="ul-counter" id="ul-desc-count">0 / 3000</span></label><textarea id="description" name="description" maxlength="3000" placeholder="What topics does this note cover?"><?= e((string)($_POST['description'] ?? '')) ?></textarea></div>
+<div class="field"><label for="note_file">Choose document</label><div class="ul-dropzone" id="ul-dropzone"><div class="ul-file-icon" aria-hidden="true">⇧</div><strong>Drag & drop your document here</strong><span>or click to browse · PDF, DOCX, PPTX · max 20 MB</span><input id="note_file" type="file" name="note_file" accept=".pdf,.docx,.pptx" required><div class="ul-file-selected" id="ul-file-selected" role="status" aria-live="polite">No file selected</div></div><div class="help">Only upload content you have permission to share. Your name will appear when the note is published.</div></div><div class="ul-upload-feedback" id="ul-upload-feedback" hidden role="status"><span class="ul-spinner" aria-hidden="true"></span><span id="ul-upload-message">Preparing secure upload…</span></div>
 <button class="primary" type="submit" id="submitNote">Submit for admin approval →</button></form><?php endif; ?></section>
 
-<aside class="panel">
+<aside class="panel ul-rewards-panel">
 <div class="eyebrow">Contribution rewards</div><h2>Your points</h2><div class="stat"><?= number_format($points) ?></div><p class="muted small">Points are earned after an administrator approves a student-uploaded note, not when you submit it.</p><hr style="border:0;border-top:1px solid var(--border);margin:25px 0"><h2>What happens next?</h2>
 <p class="muted small">1. Submit your note.<br>2. An administrator reviews it.<br>3. Approved notes become visible in the public Notes Hub.<br>4. Other students can preview, download and rate them.</p><p class="muted small">Browse approved notes in the Notes Hub. Administrators review pending submissions, and students can rate approved resources.</p></aside></div>
 
-<section class="section"><h2>Your uploaded notes</h2>
+<section class="section ul-notes-section"><div class="ul-notes-heading"><div><div class="ul-section-kicker">YOUR CONTRIBUTIONS</div><h2>Your uploaded notes</h2></div><div class="ul-note-tools"><label for="ul-note-search" class="ul-visually-hidden">Search uploaded notes</label><input id="ul-note-search" type="search" placeholder="Search your uploads…" autocomplete="off"><label for="ul-status-filter" class="ul-visually-hidden">Filter by approval status</label><select id="ul-status-filter"><option value="all">All statuses</option><option value="pending">Pending</option><option value="approved">Approved</option><option value="rejected">Rejected</option></select></div></div><p class="ul-results" id="ul-results" aria-live="polite"></p>
 <?php if (!$myNotes): ?>
 <div class="panel"><strong>No uploads yet</strong><p class="muted">Your submitted notes and their approval status will appear here.</p></div>
 <?php else: ?>
-<div class="notes">
+<div class="notes" id="ul-notes-list">
 <?php foreach ($myNotes as $n): ?>
-<article class="note">
+<article class="note ul-note" data-status="<?= e((string)$n['status']) ?>">
     <div>
         <div class="eyebrow"><?= e((string)$n['module_code']) ?> · <?= e((string)$n['module_name']) ?></div>
         <h3><?= e((string)$n['title']) ?></h3>
@@ -313,7 +316,7 @@ input[type=file]{padding:18px;border:2px dashed var(--border);background:var(--s
     </div>
 </article>
 <?php endforeach; ?>
-</div>
+</div><div class="ul-no-match" id="ul-no-match" hidden>No uploads match your search or status filter.</div>
 <?php endif; ?>
 </section>
 </main><script>
