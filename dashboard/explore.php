@@ -111,14 +111,30 @@ if (!in_array($theme, ['light', 'dark', 'system'], true)) {
 <link rel="stylesheet" href="<?= e(url('assets/css/ulearn-design-system.css?v=1')) ?>">
 <script defer src="<?= e(url('assets/js/ulearn-motion.js?v=1')) ?>"></script>
 <link rel="stylesheet" href="<?= e(url('assets/css/ulearn-student-workspaces.css?v=3')) ?>">
+<link rel="stylesheet" href="<?= e(url('assets/css/ulearn-explore-premium.css?v=20261110-21')) ?>">
+<script defer src="<?= e(url('assets/js/ulearn-explore-premium.js?v=20261110-21')) ?>"></script>
 </head>
 <body class="ul3-explore">
 <main class="container">
     <header class="top">
-        <a class="brand" href="<?= e(url('dashboard/index.php')) ?>">u learn<span>.</span></a>
-        <a class="back" href="<?= e(url('dashboard/index.php')) ?>">← Back to dashboard</a>
+        <a class="brand ex-brand" href="<?= e(url('dashboard/index.php')) ?>" aria-label="ULearn dashboard"><img src="<?= e(url('assets/images/nsbm-shield-only.png')) ?>" width="38" height="42" alt=""><span class="ex-wordmark"><b>u</b>Learn<span>.</span></span></a>
+        <div class="ex-top-actions">
+            <button type="button" id="ex-theme-toggle" class="ex-theme-toggle" aria-label="Switch color theme" title="Switch light/dark theme"><span class="ex-theme-icon" aria-hidden="true">☾</span><span class="ex-theme-label">Dark mode</span></button>
+            <a class="back" href="<?= e(url('dashboard/index.php')) ?>">← Back to dashboard</a>
+        </div>
     </header>
-    <h1>Explore &amp; Enroll</h1>
+    <div class="explore-heading">
+        <div><div class="explore-eyebrow"><span class="explore-status-dot"></span> YOUR LEARNING JOURNEY</div>
+        <h1>Explore <span>&amp; Enroll</span></h1></div>
+        <div class="explore-summary" aria-label="Module summary">
+            <div><strong><?= count($enrolled) ?></strong><small>Enrolled</small></div>
+            <div><strong><?= count($available) ?></strong><small>Available</small></div>
+        </div>
+    </div>
+    <nav class="ex-quick-nav" aria-label="Explore page sections">
+        <a href="#enrolled-heading">My enrolled modules <span><?= count($enrolled) ?></span></a>
+        <a href="#explore-heading">Available modules <span><?= count($available) ?></span></a>
+    </nav>
     <p class="lead">Discover available modules across programmes and enroll to add them to your learning list. Enrollment here is for self-directed learning; it does not change your official degree, batch, or academic progression.</p>
 
     <?php if ($notice !== ''): ?>
@@ -128,14 +144,14 @@ if (!in_array($theme, ['light', 'dark', 'system'], true)) {
         <div class="message error" role="alert"><?= e($error) ?></div>
     <?php endif; ?>
 
-    <section aria-labelledby="enrolled-heading">
+    <section class="explore-section" aria-labelledby="enrolled-heading">
         <h2 id="enrolled-heading">My Enrolled Modules <span class="count">(<?= count($enrolled) ?>)</span></h2>
         <?php if (!$enrolled): ?>
             <div class="empty">You haven't enrolled in any modules yet. Explore the modules below to get started.</div>
         <?php else: ?>
-            <div class="grid">
+            <div class="grid ex-card-grid">
                 <?php foreach ($enrolled as $module): ?>
-                    <article class="card">
+                    <article class="card ex-module-card">
                         <div class="code"><?= e($module['module_code']) ?></div>
                         <h3><?= e($module['module_name']) ?></h3>
                         <p><?= e($module['description'] ?: 'Learning module') ?></p>
@@ -146,15 +162,22 @@ if (!in_array($theme, ['light', 'dark', 'system'], true)) {
         <?php endif; ?>
     </section>
 
-    <section aria-labelledby="explore-heading">
+    <section class="explore-section" aria-labelledby="explore-heading">
+        <?php if ($available): ?>
+        <div class="explore-tools">
+            <label for="explore-module-search">Find a module</label>
+            <input id="explore-module-search" type="search" placeholder="Search module name or code..." autocomplete="off" aria-controls="explore-available-grid">
+            <span id="explore-search-count" aria-live="polite"></span>
+        </div>
+        <?php endif; ?>
         <h2 id="explore-heading">Explore Available Modules <span class="count">(<?= count($available) ?>)</span></h2>
         <p class="hint">Only active modules appear here. Semester information will be added when we connect curriculum listings in the next step.</p>
         <?php if (!$available): ?>
             <div class="empty">No additional active modules are available to enroll in right now.</div>
         <?php else: ?>
-            <div class="grid">
+            <div class="grid ex-card-grid" id="explore-available-grid">
                 <?php foreach ($available as $module): ?>
-                    <article class="card">
+                    <article class="card ex-module-card">
                         <div class="code"><?= e($module['module_code']) ?></div>
                         <h3><?= e($module['module_name']) ?></h3>
                         <p><?= e($module['description'] ?: 'Learning module') ?></p>
@@ -167,6 +190,7 @@ if (!in_array($theme, ['light', 'dark', 'system'], true)) {
                     </article>
                 <?php endforeach; ?>
             </div>
+            <p class="empty" id="explore-no-results" hidden>No modules match your search. Try another name or code.</p>
         <?php endif; ?>
     </section>
 </main>
