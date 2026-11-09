@@ -61,11 +61,98 @@ $fmt=static fn(string $date):string => date('D, j M Y · g:i A',strtotime($date)
 <!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title><?= e($session['title']) ?> · Kuppiya Room</title>
 <script>try{document.documentElement.dataset.theme=localStorage.getItem('ulearn-theme')||'light'}catch(e){}</script>
 <style>
-:root{font-family:Inter,ui-sans-serif,system-ui,-apple-system,'Segoe UI',sans-serif;color:#20213b;background:#f7f7fc;--surface:#fff;--muted:#777990;--border:#e8e8f2;--accent:#7656df;--soft:#f2efff;--field:#f9f9fd}*{box-sizing:border-box}html[data-theme=dark]{color:#f0eefb;background:#10111c;--surface:#1b1c2c;--muted:#a5a5bc;--border:#33334a;--soft:#302746;--field:#242537}body{margin:0}a{color:inherit;text-decoration:none}.wrap{max-width:1240px;margin:0 auto;padding:28px 24px}.top{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:24px}.back{font-size:14px;color:var(--muted);font-weight:600}.tag{background:var(--soft);color:var(--accent);padding:8px 12px;border-radius:999px;font-size:12px;font-weight:700}.title{margin:0;font-size:clamp(23px,3vw,31px);letter-spacing:-.9px}.subtitle{color:var(--muted);font-size:13px;margin:8px 0 0}.layout{display:grid;grid-template-columns:minmax(0,1fr) 305px;gap:18px;margin-top:24px}.panel{background:var(--surface);border:1px solid var(--border);border-radius:20px;overflow:hidden;box-shadow:0 12px 36px rgba(36,30,74,.035)}.chat-head{display:flex;justify-content:space-between;align-items:center;padding:20px 24px;border-bottom:1px solid var(--border)}.chat-head h2,.side h2{font-size:15px;margin:0;letter-spacing:-.2px}.small{font-size:12px;color:var(--muted)}.chat{height:min(60vh,610px);min-height:340px;overflow-y:auto;padding:24px;display:flex;flex-direction:column;gap:13px;scroll-behavior:smooth}.bubble{max-width:min(78%,560px);padding:12px 15px;border:1px solid var(--border);background:var(--field);border-radius:16px 16px 16px 5px;align-self:flex-start;overflow-wrap:anywhere}.bubble.mine{background:var(--soft);border-color:transparent;border-radius:16px 16px 5px 16px;align-self:flex-end}.bubble.system{background:transparent;border:0;align-self:center;text-align:center;color:var(--muted);font-size:12px}.author{font-size:11px;font-weight:750;color:var(--accent);margin-bottom:5px}.body{white-space:pre-wrap;font-size:14px;line-height:1.55}.when{text-align:right;color:var(--muted);font-size:10px;margin-top:6px}.compose{padding:15px 20px;border-top:1px solid var(--border);display:flex;gap:10px;align-items:flex-end}.compose textarea{width:100%;resize:none;max-height:130px;min-height:44px;padding:12px 14px;background:var(--field);color:inherit;border:1px solid var(--border);border-radius:12px;font:inherit;font-size:14px;outline:none}.compose textarea:focus{border-color:var(--accent)}.send{border:0;background:var(--accent);color:white;border-radius:12px;height:44px;padding:0 20px;font-weight:700;cursor:pointer}.send:disabled{opacity:.5;cursor:wait}.side{padding:23px}.section{margin-top:23px;padding-top:20px;border-top:1px solid var(--border)}.item{margin-top:16px}.item label{display:block;color:var(--muted);font-size:11px;margin-bottom:5px}.item strong{font-size:13px;line-height:1.5;font-weight:600;overflow-wrap:anywhere}.person{display:flex;align-items:center;gap:10px;margin-top:13px;font-size:13px}.avatar{width:31px;height:31px;display:grid;place-items:center;background:var(--soft);color:var(--accent);font-size:12px;font-weight:800;border-radius:10px}.alert{padding:12px 16px;border-radius:12px;background:#fff0f0;color:#a02735;margin-bottom:14px;font-size:13px}.empty{margin:auto;color:var(--muted);text-align:center;font-size:14px}.read-only{padding:15px 20px;color:var(--muted);font-size:13px;border-top:1px solid var(--border)}@media(max-width:800px){.wrap{padding:18px 14px}.layout{grid-template-columns:1fr}.chat{height:56vh}.side{padding:18px}.top{margin-bottom:18px}.chat-head{padding:17px}.chat{padding:15px}.compose{padding:12px}.bubble{max-width:90%}}
+:root {
+    color-scheme: light;
+    font-family: Inter, ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+    color: #20213b;
+    background: #f7f7fc;
+    --surface: #fff;
+    --muted: #777990;
+    --border: #e8e8f2;
+    --accent: #7656df;
+    --soft: #f2efff;
+    --field: #f9f9fd;
+}
+
+* {
+    box-sizing: border-box;
+}
+
+html[data-theme="dark"] {
+    color-scheme: dark;
+    color: #f0eefb;
+    background: #10111c;
+    --surface: #1b1c2c;
+    --muted: #a5a5bc;
+    --border: #33334a;
+    --soft: #302746;
+    --field: #242537;
+}
+
+body {
+    margin: 0;
+    background: transparent;
+    color: inherit;
+}
+a{color:inherit;text-decoration:none}.wrap{max-width:1240px;margin:0 auto;padding:28px 24px}.top{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:24px}.top-actions {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.theme-toggle {
+    width: 40px;
+    height: 40px;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    background: var(--surface);
+    color: inherit;
+    font-size: 20px;
+    cursor: pointer;
+    display: grid;
+    place-items: center;
+}
+
+.theme-toggle:hover {
+    border-color: var(--accent);
+}
+
+.theme-toggle:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 3px;
+}.back{font-size:14px;color:var(--muted);font-weight:600}.tag{background:var(--soft);color:var(--accent);padding:8px 12px;border-radius:999px;font-size:12px;font-weight:700}.title{margin:0;font-size:clamp(23px,3vw,31px);letter-spacing:-.9px}.subtitle{color:var(--muted);font-size:13px;margin:8px 0 0}.layout{display:grid;grid-template-columns:minmax(0,1fr) 305px;gap:18px;margin-top:24px}.panel{background:var(--surface);border:1px solid var(--border);border-radius:20px;overflow:hidden;box-shadow:0 12px 36px rgba(36,30,74,.035)}.chat-head{display:flex;justify-content:space-between;align-items:center;padding:20px 24px;border-bottom:1px solid var(--border)}.chat-head h2,.side h2{font-size:15px;margin:0;letter-spacing:-.2px}.small{font-size:12px;color:var(--muted)}.chat{height:min(60vh,610px);min-height:340px;overflow-y:auto;padding:24px;display:flex;flex-direction:column;gap:13px;scroll-behavior:smooth}.bubble{max-width:min(78%,560px);padding:12px 15px;border:1px solid var(--border);background:var(--field);border-radius:16px 16px 16px 5px;align-self:flex-start;overflow-wrap:anywhere}.bubble.mine{background:var(--soft);border-color:transparent;border-radius:16px 16px 5px 16px;align-self:flex-end}.bubble.system{background:transparent;border:0;align-self:center;text-align:center;color:var(--muted);font-size:12px}.author{font-size:11px;font-weight:750;color:var(--accent);margin-bottom:5px}.body{white-space:pre-wrap;font-size:14px;line-height:1.55}.when{text-align:right;color:var(--muted);font-size:10px;margin-top:6px}.compose{padding:15px 20px;border-top:1px solid var(--border);display:flex;gap:10px;align-items:flex-end}.compose textarea{width:100%;resize:none;max-height:130px;min-height:44px;padding:12px 14px;background:var(--field);color:inherit;border:1px solid var(--border);border-radius:12px;font:inherit;font-size:14px;outline:none}.compose textarea:focus{border-color:var(--accent)}.send{border:0;background:var(--accent);color:white;border-radius:12px;height:44px;padding:0 20px;font-weight:700;cursor:pointer}.send:disabled{opacity:.5;cursor:wait}.side{padding:23px}.section{margin-top:23px;padding-top:20px;border-top:1px solid var(--border)}.item{margin-top:16px}.item label{display:block;color:var(--muted);font-size:11px;margin-bottom:5px}.item strong{font-size:13px;line-height:1.5;font-weight:600;overflow-wrap:anywhere}.person{display:flex;align-items:center;gap:10px;margin-top:13px;font-size:13px}.avatar{width:31px;height:31px;display:grid;place-items:center;background:var(--soft);color:var(--accent);font-size:12px;font-weight:800;border-radius:10px}.alert{padding:12px 16px;border-radius:12px;background:#fff0f0;color:#a02735;margin-bottom:14px;font-size:13px}.empty{margin:auto;color:var(--muted);text-align:center;font-size:14px}.read-only{padding:15px 20px;color:var(--muted);font-size:13px;border-top:1px solid var(--border)}@media(max-width:800px){.wrap{padding:18px 14px}.layout{grid-template-columns:1fr}.chat{height:56vh}.side{padding:18px}.top{margin-bottom:18px}.chat-head{padding:17px}.chat{padding:15px}.compose{padding:12px}.bubble{max-width:90%}}
 </style>
-<script src="<?= htmlspecialchars(url('assets/js/theme-global.js?v=20261107-2'), ENT_QUOTES, 'UTF-8') ?>"></script>
+
 <link rel="stylesheet" href="<?= e(url('assets/css/ulearn-community-phase4.css?v=1')) ?>">
-</head><body><main class="wrap"><div class="top"><a class="back" href="<?= e(url('dashboard/kuppiya.php?view=my')) ?>">← My Kuppiyas</a><span class="tag"><?= e(ucfirst($session['status'])) ?></span></div>
+</head>
+<body>
+
+<main class="wrap">
+
+<div class="top">
+
+    <a class="back" href="<?= e(url('dashboard/kuppiya.php?view=my')) ?>">
+        ← My Kuppiyas
+    </a>
+
+    <div class="top-actions">
+
+        <button
+            type="button"
+            class="theme-toggle"
+            id="themeButton"
+            aria-label="Switch to dark mode"
+            title="Switch to dark mode">
+            ☾
+        </button>
+
+        <span class="tag">
+            <?= e(ucfirst($session['status'])) ?>
+        </span>
+
+    </div>
+
+</div>
 <h1 class="title"><?= e($session['title']) ?></h1><p class="subtitle">Hosted by <?= e($session['host_name']) ?> · <?= count($members) ?> members · Private group</p>
 <div class="layout"><section class="panel"><header class="chat-head"><div><h2>Group conversation</h2><span class="small">Only members can view these messages</span></div><span class="tag">Private</span></header><div class="chat" id="messages">
 <?php if (!$messages): ?><p class="empty">No messages yet. Start the conversation.</p><?php endif; ?>
@@ -73,5 +160,61 @@ $fmt=static fn(string $date):string => date('D, j M Y · g:i A',strtotime($date)
 </div><?php if($error): ?><p class="alert"><?= e($error) ?></p><?php endif; ?>
 <?php if($active): ?><form method="post" class="compose" id="chatForm"><input type="hidden" name="csrf" value="<?= e(csrf()) ?>"><textarea name="message" id="messageInput" maxlength="2000" rows="1" required placeholder="Write a message…" aria-label="Write a message"></textarea><button class="send" id="sendButton" type="submit">Send</button></form><?php else: ?><div class="read-only">This session has ended or been cancelled. Messages are read-only.</div><?php endif; ?></section>
 <aside class="panel side"><h2>Session details</h2><div class="item"><label>Starts</label><strong><?= e($fmt($session['starts_at'])) ?></strong></div><div class="item"><label>Ends</label><strong><?= e($fmt($session['ends_at'])) ?></strong></div><div class="item"><label>Format</label><strong><?= $session['location_type']==='online'?'Online':'In person' ?></strong></div><div class="item"><label>Meeting details</label><strong><?= e($session['meeting_details']?:'Not provided') ?></strong></div><?php if($session['description']): ?><div class="item"><label>About this session</label><strong><?= e($session['description']) ?></strong></div><?php endif; ?><div class="section"><h2>Members <span class="small">(<?= count($members) ?>)</span></h2><?php foreach($members as $m): ?><div class="person"><span class="avatar"><?= e(mb_strtoupper(mb_substr($m['full_name'],0,1))) ?></span><span><?= e($m['full_name']) ?><?= (int)$m['id']===(int)$session['host_user_id']?' · Host':'' ?></span></div><?php endforeach; ?></div></aside></div></main>
+<script>
+(function () {
+
+    const root = document.documentElement;
+    const button = document.getElementById('themeButton');
+
+    function applyTheme(theme) {
+
+        const isDark = theme === 'dark';
+
+        root.dataset.theme = isDark ? 'dark' : 'light';
+
+        if (button) {
+
+            button.textContent = isDark ? '\u2600' : '\u263E';
+
+            button.title = isDark
+                ? 'Switch to light mode'
+                : 'Switch to dark mode';
+
+            button.setAttribute('aria-label', button.title);
+        }
+    }
+
+    // Get theme saved by kuppiya.php
+    let savedTheme = 'light';
+
+    try {
+        savedTheme = localStorage.getItem('ulearn-theme') || 'light';
+    } catch (error) {
+        savedTheme = root.dataset.theme || 'light';
+    }
+
+    applyTheme(savedTheme);
+
+    // Toggle theme
+    if (button) {
+
+        button.addEventListener('click', function () {
+
+            const nextTheme =
+                root.dataset.theme === 'dark' ? 'light' : 'dark';
+
+            applyTheme(nextTheme);
+
+            try {
+                localStorage.setItem('ulearn-theme', nextTheme);
+            } catch (error) {
+                // Continue without local storage
+            }
+
+        });
+    }
+
+})();
+</script>
 <script>(function(){const chat=document.getElementById('messages');if(chat)chat.scrollTop=chat.scrollHeight;const form=document.getElementById('chatForm');if(!form)return;const input=document.getElementById('messageInput'),button=document.getElementById('sendButton');input.addEventListener('keydown',function(e){if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();if(input.value.trim()&&!button.disabled)form.requestSubmit();}});form.addEventListener('submit',function(e){if(!input.value.trim()){e.preventDefault();return;}button.disabled=true;button.textContent='Sending…';});})();</script><script src="<?= e(url('assets/js/notifications-live.js?v=20261107-profile-only-2')) ?>" data-base="<?= e(rtrim(url(), '/')) ?>" defer></script>
-<?php require_once __DIR__ . '/../includes/student-bot.php'; ?></body></html>
+<?php require_once __DIR__ . '/../includes/student-bot.php'; ?></body></html><div class=

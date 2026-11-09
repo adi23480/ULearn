@@ -662,123 +662,94 @@ $base = url('dashboard/kuppiya.php');
 <title>Kuppiya Sessions — ULearn</title>
 
 
-<!-- DARK MODE JAVASCRIPT -->
-
+<!-- KUPPIYA THEME + INVITATION JAVASCRIPT -->
 <script>
-
 (function () {
+    'use strict';
+
+    // Apply the saved theme before the page is displayed.
+    var savedTheme = 'light';
 
     try {
+        savedTheme = localStorage.getItem('ulearn-theme') || 'light';
+    } catch (error) {
+        savedTheme = 'light';
+    }
 
-        let theme = localStorage.getItem('ulearn-theme');
+    if (savedTheme !== 'dark' && savedTheme !== 'light') {
+        savedTheme = 'light';
+    }
 
-        if (theme !== 'light' && theme !== 'dark') {
+    document.documentElement.setAttribute('data-theme', savedTheme);
 
-            theme = window.matchMedia('(prefers-color-scheme: dark)').matches
-                ? 'dark'
-                : 'light';
+    function setTheme(theme) {
+        var validTheme = theme === 'dark' ? 'dark' : 'light';
+
+        document.documentElement.setAttribute('data-theme', validTheme);
+
+        try {
+            localStorage.setItem('ulearn-theme', validTheme);
+        } catch (error) {
+            // Theme still works for this page even if storage is unavailable.
         }
 
-        document.documentElement.setAttribute('data-theme', theme);
-
-    } catch (e) {
-
-        document.documentElement.setAttribute('data-theme', 'light');
-
+        updateThemeButton();
     }
 
-})();
+    function updateThemeButton() {
+        var button = document.getElementById('themeButton');
+        if (!button) return;
 
-
-function toggleTheme() {
-
-    let currentTheme =
-        document.documentElement.getAttribute('data-theme');
-
-    let newTheme =
-        currentTheme === 'dark' ? 'light' : 'dark';
-
-    document.documentElement.setAttribute('data-theme', newTheme);
-
-    try {
-
-        localStorage.setItem('ulearn-theme', newTheme);
-
-    } catch (e) {
-
-        console.log('Theme storage unavailable');
-
-    }
-
-    updateThemeButton();
-
-}
-
-
-function updateThemeButton() {
-
-    let button = document.getElementById('themeButton');
-
-    if (button) {
-
-        let dark =
-            document.documentElement.getAttribute('data-theme') === 'dark';
-
-        button.textContent = dark ? '☀' : '☾';
-
+        var isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+        button.textContent = isDark ? '\u2600' : '\u263E';
         button.setAttribute(
             'aria-label',
-            dark ? 'Switch to light mode' : 'Switch to dark mode'
+            isDark ? 'Switch to light mode' : 'Switch to dark mode'
         );
-
+        button.setAttribute('title', isDark ? 'Switch to light mode' : 'Switch to dark mode');
     }
 
-}
+    document.addEventListener('DOMContentLoaded', function () {
+        var button = document.getElementById('themeButton');
 
-
-document.addEventListener('DOMContentLoaded', function () {
-
-    updateThemeButton();
-
-});
-
-
-/* COPY INVITATION */
-
-function copyInvite(id) {
-
-    let el = document.getElementById(id);
-
-    if (!el) return;
-
-    let value = el.value;
-
-    if (navigator.clipboard && window.isSecureContext) {
-
-        navigator.clipboard.writeText(value)
-            .then(function () {
-
-                alert('Invitation copied!');
-
-            })
-            .catch(function () {
-
-                window.prompt('Copy this link:', value);
-
+        if (button) {
+            button.addEventListener('click', function () {
+                var current = document.documentElement.getAttribute('data-theme');
+                setTheme(current === 'dark' ? 'light' : 'dark');
             });
+        }
 
-    } else {
+        updateThemeButton();
+    });
 
-        el.select();
+    // Keep this function available for the existing invitation-copy button.
+    window.copyInvite = function (id) {
+        var field = document.getElementById(id);
+        if (!field) return;
 
-        document.execCommand('copy');
+        var value = field.value;
 
-        alert('Invitation copied!');
+        if (navigator.clipboard && window.isSecureContext) {
+            navigator.clipboard.writeText(value)
+                .then(function () {
+                    alert('Invitation copied!');
+                })
+                .catch(function () {
+                    window.prompt('Copy this link:', value);
+                });
+        } else {
+            field.focus();
+            field.select();
 
-    }
-
-}
-
+            try {
+                document.execCommand('copy');
+                alert('Invitation copied!');
+            } catch (error) {
+                window.prompt('Copy this link:', value);
+            }
+        }
+    };
+})();
 </script>
 
 
@@ -787,6 +758,7 @@ function copyInvite(id) {
 /* LIGHT MODE */
 
 :root {
+    color-scheme: light;
     --bg: #f7f8fc;
     --surface: #ffffff;
     --text: #171927;
@@ -800,6 +772,7 @@ function copyInvite(id) {
 /* DARK MODE */
 
 :root[data-theme="dark"] {
+    color-scheme: dark;
     --bg: #0c0e16;
     --surface: #161924;
     --text: #f4f4fa;
@@ -1516,7 +1489,7 @@ textarea::placeholder {
 </style>
 
 
-<script src="<?= htmlspecialchars(url('assets/js/theme-global.js?v=20261107-2'), ENT_QUOTES, 'UTF-8') ?>"></script>
+<!-- This page uses its own theme handler to avoid duplicate theme handlers. -->
 <link rel="stylesheet" href="<?= e(url('assets/css/ulearn-community-phase4.css?v=1')) ?>">
 </head>
 
@@ -1564,8 +1537,8 @@ textarea::placeholder {
     id="themeButton"
     class="theme-button"
     type="button"
-    onclick="toggleTheme()"
-    aria-label="Toggle theme">☾</button>
+    aria-label="Toggle theme"
+    title="Toggle theme">☾</button>
 
 <a class="avatar"
    href="<?= e(url('dashboard/profile.php')) ?>"
