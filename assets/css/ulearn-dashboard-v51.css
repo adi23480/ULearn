@@ -1,0 +1,19 @@
+/* V5.1: professional navigation + repeatable reveal. Loaded after V5. */
+.sidebar .ul-nav{display:flex!important;flex-direction:column!important;gap:5px!important;padding:4px 9px 12px!important}
+.sidebar .ul-nav a{display:flex!important;align-items:center!important;gap:15px!important;min-height:46px!important;padding:10px 13px!important;border-radius:12px!important;font-size:14px!important;font-weight:620!important;letter-spacing:.005em!important;line-height:1.35!important;border:1px solid transparent!important;transition:background .22s ease,transform .22s ease,box-shadow .22s ease,color .22s ease,border-color .22s ease!important}
+.sidebar .ul-nav a .ul-nav-icon{width:19px!important;height:19px!important;flex:0 0 19px!important;margin:0!important;opacity:.92!important;transition:transform .22s ease!important}
+.sidebar .ul-nav a span{display:block!important;flex:1!important;min-width:0!important}
+.sidebar .ul-nav a:hover{transform:translateX(3px)!important;box-shadow:0 7px 18px rgba(0,0,0,.09)!important}
+.sidebar .ul-nav a:hover .ul-nav-icon{transform:scale(1.08)!important}
+.sidebar .ul-nav a:active{transform:translateX(2px) scale(.985)!important}
+.sidebar .ul-nav a:focus-visible{outline:2px solid #1bd39c!important;outline-offset:2px!important}
+:root[data-theme="dark"] .sidebar .ul-nav a:hover{background:rgba(29,177,138,.13)!important;border-color:rgba(70,208,167,.22)!important}
+:root[data-theme="dark"] .sidebar .ul-nav a.active{background:linear-gradient(90deg,rgba(23,189,137,.21),rgba(17,108,102,.12))!important;border-color:rgba(52,219,167,.3)!important;box-shadow:inset 3px 0 #20d79c,0 7px 20px rgba(0,0,0,.12)!important}
+:root[data-theme="light"] .sidebar .ul-nav a:hover{background:#eaf8f1!important;border-color:#c8e8d8!important}
+:root[data-theme="light"] .sidebar .ul-nav a.active{box-shadow:inset 3px 0 #0fb77b,0 5px 16px rgba(8,85,53,.08)!important}
+/* Override V5 one-time behavior. Elements stay readable when JS is absent. */
+html.ul-v51-motion .ul-v5-reveal{opacity:0!important;transform:translate3d(var(--ul-v5-x,-88px),0,0)!important;transition:opacity .7s cubic-bezier(.22,1,.36,1),transform .7s cubic-bezier(.22,1,.36,1)!important;transition-delay:var(--ul-v5-delay,0ms)!important}
+html.ul-v51-motion .ul-v5-reveal.ul-v5-visible{opacity:1!important;transform:translate3d(0,0,0)!important}
+html.ul-v51-motion .ul-v5-reveal.ul-v5-visible:hover{transition:transform .2s ease,box-shadow .2s ease!important;transition-delay:0ms!important}
+@media(max-width:650px){html.ul-v51-motion .ul-v5-reveal{--ul-v5-x:0px!important}.sidebar .ul-nav a{min-height:44px!important}}
+@media(prefers-reduced-motion:reduce){html.ul-v51-motion .ul-v5-reveal{opacity:1!important;transform:none!important;transition:none!important}.sidebar .ul-nav a{transition:none!important}}
