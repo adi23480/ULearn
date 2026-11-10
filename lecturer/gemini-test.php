@@ -169,11 +169,19 @@ html[data-theme="dark"] .ai-footer {
     color: #94a3b8 !important;
 }
 </style>
-<script src="<?= htmlspecialchars(url('assets/js/theme-global.js?v=20261107-2'), ENT_QUOTES, 'UTF-8') ?>"></script>
+<script src="<?= htmlspecialchars(url('assets/js/theme-global.js?v=20261110-3'), ENT_QUOTES, 'UTF-8') ?>"></script>
 <link rel="stylesheet" href="<?= e(url('assets/css/ulearn-design-system.css?v=1')) ?>">
 <script defer src="<?= e(url('assets/js/ulearn-motion.js?v=1')) ?>"></script>
 </head><body><div class="ai-layout"><aside class="ai-nav"><a class="ai-nav-brand" href="<?= e(url('lecturer/index.php')) ?>">u learn<span>.</span></a><div class="ai-nav-title">Lecturer workspace</div><nav class="ai-nav-links" aria-label="Lecturer navigation"><a href="<?= e(url('lecturer/index.php')) ?>">▦ Overview</a><a href="<?= e(url('lecturer/index.php#modules')) ?>">▤ My modules</a><a href="<?= e(url('lecturer/materials.php')) ?>">▣ Study materials</a><a href="<?= e(url('lecturer/quizzes.php')) ?>">▣ Quiz management</a><a class="nested current" aria-current="page" href="<?= e(url('lecturer/gemini-test.php')) ?>">✦ Generate quiz with AI</a><a href="<?= e(url('lecturer/consultations.php')) ?>">◷ Consultations</a><a href="<?= e(url('lecturer/profile.php')) ?>">⚙ My profile</a></nav></aside><main class="ai-shell">
-<header class="ai-top"><div class="ai-brand"><span class="ai-brand-mark">✦</span> ULearn <span style="font-size:13px;color:#8c8da6;font-weight:700">/ AI Studio</span></div><a class="ai-back" href="<?= e(url('lecturer/index.php')) ?>">← Lecturer dashboard</a></header>
+<header class="ai-top">
+    <div class="ai-brand">
+        <span class="ai-brand-mark">✦</span>
+        ULearn 
+        <span style="font-size:13px;color:#8c8da6;font-weight:700">/ AI Studio</span>
+    </div>
+    <a class="ai-back" href="<?= e(url('lecturer/index.php')) ?>">← Lecturer dashboard</a>
+    <?php require __DIR__ . '/../includes/theme-toggle-button.php'; ?>
+</header>
 <section class="ai-hero"><div class="ai-eyebrow">Teaching tools · Powered by Gemini</div><h1>Turn your lecture notes into better quizzes.</h1><p>Create multiple-choice questions in seconds, review every answer, and bring the finished set into your existing ULearn quiz workflow.</p><span class="ai-pill">✦ AI-assisted · Lecturer reviewed</span></section>
 <div class="ai-grid"><section class="ai-card"><h2 class="ai-title">Create a question set</h2><p class="ai-sub">Paste lecture material, choose your preferences and let Gemini prepare a first draft.</p>
 <form method="post" id="ai-form"><input type="hidden" name="csrf" value="<?= e(csrf()) ?>">
