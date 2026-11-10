@@ -32,7 +32,6 @@ function quizRedirect(string $query = ''): never
     go('admin/quizzes.php' . ($query !== '' ? '?' . $query : ''));
 }
 
-
 /** Parse a pasted plain-text multiple-choice quiz into structured question records. */
 function parseBulkQuizText(string $raw): array
 {
@@ -40,7 +39,6 @@ function parseBulkQuizText(string $raw): array
     if ($raw === '') return ['questions' => [], 'errors' => ['Paste your questions into the text area first.']];
     if (strlen($raw) > 2_000_000) return ['questions' => [], 'errors' => ['The pasted content is too large. Please import fewer questions at a time.']];
 
-    // Question headers are required so question text and options can be separated reliably.
     $lines = explode("\n", $raw);
     $blocks = [];
     $current = [];
@@ -86,7 +84,6 @@ function parseBulkQuizText(string $raw): array
             if (preg_match('/^(?:reason|why)\s*([A-D])\s*[:=\-]\s*(.*)$/i', $trim, $m) || preg_match('/^([A-D])\s+(?:reason|why)\s*[:=\-]\s*(.*)$/i', $trim, $m)) {
                 $letter = strtoupper($m[1]); $item['option_explanations'][$letter] = trim($m[2]); $active = 'reason:' . $letter; continue;
             }
-            // Continuation lines are appended to whichever field was most recently started.
             if (!$sawOption && $active === 'question_text') {
                 $item['question_text'] .= ($item['question_text'] === '' ? '' : "\n") . $trim;
             } elseif (str_starts_with($active, 'option:')) {
@@ -115,7 +112,7 @@ function parseBulkQuizText(string $raw): array
     return ['questions' => $questions, 'errors' => $errors];
 }
 
-/** Extract plain text from an uploaded .txt or .docx file. No AI API is required. */
+/** Extract plain text from an uploaded .txt or .docx file. */
 function extractQuizUpload(array $file): string
 {
     if (($file['error'] ?? UPLOAD_ERR_NO_FILE) === UPLOAD_ERR_NO_FILE) return '';
@@ -173,7 +170,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if (!in_array($availabilityMode, ['unlimited', 'scheduled', 'open_until'], true)) {
                 throw new RuntimeException('Choose a valid quiz availability setting.');
             }
-            // Unlimited is the default: dates are ignored and stored as NULL.
             if ($availabilityMode === 'unlimited') {
                 $availableFrom = null;
                 $availableUntil = null;
@@ -183,7 +179,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 }
                 $availableFrom = str_replace('T', ' ', $rawAvailableFrom) . (strlen($rawAvailableFrom) === 16 ? ':00' : '');
                 $availableUntil = str_replace('T', ' ', $rawAvailableUntil) . (strlen($rawAvailableUntil) === 16 ? ':00' : '');
-            } else { // open_until: available immediately until the optional closing date
+            } else {
                 $availableFrom = null;
                 $availableUntil = $rawAvailableUntil !== '' ? str_replace('T', ' ', $rawAvailableUntil) . (strlen($rawAvailableUntil) === 16 ? ':00' : '') : null;
             }
@@ -222,7 +218,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     throw new RuntimeException('The selected module is unavailable. Refresh and try again.');
                 }
             } else {
-                // Let admins create a module inline; it remains editable later in Academics.
                 $existingModule = $pdo->prepare('SELECT id, module_name, is_active FROM academic_modules WHERE module_code = ? LIMIT 1');
                 $existingModule->execute([$newModuleCode]);
                 $existing = $existingModule->fetch(PDO::FETCH_ASSOC);
@@ -274,7 +269,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $parsed = parseBulkQuizText($bulkText);
             $bulkPreview = $parsed['questions'];
             $bulkErrors = $parsed['errors'];
-            // Keep parsed data across the POST/redirect/GET boundary, avoiding a browser resubmit.
             $_SESSION['quiz_import_preview'] = [
                 'quiz_id' => (int)$quizId,
                 'questions' => $bulkPreview,
@@ -513,8 +507,20 @@ if ($isImportPreviewPage) {
     unset($_SESSION['quiz_import_preview']);
 }
 
+// Personal unread notifications for the signed-in administrator.
+$notificationStmt = $pdo->prepare(
+    "SELECT COUNT(*) FROM notifications WHERE user_id = ? AND is_read = 0"
+);
+$notificationStmt->execute([(int)$user['id']]);
+$unreadNotifications = (int)$notificationStmt->fetchColumn();
+
 $fullName = (string)($user['full_name'] ?? 'Administrator');
+$nameParts = preg_split('/\s+/', trim($fullName));
+$firstName = $nameParts[0] ?: 'Administrator';
+$initial = strtoupper(substr($firstName, 0, 1));
+$roleLabel = $user['role'] === 'main_admin' ? 'Main Administrator' : 'Administrator';
 $theme = (string)($user['theme'] ?? 'system');
+
 $publishedCount = count(array_filter($quizzes, static fn($q) => (int)$q['is_published'] === 1));
 $totalQuestions = array_sum(array_map(static fn($q) => (int)$q['question_count'], $quizzes));
 ?>
@@ -525,232 +531,860 @@ $totalQuestions = array_sum(array_map(static fn($q) => (int)$q['question_count']
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Quiz Management — U Learn</title>
 <script>
-(function(){const p=<?= json_encode($theme, JSON_HEX_TAG|JSON_HEX_AMP|JSON_HEX_APOS|JSON_HEX_QUOT) ?>;const s=localStorage.getItem('ulearn-theme');const t=(s==='light'||s==='dark')?s:((p==='light'||p==='dark')?p:(window.matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light'));document.documentElement.dataset.theme=t;})();
-function toggleTheme(){const t=document.documentElement.dataset.theme==='dark'?'light':'dark';document.documentElement.dataset.theme=t;localStorage.setItem('ulearn-theme',t);const b=document.getElementById('themeToggle');if(b)b.textContent=t==='dark'?'☀':'☾';}
-document.addEventListener('DOMContentLoaded',()=>{const b=document.getElementById('themeToggle');if(b)b.textContent=document.documentElement.dataset.theme==='dark'?'☀':'☾';});
+    try {
+        const saved = localStorage.getItem('ulearn-theme') || <?= json_encode($theme, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
+        const theme = saved === 'system'
+            ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')
+            : saved;
+        document.documentElement.dataset.theme = theme;
+        localStorage.setItem('ulearn-theme', theme);
+    } catch (error) {}
 </script>
 <style>
-:root{color-scheme:light;--bg:#f7f8fc;--surface:#fff;--surface-alt:#f1f2f8;--text:#171927;--muted:#777b90;--border:#e7e8f0;--accent:#6756e8;--accent-light:#f0edff;--shadow:0 10px 40px rgba(30,30,60,.04);--green:#18794e;--green-bg:#e9f8f0;--red:#b4233c;--red-bg:#fff0f2}
-:root[data-theme="dark"]{color-scheme:dark;--bg:#0c0e16;--surface:#161924;--surface-alt:#202431;--text:#f4f4fa;--muted:#a0a4b6;--border:#2b2e3c;--accent:#a99aff;--accent-light:#292440;--shadow:none;--green:#8ee0b8;--green-bg:#173127;--red:#ffb1bf;--red-bg:#351e28}
-*{box-sizing:border-box}html{scroll-behavior:auto}body{margin:0;background:var(--bg);color:var(--text);font-family:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif;line-height:1.6}a{color:inherit;text-decoration:none}button,input,select,textarea{font:inherit}button{cursor:pointer}.layout{display:grid;grid-template-columns:250px minmax(0,1fr);min-height:100vh}.sidebar{background:var(--surface);border-right:1px solid var(--border);padding:28px 15px;display:flex;flex-direction:column;gap:30px}.brand{font-size:27px;font-weight:850;letter-spacing:-1.7px;padding:0 14px}.brand span,.accent-dot{color:var(--accent)}.nav-label{padding:0 14px;color:var(--muted);font-size:10px;letter-spacing:1.7px;font-weight:850;text-transform:uppercase}.nav{display:grid;gap:7px}.nav a{display:flex;align-items:center;gap:12px;padding:12px 14px;border-radius:13px;color:var(--muted);font-size:13px;font-weight:700;transition:.2s}.nav a:hover,.nav a.active{background:var(--accent-light);color:var(--accent)}.nav .ico{width:19px;text-align:center;font-size:16px}.sidebar-foot{margin-top:auto;padding:16px 14px;border:1px solid var(--border);border-radius:15px;color:var(--muted);font-size:11px}.main{min-width:0;padding:28px clamp(18px,4vw,54px) 60px}.topbar{display:flex;justify-content:space-between;align-items:center;gap:15px;margin-bottom:52px}.crumb{font-size:11px;letter-spacing:1.6px;text-transform:uppercase;color:var(--muted);font-weight:850}.top-actions{display:flex;align-items:center;gap:12px}.role{font-size:10px;color:var(--muted);font-weight:850;letter-spacing:1.2px;text-transform:uppercase}.theme-btn{width:42px;height:42px;border:1px solid var(--border);border-radius:14px;background:var(--surface);color:var(--text);font-size:18px}.logout{font-size:12px;color:var(--muted);font-weight:750}.intro{margin-bottom:30px;animation:rise .4s ease both}.eyebrow{font-size:11px;letter-spacing:1.7px;text-transform:uppercase;color:var(--muted);font-weight:850}h1{font-size:clamp(38px,5vw,62px);line-height:1.08;letter-spacing:-.06em;margin:14px 0;font-weight:820}h1 span{color:var(--accent)}.subtitle{color:var(--muted);font-size:16px;max-width:700px;margin:0;line-height:1.8}.stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px;margin:28px 0}.stat{background:var(--surface);border:1px solid var(--border);border-radius:19px;padding:20px 22px;box-shadow:var(--shadow)}.stat-label{color:var(--muted);font-size:12px;font-weight:700}.stat-number{font-size:30px;letter-spacing:-1px;font-weight:820;margin-top:8px}.stat-foot{color:var(--muted);font-size:11px;margin-top:3px}.columns{display:grid;grid-template-columns:minmax(300px,.9fr) minmax(0,1.35fr);gap:20px;align-items:start}.card{background:var(--surface);border:1px solid var(--border);border-radius:22px;padding:25px;box-shadow:var(--shadow);min-width:0;animation:rise .45s ease both}.card-head{display:flex;justify-content:space-between;align-items:flex-start;gap:14px;margin-bottom:20px}.kicker{color:var(--accent);font-size:10px;letter-spacing:1.5px;font-weight:850;text-transform:uppercase}.card h2{font-size:20px;letter-spacing:-.6px;margin:4px 0 7px}.hint{font-size:12px;color:var(--muted);margin:0;line-height:1.7}.field{margin-top:16px}label{display:block;font-size:12px;font-weight:750;margin-bottom:7px}input,select,textarea{width:100%;background:var(--surface-alt);color:var(--text);border:1px solid var(--border);border-radius:12px;padding:12px 13px;outline:none;transition:border-color .2s,box-shadow .2s}input,select{min-height:46px}textarea{min-height:82px;resize:vertical}input:focus,select:focus,textarea:focus{border-color:var(--accent);box-shadow:0 0 0 3px color-mix(in srgb,var(--accent) 18%,transparent)}.two{display:grid;grid-template-columns:1fr 1fr;gap:12px}.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;padding:11px 15px;border-radius:12px;border:1px solid var(--border);background:var(--surface-alt);color:var(--text);font-size:12px;font-weight:800;transition:transform .18s,border-color .18s}.btn:hover{transform:translateY(-1px);border-color:var(--accent)}.btn-primary{background:linear-gradient(110deg,#5d4ae0,#8571fa);border-color:transparent;color:#fff;box-shadow:0 9px 22px rgba(103,86,232,.2)}.btn-small{padding:8px 10px;font-size:11px}.btn-danger{color:var(--red)}.full{width:100%;margin-top:20px}.message{padding:13px 15px;border-radius:12px;margin-bottom:18px;font-size:13px}.success{background:var(--green-bg);color:var(--green)}.error{background:var(--red-bg);color:var(--red)}.badge{display:inline-flex;align-items:center;gap:6px;padding:6px 10px;border-radius:999px;background:var(--accent-light);color:var(--accent);font-size:10px;font-weight:850;white-space:nowrap}.badge.published{background:var(--green-bg);color:var(--green)}.badge.draft{background:var(--surface-alt);color:var(--muted)}.quiz-list{display:grid;gap:12px}.quiz-item{padding:16px;border:1px solid var(--border);border-radius:16px;background:var(--surface);transition:border-color .2s,transform .2s}.quiz-item:hover{border-color:color-mix(in srgb,var(--accent) 55%,var(--border));transform:translateY(-1px)}.quiz-title{font-size:15px;font-weight:800;letter-spacing:-.3px}.quiz-meta{font-size:11px;color:var(--muted);margin-top:7px;display:flex;gap:8px;flex-wrap:wrap}.quiz-actions{display:flex;gap:7px;flex-wrap:wrap;margin-top:13px}.empty{border:1px dashed var(--border);border-radius:16px;padding:30px 18px;text-align:center;color:var(--muted);font-size:12px}.empty strong{display:block;color:var(--text);font-size:14px;margin-bottom:6px}.section-gap{margin-top:20px}.question-item{border:1px solid var(--border);border-radius:15px;padding:16px;margin-top:12px}.question-text{font-size:13px;font-weight:750;white-space:pre-wrap;overflow-wrap:anywhere}.options{display:grid;gap:7px;margin-top:12px}.option{font-size:11px;color:var(--muted);padding:8px 10px;border-radius:9px;background:var(--surface-alt);overflow-wrap:anywhere}.option.correct{color:var(--green);background:var(--green-bg)}.topline{display:flex;justify-content:space-between;gap:12px;align-items:flex-start}.separator{height:1px;background:var(--border);margin:20px 0}.back-link{display:inline-flex;color:var(--accent);font-size:12px;font-weight:800;margin-bottom:14px}.fine{font-size:11px;color:var(--muted);margin-top:9px}@keyframes rise{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}@media(max-width:1100px){.layout{grid-template-columns:210px minmax(0,1fr)}.columns{grid-template-columns:1fr}.sidebar{padding-inline:10px}}@media(max-width:720px){.layout{grid-template-columns:1fr}.sidebar{padding:14px;gap:14px;border-right:0;border-bottom:1px solid var(--border)}.sidebar .nav{display:flex;overflow:auto}.sidebar .nav a{white-space:nowrap}.sidebar-foot,.nav-label{display:none}.main{padding:20px 15px 42px}.topbar{margin-bottom:34px}.stats{grid-template-columns:1fr 1fr}.stat:last-child{grid-column:1/-1}.card{padding:19px}.two{grid-template-columns:1fr}.top-actions{gap:8px}}@media(prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;transition-duration:.01ms!important;scroll-behavior:auto!important}}
+    :root {
+        color-scheme: light;
+        --bg: #f7f8fc;
+        --surface: #ffffff;
+        --surface-alt: #f1f2f8;
+        --text: #171927;
+        --muted: #777b90;
+        --border: #e7e8f0;
+        --accent: #6756e8;
+        --accent-light: #f0edff;
+        --shadow: 0 10px 40px rgba(30,30,60,.04);
+        --green: #087e60;
+        --soft: #e7f7ef;
+    }
+    :root[data-theme="dark"] {
+        color-scheme: dark;
+        --bg: #0c0e16;
+        --surface: #161924;
+        --surface-alt: #202431;
+        --text: #f4f4fa;
+        --muted: #a0a4b6;
+        --border: #2b2e3c;
+        --accent: #a99aff;
+        --accent-light: #292440;
+        --shadow: none;
+        --green: #5ce3b5;
+        --soft: #153d34;
+    }
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--text);
+        font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif;
+        line-height: 1.6;
+    }
+    a { color: inherit; text-decoration: none; }
+    button, select, input, textarea { font: inherit; }
+    button { cursor: pointer; }
+    
+    .layout {
+        display: grid;
+        grid-template-columns: 250px minmax(0, 1fr);
+        min-height: 100vh;
+    }
+    .sidebar {
+        background: var(--surface);
+        border-right: 1px solid var(--border);
+        padding: 32px 20px;
+        display: flex;
+        flex-direction: column;
+        gap: 40px;
+    }
+    .brand {
+        font-size: 26px;
+        font-weight: 800;
+        letter-spacing: -1.5px;
+        padding-left: 12px;
+    }
+    .brand span { color: var(--accent); }
+    .nav-label, .eyebrow {
+        font-size: 11px;
+        font-weight: 750;
+        letter-spacing: 1.7px;
+        text-transform: uppercase;
+        color: var(--muted);
+    }
+    .nav-label { margin: 0 12px 14px; }
+    .nav { display: grid; gap: 6px; }
+    .nav a {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 12px 14px;
+        border-radius: 12px;
+        font-size: 14px;
+        font-weight: 600;
+        transition: background .2s, color .2s;
+    }
+    .nav a:hover { background: var(--surface-alt); }
+    .nav a.active {
+        background: var(--accent-light);
+        color: var(--accent);
+    }
+    .ul-nav-icon {
+        width: 20px;
+        height: 20px;
+        flex-shrink: 0;
+    }
+    .sidebar-bottom {
+        margin-top: auto;
+        border: 1px solid var(--border);
+        border-radius: 16px;
+        padding: 16px;
+        font-size: 13px;
+    }
+    .sidebar-bottom strong {
+        display: block;
+        overflow-wrap: anywhere;
+    }
+    .sidebar-bottom small {
+        color: var(--muted);
+        overflow-wrap: anywhere;
+    }
+    .main {
+        min-width: 0;
+        padding: 34px clamp(20px, 5vw, 76px) 80px;
+    }
+    .topbar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 20px;
+        margin-bottom: 40px;
+    }
+    .topbar-right {
+        display: flex;
+        align-items: center;
+        gap: 16px;
+    }
+    .notification-bell {
+        width: 42px; height: 42px; position: relative;
+        display: inline-grid; place-items: center;
+        background: var(--surface); color: var(--text);
+        border: 1px solid var(--border); border-radius: 12px;
+        box-shadow: var(--shadow);
+        transition: transform .18s ease, background .18s ease, border-color .18s ease;
+    }
+    .notification-bell:hover { transform: translateY(-2px); background: var(--accent-light); border-color: var(--accent); }
+    .notification-bell svg { width: 21px; height: 21px; stroke: currentColor; fill: none; stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; }
+    .notification-count {
+        position: absolute; top: -8px; right: -9px;
+        min-width: 20px; height: 20px; padding: 0 5px;
+        display: inline-grid; place-items: center;
+        border-radius: 999px; background: #e34878; color: #fff;
+        border: 2px solid var(--bg); font-size: 10px; font-weight: 800;
+        line-height: 1;
+    }
+    .theme-toggle {
+        border: 1px solid var(--border);
+        background: var(--surface);
+        color: var(--text);
+        border-radius: 12px;
+        width: 42px;
+        height: 42px;
+        display: grid;
+        place-items: center;
+        font-size: 18px;
+        box-shadow: var(--shadow);
+        transition: transform .18s ease, background .18s ease, border-color .18s ease;
+    }
+    .theme-toggle:hover {
+        background: var(--accent-light);
+        border-color: var(--accent);
+        transform: translateY(-2px);
+    }
+    .avatar {
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        background: var(--accent-light);
+        color: var(--accent);
+        display: grid;
+        place-items: center;
+        font-weight: 800;
+        transition: transform .18s ease;
+    }
+    .avatar:hover { transform: translateY(-2px); }
+    .logout {
+        background: transparent;
+        border: 0;
+        color: var(--muted);
+        font-size: 13px;
+        font-weight: 650;
+        cursor: pointer;
+    }
+    .logout:hover { color: var(--text); }
+    h1, h2, h3, p { margin-top: 0; }
+    
+    .hero {
+        border-radius: 24px;
+        padding: 32px;
+        background: linear-gradient(115deg, #063e39, #087d62 70%, #12677b);
+        color: white;
+        margin-bottom: 30px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 20px;
+    }
+    .hero h1 { font-size: clamp(28px, 4vw, 44px); margin: 6px 0; letter-spacing: -1.5px; }
+    .hero p { opacity: .88; margin-bottom: 0; max-width: 600px; }
+    .hero .pill {
+        display: inline-flex;
+        align-items: center;
+        padding: 8px 16px;
+        border-radius: 100px;
+        background: rgba(255, 255, 255, 0.15);
+        backdrop-filter: blur(8px);
+        color: #fff;
+        font-size: 12px;
+        font-weight: 750;
+        white-space: nowrap;
+        border: 1px solid rgba(255, 255, 255, 0.2);
+    }
+    
+    .section-heading {
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+        gap: 15px;
+        margin: 40px 0 20px;
+    }
+    .section-heading h2 {
+        margin: 0;
+        font-size: 22px;
+        letter-spacing: -.5px;
+    }
+    .section-heading small { color: var(--muted); font-weight: 600; }
+    
+    .stats-grid {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 16px;
+    }
+    .stat-card {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 20px;
+        padding: 24px;
+        min-height: 154px;
+        box-shadow: var(--shadow);
+        transition: transform .2s ease, border-color .2s ease;
+    }
+    .stat-card:hover {
+        border-color: var(--accent);
+        transform: translateY(-2px);
+    }
+    .stat-top {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 12px;
+    }
+    .stat-label {
+        color: var(--muted);
+        font-size: 13px;
+        font-weight: 650;
+    }
+    .icon-box {
+        width: 40px;
+        height: 40px;
+        border-radius: 12px;
+        background: var(--accent-light);
+        color: var(--accent);
+        display: grid;
+        place-items: center;
+        flex-shrink: 0;
+    }
+    .icon-box svg { width: 20px; height: 20px; }
+    .stat-number {
+        font-size: 38px;
+        font-weight: 850;
+        letter-spacing: -1.5px;
+        line-height: 1.2;
+        margin-top: 14px;
+    }
+    .stat-description {
+        color: var(--muted);
+        font-size: 12px;
+        margin-top: 4px;
+    }
+    
+    .columns {
+        display: grid;
+        grid-template-columns: minmax(300px,.9fr) minmax(0,1.35fr);
+        gap: 20px;
+        align-items: start;
+    }
+    .card {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 22px;
+        padding: 28px;
+        box-shadow: var(--shadow);
+        min-width: 0;
+    }
+    .card-head {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        gap: 14px;
+        margin-bottom: 20px;
+    }
+    .kicker {
+        color: var(--accent);
+        font-size: 10px;
+        letter-spacing: 1.5px;
+        font-weight: 850;
+        text-transform: uppercase;
+    }
+    .card h2 {
+        font-size: 20px;
+        letter-spacing: -.6px;
+        margin: 4px 0 7px;
+    }
+    .hint {
+        font-size: 12px;
+        color: var(--muted);
+        margin: 0;
+        line-height: 1.7;
+    }
+    .field { margin-top: 16px; }
+    label {
+        display: block;
+        font-size: 12px;
+        font-weight: 750;
+        margin-bottom: 7px;
+    }
+    input, select, textarea {
+        width: 100%;
+        background: var(--surface-alt);
+        color: var(--text);
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        padding: 12px 13px;
+        outline: none;
+        transition: border-color .2s, box-shadow .2s;
+    }
+    input, select { min-height: 46px; }
+    textarea { min-height: 82px; resize: vertical; }
+    input:focus, select:focus, textarea:focus {
+        border-color: var(--accent);
+        box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 18%, transparent);
+    }
+    .two { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        padding: 11px 15px;
+        border-radius: 12px;
+        border: 1px solid var(--border);
+        background: var(--surface-alt);
+        color: var(--text);
+        font-size: 12px;
+        font-weight: 800;
+        transition: transform .18s, border-color .18s;
+    }
+    .btn:hover { transform: translateY(-1px); border-color: var(--accent); }
+    .btn-primary {
+        background: linear-gradient(110deg, #5d4ae0, #8571fa);
+        border-color: transparent;
+        color: #fff;
+        box-shadow: 0 9px 22px rgba(103,86,232,.2);
+    }
+    .btn-small { padding: 8px 10px; font-size: 11px; }
+    .btn-danger { color: #e34878; }
+    .full { width: 100%; margin-top: 20px; }
+    .message { padding: 13px 15px; border-radius: 12px; margin-bottom: 18px; font-size: 13px; }
+    .success { background: #e8fbf2; color: #176b49; }
+    .error { background: #fff0f2; color: #a52b47; }
+    .badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 6px 10px;
+        border-radius: 999px;
+        background: var(--accent-light);
+        color: var(--accent);
+        font-size: 10px;
+        font-weight: 850;
+        white-space: nowrap;
+    }
+    .badge.published { background: #e8fbf2; color: #176b49; }
+    .badge.draft { background: var(--surface-alt); color: var(--muted); }
+    .quiz-list { display: grid; gap: 12px; }
+    .quiz-item {
+        padding: 16px;
+        border: 1px solid var(--border);
+        border-radius: 16px;
+        background: var(--surface);
+        transition: border-color .2s, transform .2s;
+    }
+    .quiz-item:hover { border-color: color-mix(in srgb, var(--accent) 55%, var(--border)); transform: translateY(-1px); }
+    .quiz-title { font-size: 15px; font-weight: 800; letter-spacing: -.3px; }
+    .quiz-meta { font-size: 11px; color: var(--muted); margin-top: 7px; display: flex; gap: 8px; flex-wrap: wrap; }
+    .quiz-actions { display: flex; gap: 7px; flex-wrap: wrap; margin-top: 13px; }
+    .empty {
+        border: 1px dashed var(--border);
+        border-radius: 16px;
+        padding: 30px 18px;
+        text-align: center;
+        color: var(--muted);
+        font-size: 12px;
+    }
+    .empty strong { display: block; color: var(--text); font-size: 14px; margin-bottom: 6px; }
+    .section-gap { margin-top: 20px; }
+    .question-item { border: 1px solid var(--border); border-radius: 15px; padding: 16px; margin-top: 12px; }
+    .question-text { font-size: 13px; font-weight: 750; white-space: pre-wrap; overflow-wrap: anywhere; }
+    .options { display: grid; gap: 7px; margin-top: 12px; }
+    .option { font-size: 11px; color: var(--muted); padding: 8px 10px; border-radius: 9px; background: var(--surface-alt); overflow-wrap: anywhere; }
+    .option.correct { color: #176b49; background: #e8fbf2; }
+    .topline { display: flex; justify-content: space-between; gap: 12px; align-items: flex-start; }
+    .separator { height: 1px; background: var(--border); margin: 20px 0; }
+    .back-link { display: inline-flex; color: var(--accent); font-size: 12px; font-weight: 800; margin-bottom: 14px; }
+    .fine { font-size: 11px; color: var(--muted); margin-top: 9px; }
+
+    .stage9-management {
+        margin: 4px 0 12px;
+        padding: 10px 12px;
+        border: 1px solid var(--border);
+        border-radius: 14px;
+        background: var(--surface-alt);
+    }
+    .stage9-management summary {
+        cursor: pointer;
+        font-weight: 750;
+        font-size: 12px;
+        text-transform: uppercase;
+        letter-spacing: 1.2px;
+        color: var(--muted);
+    }
+    .stage9-management a {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 10px 12px;
+        margin-top: 6px;
+        border-radius: 10px;
+        color: var(--text);
+        font-size: 13px;
+        font-weight: 600;
+    }
+    .stage9-management a:hover {
+        background: var(--accent-light);
+        color: var(--accent);
+    }
+
+    .footer {
+        margin-top: 50px;
+        padding-top: 20px;
+        border-top: 1px solid var(--border);
+        font-size: 12px;
+        color: var(--muted);
+    }
+
+    @media (max-width: 1000px) {
+        .stats-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    }
+    @media (max-width: 900px) {
+        .layout { grid-template-columns: 1fr; }
+        .sidebar {
+            border-right: 0;
+            border-bottom: 1px solid var(--border);
+            padding: 18px;
+            gap: 18px;
+        }
+        .nav { display: flex; flex-wrap: wrap; }
+        .sidebar-bottom { display: none; }
+        .main { padding-top: 25px; }
+        .topbar { margin-bottom: 35px; }
+    }
+    @media (max-width: 600px) {
+        .main { padding: 24px 18px 60px; }
+        .stats-grid, .columns, .two { grid-template-columns: 1fr; }
+        .topbar { flex-wrap: wrap; }
+    }
 </style>
 
-<script src="<?= htmlspecialchars(url('assets/js/theme-global.js?v=20261107-2'), ENT_QUOTES, 'UTF-8') ?>"></script>
-<link rel="stylesheet" href="<?= e(url('assets/css/admin-unified-v1.css?v=1')) ?>">
+<link rel="stylesheet" href="<?= e(url('assets/css/ulearn-design-system.css?v=1')) ?>">
+<script defer src="<?= e(url('assets/js/ulearn-motion.js?v=1')) ?>"></script>
 </head>
+
 <body>
+
 <div class="layout">
-<aside class="sidebar">
-    <a class="brand" href="<?= e(url('admin/index.php')) ?>">u learn<span>.</span></a>
-    <div class="nav-label">Your workspace</div>
-    <nav class="nav" aria-label="Admin navigation">
-        <a href="<?= e(url('admin/index.php')) ?>"><span class="ico">▦</span> Overview</a>
-        <a href="<?= e(url('admin/academics.php')) ?>"><span class="ico">▤</span> Academics</a>
-        <a href="<?= e(url('admin/lecturers.php')) ?>"><span class="ico">♧</span> Lecturers</a>
-        <a class="active" href="<?= e(url('admin/quizzes.php')) ?>"><span class="ico">▣</span> Quiz management</a>
-    </nav>
-    <div class="sidebar-foot">ULearn administration<br>Manage learning content with care.</div>
-</aside>
-<main class="main">
-<header class="topbar">
-    <div class="crumb">U Learn / Admin space</div>
-    <div class="top-actions"><span class="role"><?= e(str_replace('_', ' ', (string)$user['role'])) ?></span><button class="theme-btn" id="themeToggle" type="button" onclick="toggleTheme()" aria-label="Toggle theme">☾</button><a class="logout" href="<?= e(url('auth/logout.php')) ?>">Log out ↗</a></div>
-</header>
-<section class="intro">
-    <div class="eyebrow">Assessment workspace</div>
-    <h1>Quiz management<span>.</span></h1>
-    <p class="subtitle">Create module-based quizzes, write multiple-choice questions, review answer keys, and publish only when your quiz is ready.</p>
-</section>
-<?php if ($notice !== ''): ?><div class="message success" role="status"><?= e($notice) ?></div><?php endif; ?>
-<?php if ($error !== ''): ?><div class="message error" role="alert"><?= e($error) ?></div><?php endif; ?>
-<div class="stats">
-    <div class="stat"><div class="stat-label">Total quizzes</div><div class="stat-number"><?= count($quizzes) ?></div><div class="stat-foot">Drafts and published quizzes</div></div>
-    <div class="stat"><div class="stat-label">Published</div><div class="stat-number"><?= $publishedCount ?></div><div class="stat-foot">Available for student delivery</div></div>
-    <div class="stat"><div class="stat-label">Questions created</div><div class="stat-number"><?= $totalQuestions ?></div><div class="stat-foot">Across all quizzes</div></div>
-</div>
-<div class="columns">
-<section class="card">
-    <div class="card-head"><div><div class="kicker"><?= $editingQuiz ? 'Quiz settings' : 'Build an assessment' ?></div><h2><?= $editingQuiz ? 'Edit quiz details' : 'Create a quiz' ?></h2><p class="hint">Start with the module, format and timing. New quizzes remain drafts until published.</p></div></div>
-    <form method="post">
-        <input type="hidden" name="csrf" value="<?= e(csrf()) ?>">
-        <input type="hidden" name="action" value="<?= $editingQuiz ? 'update_quiz' : 'create_quiz' ?>">
-        <?php if ($editingQuiz): ?><input type="hidden" name="quiz_id" value="<?= (int)$editingQuiz['id'] ?>"><?php endif; ?>
-        <div class="field"><label for="title">Quiz title</label><input id="title" name="title" maxlength="200" required placeholder="e.g. Sorting Algorithms — Practice 01" value="<?= e((string)($editingQuiz['title'] ?? '')) ?>"></div>
-        <div class="field">
-            <label for="module_id">Choose an existing module <span style="color:var(--muted);font-weight:500">(optional if adding one below)</span></label>
-            <select id="module_id" name="module_id">
-                <option value="">Choose existing module or create one below</option>
-                <?php foreach ($modules as $module): ?>
-                <option value="<?= (int)$module['id'] ?>" <?= (int)($editingQuiz['module_id'] ?? 0) === (int)$module['id'] ? 'selected' : '' ?>><?= e((string)$module['module_code']) ?> — <?= e((string)$module['module_name']) ?></option>
-                <?php endforeach; ?>
-            </select>
-            <p class="fine">If your module is not listed, you can create it here and edit its details later under Academics.</p>
+
+    <aside class="sidebar" id="adminSidebar">
+        <a class="brand" href="<?= e(url('admin/index.php')) ?>">
+            u learn<span>.</span>
+        </a>
+
+        <nav aria-label="Admin navigation">
+            <p class="nav-label">System management</p>
+            <details open class="stage9-management">
+                <summary>System Access</summary>
+                <a href="<?= e(url('admin/users.php')) ?>">
+                    <svg class="ul-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+                    All Registered Users
+                </a>
+                <a href="<?= e(url('admin/change-requests.php')) ?>">
+                    <svg class="ul-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+                    Academic Requests
+                </a>
+            </details>
+
+            <p class="nav-label" style="margin-top: 18px;">Your workspace</p>
+
+            <div class="nav ul-nav">
+                <a href="<?= e(url('admin/index.php')) ?>">
+                    <svg class="ul-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+                    <span>Overview</span>
+                </a>
+                <a href="<?= e(url('admin/lecturers.php')) ?>">
+                    <svg class="ul-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+                    <span>Lecturers</span>
+                </a>
+                <a href="<?= e(url('admin/academics.php')) ?>">
+                    <svg class="ul-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+                    <span>Academics</span>
+                </a>
+                <a href="<?= e(url('admin/universities.php')) ?>">
+                     <svg class="ul-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="m2 9 10-5 10 5-10 5z"/><path d="M6 12v5c4 3 8 3 12 0v-5M22 9v7"/></svg>
+                     <span>Universities</span>
+                </a>
+                <a class="active" href="<?= e(url('admin/quizzes.php')) ?>">
+                    <svg class="ul-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+                    <span>Quizzes</span>
+                </a>
+                <a href="<?= e(url('admin/assignments.php')) ?>">
+                    <svg class="ul-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-2 2"/><path d="M14 11a5 5 0 0 0-7 0l-3 3a5 5 0 0 0 7 7l2-2"/></svg>
+                    <span>Assignments</span>
+                </a>
+                <a href="<?= e(url('admin/announcements.php')) ?>">
+                    <svg class="ul-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+                    <span>Announcements</span>
+                </a>
+                <a href="<?= e(url('admin/platform-settings.php')) ?>">
+                    <svg class="ul-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l-.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+                    <span>Platform Settings</span>
+                </a>
+                <a href="<?= e(url('admin/profile.php')) ?>">
+                    <svg class="ul-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                    <span>My Profile &amp; Settings</span>
+                </a>
+                <a href="<?= e(url('admin/consultations.php')) ?>">
+                    <svg class="ul-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                    <span>Consultations</span>
+                </a>
+                <a href="<?= e(url('admin/kuppiya.php')) ?>">
+                    <svg class="ul-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3"/><path d="M3 20v-2a6 6 0 0 1 12 0v2"/><path d="M17 5a3 3 0 0 1 0 6"/><path d="M18 15a5 5 0 0 1 3 5"/></svg>
+                    <span>Kuppiya Sessions</span>
+                </a>
+            </div>
+        </nav>
+
+        <div class="sidebar-bottom">
+            <small>Signed in as</small>
+            <strong><?= e($fullName) ?></strong>
+            <small><?= e((string)$user['email']) ?></small>
         </div>
-        <div class="separator"></div>
-        <div class="kicker">Or create a module now</div>
-        <div class="two">
-            <div class="field"><label for="new_module_code">Module code</label><input id="new_module_code" name="new_module_code" maxlength="30" placeholder="e.g. IT2030" pattern="[A-Za-z0-9._-]+"></div>
-            <div class="field"><label for="new_module_name">Module name</label><input id="new_module_name" name="new_module_name" maxlength="200" placeholder="e.g. Algorithms"></div>
-        </div>
-        <p class="fine">Enter both fields only if creating a new module. The module will be added to Academics automatically. If an existing module is selected above, these fields are ignored.</p>
-        <div class="field"><label for="description">Description <span style="color:var(--muted);font-weight:500">(optional)</span></label><textarea id="description" name="description" maxlength="5000" placeholder="What should students practise or learn?"><?= e((string)($editingQuiz['description'] ?? '')) ?></textarea></div>
-        <div class="two">
-            <div class="field"><label for="quiz_type">Quiz category</label><select id="quiz_type" name="quiz_type"><option value="topic" <?= ($editingQuiz['quiz_type'] ?? 'topic') === 'topic' ? 'selected' : '' ?>>Topic practice</option><option value="general" <?= ($editingQuiz['quiz_type'] ?? '') === 'general' ? 'selected' : '' ?>>General practice</option><option value="exam" <?= ($editingQuiz['quiz_type'] ?? '') === 'exam' ? 'selected' : '' ?>>Exam preparation</option></select></div>
-            <div class="field"><label for="duration_minutes">Duration (minutes)</label><input id="duration_minutes" name="duration_minutes" type="number" min="1" max="600" required value="<?= e((string)($editingQuiz['duration_minutes'] ?? 20)) ?>"></div>
-        </div>
-        <div class="field"><label for="points_per_question">Points per question</label><input id="points_per_question" name="points_per_question" type="number" min="1" max="100" required value="<?= e((string)($editingQuiz['points_per_question'] ?? 1)) ?>"></div>
-        <?php
-            $savedFrom = !empty($editingQuiz['available_from']) ? date('Y-m-d\TH:i', strtotime((string)$editingQuiz['available_from'])) : '';
-            $savedUntil = !empty($editingQuiz['available_until']) ? date('Y-m-d\TH:i', strtotime((string)$editingQuiz['available_until'])) : '';
-            $savedAvailabilityMode = ($savedFrom !== '' && $savedUntil !== '') ? 'scheduled' : (($savedFrom === '' && $savedUntil !== '') ? 'open_until' : 'unlimited');
-        ?>
-        <div class="field">
-            <label for="availability_mode">Quiz availability <span style="color:var(--muted);font-weight:500">(optional)</span></label>
-            <select id="availability_mode" name="availability_mode" onchange="updateAvailabilityFields()">
-                <option value="unlimited" <?= $savedAvailabilityMode === 'unlimited' ? 'selected' : '' ?>>Unlimited — stays available until I close it</option>
-                <option value="scheduled" <?= $savedAvailabilityMode === 'scheduled' ? 'selected' : '' ?>>Scheduled — choose opening and closing dates</option>
-                <option value="open_until" <?= $savedAvailabilityMode === 'open_until' ? 'selected' : '' ?>>Open immediately — optional closing date</option>
-            </select>
-        </div>
-        <div class="two" id="availability_dates" style="display:none">
-            <div class="field" id="available_from_wrap"><label for="available_from">Opens</label><input id="available_from" name="available_from" type="datetime-local" value="<?= e($savedFrom) ?>"></div>
-            <div class="field" id="available_until_wrap"><label for="available_until">Closes <span style="color:var(--muted);font-weight:500">(optional for open)</span></label><input id="available_until" name="available_until" type="datetime-local" value="<?= e($savedUntil) ?>"></div>
-        </div>
-        <p class="fine" id="availability_help">Unlimited availability is selected by default. Leave dates unset to keep the quiz available until you manually close or unpublish it.</p>
-        <button class="btn btn-primary full" type="submit"><?= $editingQuiz ? 'Save quiz details' : 'Create quiz draft' ?> <span>→</span></button>
-        <?php if ($editingQuiz): ?><a class="btn full" href="<?= e(url('admin/quizzes.php?quiz=' . (int)$editingQuiz['id'])) ?>">Cancel edit</a><?php endif; ?>
-    </form>
-</section>
-<section class="card">
-<?php if ($editingQuiz): ?>
-    <a class="back-link" href="<?= e(url('admin/quizzes.php')) ?>">← All quizzes</a>
-    <div class="card-head"><div><div class="kicker">Question builder</div><h2><?= e((string)$editingQuiz['title']) ?></h2><p class="hint">Add four-option multiple-choice questions. Select the correct answer and include an explanation to help students learn from mistakes.</p></div><span class="badge <?= (int)$editingQuiz['is_published'] === 1 ? 'published' : 'draft' ?>"><?= (int)$editingQuiz['is_published'] === 1 ? 'Published' : 'Draft' ?></span></div>
-    <?php if ((int)$editingQuiz['is_published'] === 1): ?>
-      <div class="message success">This quiz is currently published. To safely edit an individual question, first move this quiz back to draft. Students will no longer be able to start it while it is a draft; you can publish it again after reviewing your changes.</div>
-      <form method="post" class="section-gap" onsubmit="return confirm('Unpublish this quiz so you can edit individual questions?')">
-        <input type="hidden" name="csrf" value="<?= e(csrf()) ?>">
-        <input type="hidden" name="action" value="toggle_publish">
-        <input type="hidden" name="quiz_id" value="<?= (int)$editingQuiz['id'] ?>">
-        <button class="btn btn-primary" type="submit">Unpublish quiz to edit questions</button>
-        <a class="btn" href="<?= e(url('admin/quizzes.php')) ?>">Back to quiz list</a>
-      </form>
-      <div class="separator"></div>
-      <div class="kicker">Question review</div><h2>Questions (<?= count($questions) ?>)</h2>
-      <p class="hint">Your questions are listed below for review. Unpublish the quiz to reveal the individual Edit question and Delete question controls.</p>
-      <?php if (!$questions): ?><div class="empty"><strong>No questions added yet</strong></div><?php else: foreach ($questions as $index => $question): ?>
-        <article class="question-item">
-          <div class="topline"><div class="question-text"><?= ($index + 1) ?>. <?= e((string)$question['question_text']) ?></div><span class="badge"><?= e((string)$question['topic']) ?></span></div>
-          <div class="options"><?php foreach (($question['options'] ?? []) as $option): ?><div class="option <?= (int)$option['is_correct'] === 1 ? 'correct' : '' ?>"><?= (int)$option['is_correct'] === 1 ? '✓ Correct · ' : '' ?><?= e((string)$option['option_text']) ?></div><?php endforeach; ?></div>
-        </article>
-      <?php endforeach; endif; ?>
-    <?php else: ?>
-    <div class="separator"></div>
-    <div class="kicker">Faster workflow</div><h2>Bulk import questions</h2>
-    <p class="hint">Paste all questions at once. ULearn separates the options, correct answer, explanation, topic and optional reason for each option. Students will not see answer keys during the quiz.</p>
-    <form method="post" enctype="multipart/form-data" class="section-gap" id="quiz-upload-form">
-        <input type="hidden" name="csrf" value="<?= e(csrf()) ?>"><input type="hidden" name="action" value="preview_bulk"><input type="hidden" name="quiz_id" value="<?= (int)$editingQuiz['id'] ?>">
-        <div class="field quiz-upload-field">
-          <label for="source_file">Upload your question document</label>
-          <div class="quiz-upload-zone" id="quiz-upload-zone">
-            <div class="quiz-upload-symbol" aria-hidden="true">&#8593;</div>
-            <strong>Drop a question file here</strong>
-            <span class="quiz-upload-description">Word DOCX or plain TXT · Select a file to automatically open the review page</span>
-            <label for="source_file" class="quiz-file-picker">Choose a file</label>
-            <input id="source_file" name="source_file" type="file" accept=".txt,.docx" aria-describedby="quiz-upload-status">
-            <div id="quiz-upload-status" class="quiz-upload-status" role="status" aria-live="polite">No file selected</div>
-          </div>
-          <button class="btn btn-primary full" type="submit" id="quiz-upload-button" disabled>Upload file &amp; review questions &rarr;</button>
-          <p class="fine">Selecting a file starts validation automatically. The button is available as a fallback. Your quiz remains a draft until you publish it.</p>
-        </div><div class="field"><label for="bulk_text">Paste question set</label><textarea id="bulk_text" name="bulk_text" style="min-height:280px" placeholder="Q1: What is the time complexity of binary search?&#10;A) O(n)&#10;B) O(log n)&#10;C) O(n²)&#10;D) O(1)&#10;Correct: B&#10;Topic: Searching&#10;Explanation: Binary search halves the search interval at each step.&#10;Reason A: A linear scan is O(n), not binary search.&#10;Reason B: Each step halves the interval, so this is correct.&#10;Reason C: This is not the complexity of binary search.&#10;Reason D: The search is not constant time in general."><?= e($bulkText) ?></textarea></div>
-        <p class="fine">Use Q1: / Q2: headers; A)–D) options; Correct: B; optional Topic:, Difficulty:, Explanation:, and Reason A:–Reason D: lines. One blank line between questions is recommended. Word .docx and text .txt files are supported where PHP ZipArchive is enabled.</p>
-        <button class="btn full" type="submit" id="quiz-paste-preview-button">Preview pasted questions &rarr;</button>
-    </form>
-    <?php if ($bulkPreview): ?>
-    <div id="import-preview-content">
-        <div class="separator"></div><div class="topline"><div><div class="kicker">Import preview</div><h2><?= count($bulkPreview) ?> question block(s) detected</h2></div><span class="badge <?= $bulkErrors ? 'draft' : 'published' ?>"><?= $bulkErrors ? count($bulkErrors) . ' issue(s)' : 'Ready to import' ?></span></div>
-        <?php foreach ($bulkErrors as $bulkIssue): ?><div class="message error"><?= e($bulkIssue) ?></div><?php endforeach; ?>
-        <p class="hint" style="margin:12px 0">Review every question below. Edit the wording, answers, explanations, and reasons, or remove unwanted questions. Your edits are validated again before saving.</p>
-        <form method="post" class="section-gap" id="bulk-import-editor">
-          <input type="hidden" name="csrf" value="<?= e(csrf()) ?>">
-          <input type="hidden" name="action" value="import_bulk">
-          <input type="hidden" name="quiz_id" value="<?= (int)$editingQuiz['id'] ?>">
-          <textarea name="bulk_text" hidden id="edited-bulk-text"></textarea>
-          <div id="bulk-editable-list">
-          <?php foreach ($bulkPreview as $pi => $pq): ?>
-            <article class="question-item bulk-edit-question">
-              <div class="topline"><strong class="bulk-question-number">Question <?= $pi + 1 ?></strong><button type="button" class="btn btn-small btn-danger bulk-remove-question">Delete question</button></div>
-              <div class="field"><label>Question text</label><textarea data-field="question" required maxlength="10000"><?= e($pq['question_text']) ?></textarea></div>
-              <div class="two"><div class="field"><label>Topic</label><input data-field="topic" required maxlength="150" value="<?= e($pq['topic']) ?>"></div><div class="field"><label>Difficulty</label><select data-field="difficulty"><option value="">Not set</option><?php foreach (['Easy','Medium','Advanced'] as $level): ?><option value="<?= e($level) ?>" <?= strcasecmp((string)$pq['difficulty'],$level)===0?'selected':'' ?>><?= e($level) ?></option><?php endforeach; ?></select></div></div>
-              <?php foreach (['A','B','C','D'] as $letter): ?>
-                <div class="field"><label>Option <?= $letter ?></label><textarea data-field="option-<?= $letter ?>" required><?= e($pq['options'][$letter]) ?></textarea></div>
-                <div class="field"><label>Reason <?= $letter ?></label><textarea data-field="reason-<?= $letter ?>"><?= e($pq['option_explanations'][$letter]) ?></textarea></div>
-              <?php endforeach; ?>
-              <div class="field"><label>Correct answer</label><select data-field="correct" required><?php foreach (['A','B','C','D'] as $letter): ?><option value="<?= $letter ?>" <?= $pq['correct']===$letter?'selected':'' ?>><?= $letter ?></option><?php endforeach; ?></select></div>
-              <div class="field"><label>Overall explanation</label><textarea data-field="explanation"><?= e($pq['explanation']) ?></textarea></div>
+    </aside>
+
+    <main class="main">
+        <header class="topbar">
+            <span class="eyebrow">
+                U LEARN / QUIZ MANAGEMENT SPACE
+            </span>
+
+            <div class="topbar-right">
+                <a class="notification-bell" href="<?= e(url('dashboard/notifications.php')) ?>"
+                   aria-label="Notifications<?= $unreadNotifications ? ' (' . $unreadNotifications . ' unread)' : '' ?>"
+                   title="Open notification center">
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9"/><path d="M10 21h4"/></svg>
+                    <?php if ($unreadNotifications > 0): ?>
+                        <span class="notification-count" aria-hidden="true"><?= $unreadNotifications > 99 ? '99+' : $unreadNotifications ?></span>
+                    <?php endif; ?>
+                </a>
+
+                <button
+                    type="button"
+                    class="theme-toggle"
+                    id="themeToggle"
+                    aria-label="Switch appearance"
+                    title="Switch appearance"
+                >◐</button>
+
+                <a class="avatar" href="<?= e(url('admin/profile.php')) ?>" aria-label="Open My Profile and Settings" title="My Profile & Settings">
+                    <?= e($initial) ?>
+                </a>
+
+                <form method="post" action="<?= e(url('auth/logout.php')) ?>" style="margin:0;">
+                    <input type="hidden" name="csrf" value="<?= e(csrf()) ?>">
+                    <button type="submit" class="logout">
+                        Log out ↗
+                    </button>
+                </form>
+            </div>
+        </header>
+
+        <header class="hero">
+            <div>
+                <div style="font-size:12px; font-weight:750; text-transform:uppercase; letter-spacing:1.5px; opacity:0.8;">Administration / Assessments</div>
+                <h1>Quiz management</h1>
+                <p>Create module-based quizzes, write multiple-choice questions, review answer keys, and publish safely.</p>
+            </div>
+            <span class="pill">
+                <?= e($roleLabel) ?>
+            </span>
+        </header>
+
+        <?php if ($notice !== ''): ?><div class="message success" role="status"><?= e($notice) ?></div><?php endif; ?>
+        <?php if ($error !== ''): ?><div class="message error" role="alert"><?= e($error) ?></div><?php endif; ?>
+
+        <div class="stats-grid" style="margin-bottom: 30px;">
+            <article class="stat-card">
+                <div class="stat-top">
+                    <span class="stat-label">Total quizzes</span>
+                    <div class="icon-box">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+                    </div>
+                </div>
+                <div class="stat-number"><?= count($quizzes) ?></div>
+                <div class="stat-description">Drafts and published quizzes</div>
             </article>
-          <?php endforeach; ?>
-          </div>
-          <button class="btn btn-primary full" type="submit">Validate edits &amp; import questions</button>
-        </form>
-    </div>
-    <?php endif; ?>
-    <div class="separator"></div><div class="kicker">Or add one question manually</div>
-    <form method="post">
-        <input type="hidden" name="csrf" value="<?= e(csrf()) ?>"><input type="hidden" name="action" value="add_question"><input type="hidden" name="quiz_id" value="<?= (int)$editingQuiz['id'] ?>">
-        <div class="field"><label for="question_text">Question</label><textarea id="question_text" name="question_text" required maxlength="10000" placeholder="Write a clear question..."></textarea></div>
-        <div class="two"><div class="field"><label for="topic">Topic tag</label><input id="topic" name="topic" required maxlength="150" placeholder="e.g. Sorting, Searching"></div><div class="field"><label for="difficulty">Difficulty</label><select id="difficulty" name="difficulty"><option value="">Not set</option><option>Easy</option><option>Medium</option><option>Advanced</option></select></div></div>
-        <div class="separator"></div>
-        <div class="kicker">Answer options</div>
-        <?php foreach (['a','b','c','d'] as $idx => $letter): ?><div class="field"><label for="option_<?= $letter ?>">Option <?= strtoupper($letter) ?> <?= $idx === 0 ? '' : '' ?></label><input id="option_<?= $letter ?>" name="option_<?= $letter ?>" maxlength="2000" required placeholder="Enter option <?= strtoupper($letter) ?>"></div><?php endforeach; ?>
-        <div class="field"><label for="reason_a">Why option A is wrong/right (optional)</label><textarea id="reason_a" name="reason_a"></textarea></div><div class="field"><label for="reason_b">Why option B is wrong/right (optional)</label><textarea id="reason_b" name="reason_b"></textarea></div><div class="field"><label for="reason_c">Why option C is wrong/right (optional)</label><textarea id="reason_c" name="reason_c"></textarea></div><div class="field"><label for="reason_d">Why option D is wrong/right (optional)</label><textarea id="reason_d" name="reason_d"></textarea></div><div class="field"><label for="correct_option">Correct answer</label><select id="correct_option" name="correct_option" required><option value="">Choose the correct option</option><option value="0">Option A</option><option value="1">Option B</option><option value="2">Option C</option><option value="3">Option D</option></select></div>
-        <div class="field"><label for="explanation">Answer explanation</label><textarea id="explanation" name="explanation" maxlength="10000" placeholder="Explain why the correct answer is right and clarify common mistakes."></textarea></div>
-        <button class="btn btn-primary full" type="submit">Add question <span>→</span></button>
-    </form>
-    <?php endif; ?>
-    <div class="separator"></div>
-    <div class="topline"><div><div class="kicker">Question review</div><h2>Questions (<?= count($questions) ?>)</h2></div></div>
-    <?php if (!$questions): ?><div class="empty"><strong>No questions added yet</strong>Add your first question above. At least one question is required before publishing.</div><?php else: foreach ($questions as $index => $question): ?>
-    <article class="question-item">
-        <div class="topline"><div class="question-text"><?= ($index + 1) ?>. <?= e((string)$question['question_text']) ?></div><span class="badge"><?= e((string)$question['topic']) ?></span></div>
-        <?php if ($editQuestionId === (int)$question['id'] && (int)$editingQuiz['is_published'] !== 1): ?>
-        <form method="post" class="section-gap">
-          <input type="hidden" name="csrf" value="<?= e(csrf()) ?>"><input type="hidden" name="action" value="update_question"><input type="hidden" name="quiz_id" value="<?= (int)$editingQuiz['id'] ?>"><input type="hidden" name="question_id" value="<?= (int)$question['id'] ?>">
-          <div class="field"><label>Question text</label><textarea name="question_text" required><?= e((string)$question['question_text']) ?></textarea></div>
-          <div class="two"><div class="field"><label>Topic</label><input name="topic" required value="<?= e((string)$question['topic']) ?>"></div><div class="field"><label>Difficulty</label><select name="difficulty"><option value="">Not set</option><?php foreach (['Easy','Medium','Advanced'] as $level): ?><option value="<?= e($level) ?>" <?= (string)($question['difficulty'] ?? '') === $level ? 'selected' : '' ?>><?= e($level) ?></option><?php endforeach; ?></select></div></div>
-          <?php foreach (['A','B','C','D'] as $letter): $op = $question['options'][ord($letter)-65] ?? []; ?>
-          <div class="field"><label>Option <?= $letter ?></label><input name="option_<?= strtolower($letter) ?>" required value="<?= e((string)($op['option_text'] ?? '')) ?>"></div>
-          <div class="field"><label>Reason for option <?= $letter ?> (optional)</label><textarea name="reason_<?= strtolower($letter) ?>"><?= e((string)($op['explanation'] ?? '')) ?></textarea></div>
-          <?php endforeach; ?>
-          <div class="field"><label>Correct answer</label><select name="correct_option" required><?php foreach (['A','B','C','D'] as $letter): $op = $question['options'][ord($letter)-65] ?? []; ?><option value="<?= $letter ?>" <?= !empty($op['is_correct']) ? 'selected' : '' ?>>Option <?= $letter ?></option><?php endforeach; ?></select></div>
-          <div class="field"><label>Overall explanation</label><textarea name="explanation"><?= e((string)$question['explanation']) ?></textarea></div>
-          <button class="btn btn-primary" type="submit">Save question changes</button> <a class="btn" href="<?= e(url('admin/quizzes.php?quiz=' . (int)$editingQuiz['id'])) ?>">Cancel</a>
-        </form>
-        <?php else: ?>
-        <div class="options"><?php foreach (($question['options'] ?? []) as $option): ?><div class="option <?= (int)$option['is_correct'] === 1 ? 'correct' : '' ?>"><?= (int)$option['is_correct'] === 1 ? '✓ Correct · ' : '' ?><?= e((string)$option['option_text']) ?><?php if (!empty($option['explanation'])): ?><div class="fine">Reason: <?= e((string)$option['explanation']) ?></div><?php endif; ?></div><?php endforeach; ?></div>
-        <?php if (trim((string)$question['explanation']) !== ''): ?><p class="hint" style="margin-top:12px"><strong>Explanation:</strong> <?= e((string)$question['explanation']) ?></p><?php endif; ?>
-        <?php if ((int)$editingQuiz['is_published'] !== 1): ?><a class="btn btn-small" href="<?= e(url('admin/quizzes.php?quiz=' . (int)$editingQuiz['id'] . '&edit_question=' . (int)$question['id'])) ?>">Edit question</a> <form method="post" class="section-gap" onsubmit="return confirm('Delete this question and its options?')"><input type="hidden" name="csrf" value="<?= e(csrf()) ?>"><input type="hidden" name="action" value="delete_question"><input type="hidden" name="quiz_id" value="<?= (int)$editingQuiz['id'] ?>"><input type="hidden" name="question_id" value="<?= (int)$question['id'] ?>"><button class="btn btn-small btn-danger" type="submit">Delete question</button></form><?php endif; ?>
-        <?php endif; ?>
-    </article>
-    <?php endforeach; endif; ?>
-<?php else: ?>
-    <div class="card-head"><div><div class="kicker">Assessment library</div><h2>Your quizzes</h2><p class="hint">Open a quiz to manage its questions, review answers, or change publication status.</p></div></div>
-    <?php if (!$quizzes): ?><div class="empty"><strong>Your quiz library is ready</strong>No quizzes have been created yet. Use the form to create your first draft.</div><?php else: ?>
-    <div class="quiz-list">
-    <?php foreach ($quizzes as $quiz): ?><article class="quiz-item">
-        <div class="topline"><div class="quiz-title"><?= e((string)$quiz['title']) ?></div><span class="badge <?= (int)$quiz['is_published'] === 1 ? 'published' : 'draft' ?>"><?= (int)$quiz['is_published'] === 1 ? 'Published' : 'Draft' ?></span></div>
-        <div class="quiz-meta"><span><?= e((string)($quiz['module_code'] ?? 'No module')) ?></span><span>·</span><span><?= (int)$quiz['question_count'] ?> questions</span><span>·</span><span><?= (int)$quiz['duration_minutes'] ?> min</span><span>·</span><span><?= e(ucfirst((string)$quiz['quiz_type'])) ?></span><?php if (!empty($quiz['available_from'])): ?><span>· Opens <?= e(date('d M Y H:i', strtotime((string)$quiz['available_from']))) ?></span><?php endif; ?><?php if (!empty($quiz['available_until'])): ?><span>· Closes <?= e(date('d M Y H:i', strtotime((string)$quiz['available_until']))) ?></span><?php endif; ?></div>
-        <?php if (trim((string)$quiz['description']) !== ''): ?><p class="hint" style="margin-top:8px"><?= e((string)$quiz['description']) ?></p><?php endif; ?>
-        <div class="quiz-actions"><a class="btn btn-small" href="<?= e(url('admin/quizzes.php?quiz=' . (int)$quiz['id'])) ?>">Manage questions</a><a class="btn btn-small" href="<?= e(url('admin/quizzes.php?edit=' . (int)$quiz['id'])) ?>">Edit details</a>
-        <form method="post"><input type="hidden" name="csrf" value="<?= e(csrf()) ?>"><input type="hidden" name="action" value="toggle_publish"><input type="hidden" name="quiz_id" value="<?= (int)$quiz['id'] ?>"><button class="btn btn-small" type="submit"><?= (int)$quiz['is_published'] === 1 ? 'Unpublish' : 'Publish' ?></button></form>
-        <form method="post" onsubmit="return confirm('Permanently delete this quiz and all its questions?')"><input type="hidden" name="csrf" value="<?= e(csrf()) ?>"><input type="hidden" name="action" value="delete_quiz"><input type="hidden" name="quiz_id" value="<?= (int)$quiz['id'] ?>"><button class="btn btn-small btn-danger" type="submit">Delete</button></form></div>
-    </article><?php endforeach; ?>
-    </div><?php endif; ?>
-<?php endif; ?>
-</section>
+            <article class="stat-card">
+                <div class="stat-top">
+                    <span class="stat-label">Published</span>
+                    <div class="icon-box">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+                    </div>
+                </div>
+                <div class="stat-number"><?= $publishedCount ?></div>
+                <div class="stat-description">Available for student delivery</div>
+            </article>
+            <article class="stat-card">
+                <div class="stat-top">
+                    <span class="stat-label">Questions created</span>
+                    <div class="icon-box">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                    </div>
+                </div>
+                <div class="stat-number"><?= $totalQuestions ?></div>
+                <div class="stat-description">Across all quizzes</div>
+            </article>
+        </div>
+
+        <div class="columns">
+            <section class="card">
+                <div class="card-head">
+                    <div>
+                        <div class="kicker"><?= $editingQuiz ? 'Quiz settings' : 'Build an assessment' ?></div>
+                        <h2><?= $editingQuiz ? 'Edit quiz details' : 'Create a quiz' ?></h2>
+                        <p class="hint">Start with the module, format and timing. New quizzes remain drafts until published.</p>
+                    </div>
+                </div>
+                <form method="post">
+                    <input type="hidden" name="csrf" value="<?= e(csrf()) ?>">
+                    <input type="hidden" name="action" value="<?= $editingQuiz ? 'update_quiz' : 'create_quiz' ?>">
+                    <?php if ($editingQuiz): ?><input type="hidden" name="quiz_id" value="<?= (int)$editingQuiz['id'] ?>"><?php endif; ?>
+                    <div class="field"><label for="title">Quiz title</label><input id="title" name="title" maxlength="200" required placeholder="e.g. Sorting Algorithms — Practice 01" value="<?= e((string)($editingQuiz['title'] ?? '')) ?>"></div>
+                    <div class="field">
+                        <label for="module_id">Choose an existing module <span style="color:var(--muted);font-weight:500">(optional if adding one below)</span></label>
+                        <select id="module_id" name="module_id">
+                            <option value="">Choose existing module or create one below</option>
+                            <?php foreach ($modules as $module): ?>
+                            <option value="<?= (int)$module['id'] ?>" <?= (int)($editingQuiz['module_id'] ?? 0) === (int)$module['id'] ? 'selected' : '' ?>><?= e((string)$module['module_code']) ?> — <?= e((string)$module['module_name']) ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                        <p class="fine">If your module is not listed, you can create it here and edit its details later under Academics.</p>
+                    </div>
+                    <div class="separator"></div>
+                    <div class="kicker">Or create a module now</div>
+                    <div class="two">
+                        <div class="field"><label for="new_module_code">Module code</label><input id="new_module_code" name="new_module_code" maxlength="30" placeholder="e.g. IT2030" pattern="[A-Za-z0-9._-]+"></div>
+                        <div class="field"><label for="new_module_name">Module name</label><input id="new_module_name" name="new_module_name" maxlength="200" placeholder="e.g. Algorithms"></div>
+                    </div>
+                    <p class="fine">Enter both fields only if creating a new module. The module will be added to Academics automatically.</p>
+                    <div class="field"><label for="description">Description <span style="color:var(--muted);font-weight:500">(optional)</span></label><textarea id="description" name="description" maxlength="5000" placeholder="What should students practise or learn?"><?= e((string)($editingQuiz['description'] ?? '')) ?></textarea></div>
+                    <div class="two">
+                        <div class="field"><label for="quiz_type">Quiz category</label><select id="quiz_type" name="quiz_type"><option value="topic" <?= ($editingQuiz['quiz_type'] ?? 'topic') === 'topic' ? 'selected' : '' ?>>Topic practice</option><option value="general" <?= ($editingQuiz['quiz_type'] ?? '') === 'general' ? 'selected' : '' ?>>General practice</option><option value="exam" <?= ($editingQuiz['quiz_type'] ?? '') === 'exam' ? 'selected' : '' ?>>Exam preparation</option></select></div>
+                        <div class="field"><label for="duration_minutes">Duration (minutes)</label><input id="duration_minutes" name="duration_minutes" type="number" min="1" max="600" required value="<?= e((string)($editingQuiz['duration_minutes'] ?? 20)) ?>"></div>
+                    </div>
+                    <div class="field"><label for="points_per_question">Points per question</label><input id="points_per_question" name="points_per_question" type="number" min="1" max="100" required value="<?= e((string)($editingQuiz['points_per_question'] ?? 1)) ?>"></div>
+                    <?php
+                        $savedFrom = !empty($editingQuiz['available_from']) ? date('Y-m-d\TH:i', strtotime((string)$editingQuiz['available_from'])) : '';
+                        $savedUntil = !empty($editingQuiz['available_until']) ? date('Y-m-d\TH:i', strtotime((string)$editingQuiz['available_until'])) : '';
+                        $savedAvailabilityMode = ($savedFrom !== '' && $savedUntil !== '') ? 'scheduled' : (($savedFrom === '' && $savedUntil !== '') ? 'open_until' : 'unlimited');
+                    ?>
+                    <div class="field">
+                        <label for="availability_mode">Quiz availability <span style="color:var(--muted);font-weight:500">(optional)</span></label>
+                        <select id="availability_mode" name="availability_mode" onchange="updateAvailabilityFields()">
+                            <option value="unlimited" <?= $savedAvailabilityMode === 'unlimited' ? 'selected' : '' ?>>Unlimited — stays available until I close it</option>
+                            <option value="scheduled" <?= $savedAvailabilityMode === 'scheduled' ? 'selected' : '' ?>>Scheduled — choose opening and closing dates</option>
+                            <option value="open_until" <?= $savedAvailabilityMode === 'open_until' ? 'selected' : '' ?>>Open immediately — optional closing date</option>
+                        </select>
+                    </div>
+                    <div class="two" id="availability_dates" style="display:none">
+                        <div class="field" id="available_from_wrap"><label for="available_from">Opens</label><input id="available_from" name="available_from" type="datetime-local" value="<?= e($savedFrom) ?>"></div>
+                        <div class="field" id="available_until_wrap"><label for="available_until">Closes <span style="color:var(--muted);font-weight:500">(optional for open)</span></label><input id="available_until" name="available_until" type="datetime-local" value="<?= e($savedUntil) ?>"></div>
+                    </div>
+                    <p class="fine" id="availability_help">Unlimited availability is selected by default.</p>
+                    <button class="btn btn-primary full" type="submit"><?= $editingQuiz ? 'Save quiz details' : 'Create quiz draft' ?> <span>→</span></button>
+                    <?php if ($editingQuiz): ?><a class="btn full" href="<?= e(url('admin/quizzes.php?quiz=' . (int)$editingQuiz['id'])) ?>">Cancel edit</a><?php endif; ?>
+                </form>
+            </section>
+
+            <section class="card">
+            <?php if ($editingQuiz): ?>
+                <a class="back-link" href="<?= e(url('admin/quizzes.php')) ?>">← All quizzes</a>
+                <div class="card-head">
+                    <div>
+                        <div class="kicker">Question builder</div>
+                        <h2><?= e((string)$editingQuiz['title']) ?></h2>
+                        <p class="hint">Add four-option multiple-choice questions. Select the correct answer and include an explanation.</p>
+                    </div>
+                    <span class="badge <?= (int)$editingQuiz['is_published'] === 1 ? 'published' : 'draft' ?>"><?= (int)$editingQuiz['is_published'] === 1 ? 'Published' : 'Draft' ?></span>
+                </div>
+                <?php if ((int)$editingQuiz['is_published'] === 1): ?>
+                  <div class="message success">This quiz is currently published. To safely edit an individual question, first move this quiz back to draft.</div>
+                  <form method="post" class="section-gap" onsubmit="return confirm('Unpublish this quiz so you can edit individual questions?')">
+                    <input type="hidden" name="csrf" value="<?= e(csrf()) ?>">
+                    <input type="hidden" name="action" value="toggle_publish">
+                    <input type="hidden" name="quiz_id" value="<?= (int)$editingQuiz['id'] ?>">
+                    <button class="btn btn-primary" type="submit">Unpublish quiz to edit questions</button>
+                    <a class="btn" href="<?= e(url('admin/quizzes.php')) ?>">Back to quiz list</a>
+                  </form>
+                  <div class="separator"></div>
+                  <div class="kicker">Question review</div><h2>Questions (<?= count($questions) ?>)</h2>
+                  <?php if (!$questions): ?><div class="empty"><strong>No questions added yet</strong></div><?php else: foreach ($questions as $index => $question): ?>
+                    <article class="question-item">
+                      <div class="topline"><div class="question-text"><?= ($index + 1) ?>. <?= e((string)$question['question_text']) ?></div><span class="badge"><?= e((string)$question['topic']) ?></span></div>
+                      <div class="options"><?php foreach (($question['options'] ?? []) as $option): ?><div class="option <?= (int)$option['is_correct'] === 1 ? 'correct' : '' ?>"><?= (int)$option['is_correct'] === 1 ? '✓ Correct · ' : '' ?><?= e((string)$option['option_text']) ?></div><?php endforeach; ?></div>
+                    </article>
+                  <?php endforeach; endif; ?>
+                <?php else: ?>
+                <div class="separator"></div>
+                <div class="kicker">Faster workflow</div><h2>Bulk import questions</h2>
+                <p class="hint">Paste all questions at once or upload a Word/Text file.</p>
+                <form method="post" enctype="multipart/form-data" class="section-gap" id="quiz-upload-form">
+                    <input type="hidden" name="csrf" value="<?= e(csrf()) ?>"><input type="hidden" name="action" value="preview_bulk"><input type="hidden" name="quiz_id" value="<?= (int)$editingQuiz['id'] ?>">
+                    <div class="field quiz-upload-field">
+                      <label for="source_file">Upload your question document</label>
+                      <div class="quiz-upload-zone" id="quiz-upload-zone">
+                        <div class="quiz-upload-symbol" aria-hidden="true">&#8593;</div>
+                        <strong>Drop a question file here</strong>
+                        <span class="quiz-upload-description">Word DOCX or plain TXT</span>
+                        <label for="source_file" class="quiz-file-picker">Choose a file</label>
+                        <input id="source_file" name="source_file" type="file" accept=".txt,.docx" aria-describedby="quiz-upload-status">
+                        <div id="quiz-upload-status" class="quiz-upload-status" role="status" aria-live="polite">No file selected</div>
+                      </div>
+                      <button class="btn btn-primary full" type="submit" id="quiz-upload-button" disabled>Upload file &amp; review questions &rarr;</button>
+                    </div>
+                    <div class="field"><label for="bulk_text">Paste question set</label><textarea id="bulk_text" name="bulk_text" style="min-height:180px" placeholder="Q1: What is binary search complexity?&#10;A) O(n)&#10;B) O(log n)&#10;C) O(n²)&#10;D) O(1)&#10;Correct: B&#10;Topic: Searching"><?= e($bulkText) ?></textarea></div>
+                    <button class="btn full" type="submit" id="quiz-paste-preview-button">Preview pasted questions &rarr;</button>
+                </form>
+                <?php if ($bulkPreview): ?>
+                <div id="import-preview-content">
+                    <div class="separator"></div><div class="topline"><div><div class="kicker">Import preview</div><h2><?= count($bulkPreview) ?> question block(s) detected</h2></div><span class="badge <?= $bulkErrors ? 'draft' : 'published' ?>"><?= $bulkErrors ? count($bulkErrors) . ' issue(s)' : 'Ready to import' ?></span></div>
+                    <?php foreach ($bulkErrors as $bulkIssue): ?><div class="message error"><?= e($bulkIssue) ?></div><?php endforeach; ?>
+                    <form method="post" class="section-gap" id="bulk-import-editor">
+                      <input type="hidden" name="csrf" value="<?= e(csrf()) ?>">
+                      <input type="hidden" name="action" value="import_bulk">
+                      <input type="hidden" name="quiz_id" value="<?= (int)$editingQuiz['id'] ?>">
+                      <textarea name="bulk_text" hidden id="edited-bulk-text"></textarea>
+                      <div id="bulk-editable-list">
+                      <?php foreach ($bulkPreview as $pi => $pq): ?>
+                        <article class="question-item bulk-edit-question">
+                          <div class="topline"><strong class="bulk-question-number">Question <?= $pi + 1 ?></strong><button type="button" class="btn btn-small btn-danger bulk-remove-question">Delete</button></div>
+                          <div class="field"><label>Question text</label><textarea data-field="question" required maxlength="10000"><?= e($pq['question_text']) ?></textarea></div>
+                          <div class="two"><div class="field"><label>Topic</label><input data-field="topic" required maxlength="150" value="<?= e($pq['topic']) ?>"></div><div class="field"><label>Difficulty</label><select data-field="difficulty"><option value="">Not set</option><?php foreach (['Easy','Medium','Advanced'] as $level): ?><option value="<?= e($level) ?>" <?= strcasecmp((string)$pq['difficulty'],$level)===0?'selected':'' ?>><?= e($level) ?></option><?php endforeach; ?></select></div></div>
+                          <?php foreach (['A','B','C','D'] as $letter): ?>
+                            <div class="field"><label>Option <?= $letter ?></label><textarea data-field="option-<?= $letter ?>" required><?= e($pq['options'][$letter]) ?></textarea></div>
+                          <?php endforeach; ?>
+                          <div class="field"><label>Correct answer</label><select data-field="correct" required><?php foreach (['A','B','C','D'] as $letter): ?><option value="<?= $letter ?>" <?= $pq['correct']===$letter?'selected':'' ?>><?= $letter ?></option><?php endforeach; ?></select></div>
+                        </article>
+                      <?php endforeach; ?>
+                      </div>
+                      <button class="btn btn-primary full" type="submit">Validate edits &amp; import questions</button>
+                    </form>
+                </div>
+                <?php endif; ?>
+                <div class="separator"></div><div class="kicker">Or add one question manually</div>
+                <form method="post">
+                    <input type="hidden" name="csrf" value="<?= e(csrf()) ?>"><input type="hidden" name="action" value="add_question"><input type="hidden" name="quiz_id" value="<?= (int)$editingQuiz['id'] ?>">
+                    <div class="field"><label for="question_text">Question</label><textarea id="question_text" name="question_text" required maxlength="10000" placeholder="Write a clear question..."></textarea></div>
+                    <div class="two"><div class="field"><label for="topic">Topic tag</label><input id="topic" name="topic" required maxlength="150" placeholder="e.g. Sorting"></div><div class="field"><label for="difficulty">Difficulty</label><select id="difficulty" name="difficulty"><option value="">Not set</option><option>Easy</option><option>Medium</option><option>Advanced</option></select></div></div>
+                    <div class="separator"></div>
+                    <div class="kicker">Answer options</div>
+                    <?php foreach (['a','b','c','d'] as $idx => $letter): ?><div class="field"><label for="option_<?= $letter ?>">Option <?= strtoupper($letter) ?></label><input id="option_<?= $letter ?>" name="option_<?= $letter ?>" maxlength="2000" required placeholder="Enter option <?= strtoupper($letter) ?>"></div><?php endforeach; ?>
+                    <div class="field"><label for="correct_option">Correct answer</label><select id="correct_option" name="correct_option" required><option value="">Choose the correct option</option><option value="0">Option A</option><option value="1">Option B</option><option value="2">Option C</option><option value="3">Option D</option></select></div>
+                    <div class="field"><label for="explanation">Answer explanation</label><textarea id="explanation" name="explanation" maxlength="10000" placeholder="Explain why the correct answer is right..."></textarea></div>
+                    <button class="btn btn-primary full" type="submit">Add question <span>→</span></button>
+                </form>
+                <?php endif; ?>
+                <div class="separator"></div>
+                <div class="topline"><div><div class="kicker">Question review</div><h2>Questions (<?= count($questions) ?>)</h2></div></div>
+                <?php if (!$questions): ?><div class="empty"><strong>No questions added yet</strong>Add your first question above.</div><?php else: foreach ($questions as $index => $question): ?>
+                <article class="question-item">
+                    <div class="topline"><div class="question-text"><?= ($index + 1) ?>. <?= e((string)$question['question_text']) ?></div><span class="badge"><?= e((string)$question['topic']) ?></span></div>
+                    <div class="options"><?php foreach (($question['options'] ?? []) as $option): ?><div class="option <?= (int)$option['is_correct'] === 1 ? 'correct' : '' ?>"><?= (int)$option['is_correct'] === 1 ? '✓ Correct · ' : '' ?><?= e((string)$option['option_text']) ?></div><?php endforeach; ?></div>
+                    <?php if ((int)$editingQuiz['is_published'] !== 1): ?><form method="post" class="section-gap" onsubmit="return confirm('Delete this question?')"><input type="hidden" name="csrf" value="<?= e(csrf()) ?>"><input type="hidden" name="action" value="delete_question"><input type="hidden" name="quiz_id" value="<?= (int)$editingQuiz['id'] ?>"><input type="hidden" name="question_id" value="<?= (int)$question['id'] ?>"><button class="btn btn-small btn-danger" type="submit">Delete question</button></form><?php endif; ?>
+                </article>
+                <?php endforeach; endif; ?>
+            <?php else: ?>
+                <div class="card-head">
+                    <div>
+                        <div class="kicker">Assessment library</div>
+                        <h2>Your quizzes</h2>
+                        <p class="hint">Open a quiz to manage its questions, review answers, or change publication status.</p>
+                    </div>
+                </div>
+                <?php if (!$quizzes): ?><div class="empty"><strong>Your quiz library is ready</strong>No quizzes have been created yet. Use the form to create your first draft.</div><?php else: ?>
+                <div class="quiz-list">
+                <?php foreach ($quizzes as $quiz): ?><article class="quiz-item">
+                    <div class="topline"><div class="quiz-title"><?= e((string)$quiz['title']) ?></div><span class="badge <?= (int)$quiz['is_published'] === 1 ? 'published' : 'draft' ?>"><?= (int)$quiz['is_published'] === 1 ? 'Published' : 'Draft' ?></span></div>
+                    <div class="quiz-meta"><span><?= e((string)($quiz['module_code'] ?? 'No module')) ?></span><span>·</span><span><?= (int)$quiz['question_count'] ?> questions</span><span>·</span><span><?= (int)$quiz['duration_minutes'] ?> min</span><span>·</span><span><?= e(ucfirst((string)$quiz['quiz_type'])) ?></span></div>
+                    <?php if (trim((string)$quiz['description']) !== ''): ?><p class="hint" style="margin-top:8px"><?= e((string)$quiz['description']) ?></p><?php endif; ?>
+                    <div class="quiz-actions">
+                        <a class="btn btn-small" href="<?= e(url('admin/quizzes.php?quiz=' . (int)$quiz['id'])) ?>">Manage questions</a>
+                        <a class="btn btn-small" href="<?= e(url('admin/quizzes.php?edit=' . (int)$quiz['id'])) ?>">Edit details</a>
+                        <form method="post"><input type="hidden" name="csrf" value="<?= e(csrf()) ?>"><input type="hidden" name="action" value="toggle_publish"><input type="hidden" name="quiz_id" value="<?= (int)$quiz['id'] ?>"><button class="btn btn-small" type="submit"><?= (int)$quiz['is_published'] === 1 ? 'Unpublish' : 'Publish' ?></button></form>
+                        <form method="post" onsubmit="return confirm('Permanently delete this quiz?')"><input type="hidden" name="csrf" value="<?= e(csrf()) ?>"><input type="hidden" name="action" value="delete_quiz"><input type="hidden" name="quiz_id" value="<?= (int)$quiz['id'] ?>"><button class="btn btn-small btn-danger" type="submit">Delete</button></form>
+                    </div>
+                </article><?php endforeach; ?>
+                </div><?php endif; ?>
+            <?php endif; ?>
+            </section>
+        </div>
+
+        <footer class="footer">
+            © <?= date('Y') ?> U Learn · Administration Workspace
+        </footer>
+    </main>
 </div>
-</main>
-</div>
+
 <script>
+const themeButton = document.getElementById('themeToggle');
+function updateThemeButton() {
+    const theme = document.documentElement.dataset.theme;
+    themeButton.textContent = theme === 'dark' ? '☀' : '☾';
+}
+themeButton.addEventListener('click', function () {
+    const current = document.documentElement.dataset.theme;
+    const next = current === 'dark' ? 'light' : 'dark';
+    document.documentElement.dataset.theme = next;
+    localStorage.setItem('ulearn-theme', next);
+    updateThemeButton();
+});
+updateThemeButton();
+
 function updateAvailabilityFields() {
     const mode = document.getElementById('availability_mode');
     const dates = document.getElementById('availability_dates');
@@ -768,128 +1402,11 @@ function updateAvailabilityFields() {
     } else if (mode.value === 'scheduled') {
         help.textContent = 'Students can access this quiz only between the required opening and closing dates.';
     } else {
-        help.textContent = 'The quiz is available immediately. Set a closing date if you want it to expire automatically, or leave it blank for no automatic expiry.';
+        help.textContent = 'The quiz is available immediately. Set a closing date if you want it to expire automatically.';
     }
 }
 document.addEventListener('DOMContentLoaded', updateAvailabilityFields);
+</script>
 
-// A small confirmation guard for publishing and deleting destructive records.
-document.querySelectorAll('form').forEach(function(form){
-    const action = form.querySelector('input[name="action"]')?.value;
-    if (action === 'toggle_publish') {
-        form.addEventListener('submit', function(event){
-            const button = form.querySelector('button[type="submit"]');
-            if (button && button.textContent.trim() === 'Publish' && !confirm('Publish this quiz now? Students may be able to access it.')) event.preventDefault();
-        });
-    }
-});
-</script>
-<script>
-(function(){
- const form=document.getElementById('bulk-import-editor');
- if(!form)return;
- const list=document.getElementById('bulk-editable-list');
- const renumber=()=>[...list.querySelectorAll('.bulk-edit-question')].forEach((card,i)=>card.querySelector('.bulk-question-number').textContent='Question '+(i+1));
- list.addEventListener('click',e=>{const btn=e.target.closest('.bulk-remove-question');if(!btn)return;if(!confirm('Remove this question from the import preview?'))return;btn.closest('.bulk-edit-question').remove();renumber();});
- form.addEventListener('submit',e=>{
-   const cards=[...list.querySelectorAll('.bulk-edit-question')];
-   if(!cards.length){e.preventDefault();alert('Keep at least one question to import.');return;}
-   const get=(card,key)=>card.querySelector('[data-field="'+key+'"]')?.value.trim()||'';
-   const lines=[];
-   for(let i=0;i<cards.length;i++){
-     const c=cards[i], q=get(c,'question');
-     if(!q){e.preventDefault();alert('Question '+(i+1)+' has no text.');return;}
-     lines.push('Q'+(i+1)+': '+q);
-     for(const letter of ['A','B','C','D']){
-       const option=get(c,'option-'+letter);
-       if(!option){e.preventDefault();alert('Question '+(i+1)+' is missing option '+letter);return;}
-       lines.push(letter+') '+option);
-     }
-     lines.push('Correct: '+get(c,'correct'),'Topic: '+(get(c,'topic')||'General'));
-     if(get(c,'difficulty'))lines.push('Difficulty: '+get(c,'difficulty'));
-     lines.push('Explanation: '+get(c,'explanation'));
-     for(const letter of ['A','B','C','D'])lines.push('Reason '+letter+': '+get(c,'reason-'+letter));
-     lines.push('');
-   }
-   document.getElementById('edited-bulk-text').value=lines.join('\n');
-   if(!confirm('Import '+cards.length+' reviewed question(s) into this draft quiz?'))e.preventDefault();
- });
-})();
-</script>
-<script>
-(function(){
-  // Import preview is its own focused screen, not a section below the upload form.
-  const previewMode = <?= $isImportPreviewPage ? 'true' : 'false' ?>;
-  if (!previewMode) return;
-  document.addEventListener('DOMContentLoaded', function(){
-    const main = document.querySelector('main.main');
-    const preview = document.getElementById('import-preview-content');
-    if (!main) return;
-    const pane = document.createElement('section');
-    pane.className = 'card';
-    pane.style.cssText = 'max-width:940px;margin:0 auto;animation:none';
-    const header = document.createElement('div');
-    header.innerHTML = '<a class="back-link" href="quizzes.php?quiz=<?= (int)($selectedQuizId ?? 0) ?>">← Back to quiz editor</a><div class="kicker">Step 2 of 3 · Review imported questions</div><h1 style="font-size:clamp(28px,3vw,40px);margin:12px 0">Review &amp; edit questions</h1><p class="hint">Edit questions, answers, explanations and reasons, or delete unwanted questions. Nothing is published until you confirm the import and publish the quiz.</p>';
-    pane.appendChild(header);
-    if (preview) pane.appendChild(preview);
-    else { const msg=document.createElement('p');msg.className='message error';msg.textContent='Preview expired. Return to the quiz and upload the file again.';pane.appendChild(msg); }
-    Array.from(main.children).forEach(child=>child.remove());
-    main.appendChild(pane);
-    document.documentElement.style.scrollBehavior='auto';
-    window.scrollTo(0,0);
-  });
-})();
-</script>
-<style>
-.quiz-upload-zone{position:relative;border:1.5px dashed color-mix(in srgb,var(--accent) 48%,var(--border));border-radius:19px;padding:28px 18px;text-align:center;background:linear-gradient(135deg,var(--accent-light),var(--surface));display:flex;flex-direction:column;align-items:center;gap:9px;transition:border-color .2s,background .2s}
-.quiz-upload-zone.dragover{border-color:var(--accent);background:var(--accent-light)}
-.quiz-upload-symbol{display:grid;place-items:center;width:48px;height:48px;border-radius:15px;background:var(--surface);color:var(--accent);font-size:27px;font-weight:700;border:1px solid var(--border)}
-.quiz-upload-zone strong{font-size:15px;letter-spacing:-.3px}
-.quiz-upload-description{font-size:12px;color:var(--muted);max-width:360px}
-.quiz-file-picker{display:inline-flex;align-items:center;justify-content:center;cursor:pointer;border-radius:11px;background:var(--accent);color:#fff;padding:11px 22px;margin:6px 0 0;font-size:12px;font-weight:800;box-shadow:0 7px 20px rgba(103,86,232,.18)}
-.quiz-upload-zone input[type=file]{position:absolute;width:1px;height:1px;opacity:0;overflow:hidden;padding:0;min-height:0;pointer-events:none}
-.quiz-upload-status{font-size:12px;font-weight:650;color:var(--muted);overflow-wrap:anywhere}
-#quiz-upload-button:disabled{opacity:.5;cursor:not-allowed;transform:none}
-</style>
-<script>
-(function(){
-  const form=document.getElementById('quiz-upload-form');
-  if(!form)return;
-  const input=form.querySelector('#source_file'),zone=form.querySelector('#quiz-upload-zone');
-  const status=form.querySelector('#quiz-upload-status'),uploadButton=form.querySelector('#quiz-upload-button');
-  const pasteButton=form.querySelector('#quiz-paste-preview-button');
-  let submitting=false;
-  function checkFile(file){
-    if(!file)return false;
-    if(!/\.(docx|txt)$/i.test(file.name)){status.textContent='Please select a .docx or .txt file.';return false;}
-    if(file.size>10*1024*1024){status.textContent='File exceeds 10 MB. Please choose a smaller file.';return false;}
-    return true;
-  }
-  function upload(){
-    if(submitting||!checkFile(input.files&&input.files[0]))return;
-    submitting=true;status.textContent='Uploading and validating '+input.files[0].name+'…';
-    uploadButton.disabled=true;uploadButton.textContent='Processing document…';
-    pasteButton.disabled=true;
-    if(form.requestSubmit)form.requestSubmit();
-    else form.submit();
-  }
-  input.addEventListener('change',function(){
-    const file=input.files&&input.files[0];
-    uploadButton.disabled=!checkFile(file);
-    status.textContent=file?(uploadButton.disabled?status.textContent:file.name+' · Ready to review'):'No file selected';
-    if(file&&!uploadButton.disabled)upload();
-  });
-  uploadButton.addEventListener('click',function(e){if(submitting)e.preventDefault();});
-  pasteButton.addEventListener('click',function(){input.value='';});
-  for(const eventName of ['dragenter','dragover'])zone.addEventListener(eventName,function(e){e.preventDefault();zone.classList.add('dragover');});
-  for(const eventName of ['dragleave','drop'])zone.addEventListener(eventName,function(e){e.preventDefault();zone.classList.remove('dragover');});
-  zone.addEventListener('drop',function(e){
-    const file=e.dataTransfer&&e.dataTransfer.files&&e.dataTransfer.files[0];
-    if(!checkFile(file))return;
-    try{const dt=new DataTransfer();dt.items.add(file);input.files=dt.files;input.dispatchEvent(new Event('change',{bubbles:true}));}
-    catch(err){status.textContent='Drag-and-drop is unavailable here. Please use Choose a file.';}
-  });
-})();
-</script>
 </body>
 </html>
