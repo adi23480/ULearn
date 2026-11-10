@@ -63,7 +63,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 throw new RuntimeException('Your current password is incorrect.');
             }
             if (
-                strlen($new) < 8 ||
+                strlen($new) < 8 || strlen($new) > 128 ||
                 !preg_match('/[A-Z]/', $new) ||
                 !preg_match('/[0-9]/', $new) ||
                 !preg_match('/[^a-zA-Z0-9]/', $new)
@@ -119,13 +119,7 @@ $initial = strtoupper(substr(trim((string)$profile['full_name']), 0, 1));
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Lecturer Profile & Settings | U Learn</title>
 <script>
-(function () {
-  var saved = <?= json_encode($theme, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
-  var local = localStorage.getItem('ulearn-theme');
-  var pref = local === 'light' || local === 'dark' ? local : saved;
-  var dark = pref === 'dark' || (pref === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
-  document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light');
-})();
+(function(){var pref=<?= json_encode($theme) ?>;try{var local=localStorage.getItem('ulearn-theme');if(['light','dark','system'].includes(local))pref=local;}catch(e){}var dark=pref==='dark'||(pref==='system'&&matchMedia('(prefers-color-scheme: dark)').matches);document.documentElement.dataset.theme=dark?'dark':'light';window.profileTheme=pref;})();
 </script>
 <style>
 :root{--bg:#f7f8fc;--card:#fff;--text:#1b1d2c;--muted:#777b90;--border:#e7e8ef;--accent:#6856e8;--soft:#f0edff;--input:#fff}
@@ -134,25 +128,31 @@ $initial = strtoupper(substr(trim((string)$profile['full_name']), 0, 1));
 </style>
 <style>.stage9-card{background:var(--card,#fff);color:var(--text,#1c2040);border:1px solid var(--border,#e5e7ef);border-radius:20px;padding:22px;margin:20px 0;box-shadow:0 10px 35px #13172a09}.stage9-card h2{margin:0 0 8px;font-size:20px}.stage9-card p{color:var(--muted,#6d7486);margin:0 0 14px}.stage9-head{display:flex;align-items:center;gap:18px}.stage9-head img{width:86px;height:86px;border-radius:20px}.stage9-card label{display:block;font-size:13px;font-weight:650;margin:14px 0 6px}.stage9-card select,.stage9-card textarea{width:100%;max-width:440px;padding:11px;border-radius:10px;border:1px solid var(--border,#dce0eb);background:var(--card,#fff);color:var(--text,#222);font:inherit}.stage9-button{border:0;border-radius:10px;background:#7158d9;color:#fff;padding:11px 16px;cursor:pointer;margin:10px 0;font:inherit}.stage9-avatars{display:grid;grid-template-columns:repeat(auto-fill,minmax(60px,1fr));gap:10px;margin-top:14px}.stage9-avatars img{width:100%;border-radius:14px}.stage9-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:14px}.stage9-grid strong{display:block}.stage9-note{font-size:13px;color:var(--muted,#777)}@media(max-width:600px){.stage9-card{padding:16px}.stage9-head img{width:64px;height:64px}}</style>
 <style>.appearance-title{display:flex;justify-content:space-between;align-items:start}.appearance-symbol{font-size:32px;color:var(--accent)}.theme-options{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;margin:22px 0}.theme-choice{display:flex;flex-direction:column;gap:7px;padding:13px;border:1.5px solid var(--border);border-radius:17px;cursor:pointer;transition:transform .18s,border-color .18s,box-shadow .18s;position:relative}.theme-choice:hover{transform:translateY(-2px)}.theme-choice:has(input:checked){border-color:var(--accent);box-shadow:0 0 0 3px color-mix(in srgb,var(--accent) 13%,transparent)}.theme-choice input{position:absolute;right:15px;top:15px;accent-color:#8069e8;width:17px;height:17px}.theme-choice strong{font-size:15px}.theme-choice small{font-size:12px;color:var(--muted)}.theme-art{height:92px;border-radius:11px;display:block;position:relative;overflow:hidden;border:1px solid #9ca1bc44}.theme-art i{position:absolute;top:15px;left:13px;width:22%;height:68%;border-radius:5px}.theme-art b{position:absolute;top:15px;left:39%;width:49%;height:22%;border-radius:5px;box-shadow:0 28px 0 -2px currentColor,0 48px 0 -2px currentColor}.theme-art-light{background:#f4f5fa;color:#dedff0}.theme-art-light i{background:#d5d8ec}.theme-art-dark{background:#111625;color:#333a58}.theme-art-dark i{background:#282f4c}.theme-art-system{background:linear-gradient(90deg,#f4f5fa 50%,#111625 50%);color:#8d8eaf}.theme-art-system i{background:linear-gradient(90deg,#d5d8ec 50%,#282f4c 50%)}.appearance-save{margin-top:4px}@media(max-width:650px){.theme-options{gap:8px}.theme-choice{padding:8px}.theme-art{height:65px}.theme-choice strong{font-size:12px}.theme-choice small{font-size:10px}}</style>
-<script src="<?= htmlspecialchars(url('assets/js/theme-global.js?v=20261107-2'), ENT_QUOTES, 'UTF-8') ?>"></script>
-<link rel="stylesheet" href="<?= e(url('assets/css/lecturer-premium-v5.css?v=1')) ?>">
-<script defer src="<?= e(url('assets/js/lecturer-premium-v5.js?v=1')) ?>"></script>
+
+">
+
+<style>
+:root{--bg:#f5f5fb;--card:#fff;--text:#22243c;--muted:#666b83;--border:#e5e5f0;--accent:#6955e8;--soft:#efecff;--input:#fafaff;--shadow:0 8px 30px #24204d05;color-scheme:light}
+[data-theme="dark"]{--bg:#0c1720;--card:#14222e;--text:#f2f3fc;--muted:#a6b0c5;--border:#2a3a4b;--accent:#b0a3ff;--soft:#2b2949;--input:#101d29;--shadow:0 8px 30px #00000012;color-scheme:dark}
+html{scroll-behavior:smooth}body{line-height:1.5}button,input,select{font:inherit}button,a,input{touch-action:manipulation}button,a,input,select,.card,.theme-choice{transition:background-color .2s,color .2s,border-color .2s,box-shadow .2s,transform .2s}a:focus-visible,button:focus-visible{outline:3px solid var(--accent);outline-offset:4px}.layout{grid-template-columns:250px minmax(0,1fr)}.sidebar{position:sticky;top:0;height:100dvh;overflow:auto;padding:30px 20px}.brand{display:flex;gap:11px;align-items:center;font-size:25px;letter-spacing:-1px;margin-bottom:36px}.brand svg{width:39px;height:39px;flex:none}.brand span{color:var(--text)}.nav a{display:flex;align-items:center;gap:12px;font-size:13px;padding:12px;line-height:1.4}.nav a svg{width:19px;height:19px;flex:none}.nav a:hover{transform:translateX(3px)}.main{max-width:1240px;padding:30px 40px 64px}.topbar{margin-bottom:28px}.eyebrow{font-size:10px;letter-spacing:1.6px}.theme-btn{display:grid;place-items:center;font-size:20px}.intro{position:relative;overflow:hidden;background:linear-gradient(120deg,#292456,#6655ed);color:white;border-radius:25px;padding:32px 36px;margin-bottom:22px}.intro:after{content:'✦';position:absolute;right:32px;top:-30px;font-size:200px;color:#ffffff0c;pointer-events:none}.intro .eyebrow{color:#d3ccff}.intro h1{font-size:clamp(28px,3.5vw,42px);margin:12px 0;letter-spacing:-1.4px;position:relative;z-index:1}.intro h1 span{color:#d6ceff}.intro p{color:#eeeaff;max-width:570px;margin-bottom:0;font-size:14px;position:relative;z-index:1}.profile-head{padding:20px 24px;background:var(--card);border:1px solid var(--border);border-radius:19px;box-shadow:var(--shadow)}.profile-head>div:last-child{min-width:0}.profile-head strong,.profile-head small{overflow-wrap:anywhere}.avatar{width:54px;height:54px;flex:none;font-size:23px;border-radius:16px}.cards{align-items:start;gap:20px}.card{padding:26px;border-radius:20px;box-shadow:var(--shadow);min-width:0}.card h2{font-size:18px;letter-spacing:-.3px}.card .hint{font-size:13px;margin-bottom:23px}.card input{font-size:14px;min-width:0}.field input[readonly]{opacity:1;background:var(--bg);color:var(--muted)}.btn,.stage9-button{background:#6955e8;color:#fff;min-height:44px;font-size:13px;font-weight:700;box-shadow:0 4px 10px #6955e820}.btn:hover,.stage9-button:hover{transform:translateY(-1px);background:#5945d5}.btn:active{transform:translateY(0)}.card.wide{grid-column:auto}.theme-options{gap:9px}.theme-choice{padding:10px;min-width:0}.theme-choice strong{font-size:12px}.theme-choice small{font-size:10px}.theme-choice input{top:16px;right:14px}.theme-art{height:75px}.password-wrap{position:relative}.password-wrap input{padding-right:64px}.password-toggle{position:absolute;right:6px;top:5px;bottom:5px;padding:0 9px;border:0;background:transparent;color:var(--accent);font-size:11px;font-weight:700;cursor:pointer}.password-rules{font-size:12px;color:var(--muted);margin:-5px 0 18px}.password-rules.valid{color:var(--accent)}.stage9-card{box-shadow:var(--shadow)}.stage9-card input[type=file]{max-width:100%;color:var(--muted)}.stage9-card img{object-fit:cover}.message{overflow-wrap:anywhere}.card,.intro,.profile-head{animation:enter .4s ease both}.card:nth-child(2){animation-delay:.04s}.card:nth-child(3){animation-delay:.08s}.card:nth-child(4){animation-delay:.12s}@keyframes enter{from{opacity:0;transform:translateY(9px)}to{opacity:1;transform:none}}
+@media(min-width:1600px){.main{padding-top:40px}}@media(max-width:1100px){.layout{grid-template-columns:220px minmax(0,1fr)}.sidebar{padding:28px 14px}.main{padding:26px}.cards{grid-template-columns:1fr}.theme-art{height:90px}.card.wide{grid-column:auto}}@media(max-width:850px){.layout{display:block}.sidebar{position:relative;height:auto;padding:18px;border-bottom:1px solid var(--border)}.brand{margin:0 0 16px}.nav-label{display:none}.nav{display:flex;gap:5px;padding-bottom:5px;overflow-x:auto}.nav a{flex:none;padding:10px 13px}.nav a:hover{transform:none}.main{padding:22px 18px 40px}.topbar{margin-bottom:22px}.intro{padding:26px}.cards{grid-template-columns:1fr 1fr}.card.wide{grid-column:auto}.topbar .eyebrow{max-width:140px}.top-actions{gap:10px}.pill{display:none}}@media(max-width:650px){.cards{grid-template-columns:1fr}.card{padding:22px}.intro{padding:25px 22px;border-radius:20px}.intro:after{right:-20px}.intro h1{font-size:30px}.profile-head{padding:18px}.profile-head strong{font-size:16px}.profile-head small{font-size:12px}.theme-choice strong{font-size:12px}.theme-choice small{font-size:10px}.theme-art{height:80px}.topbar .eyebrow{font-size:9px}.theme-btn{width:38px;height:38px}.logout{font-size:12px}.theme-options{gap:8px}.stage9-head{flex-wrap:wrap}}@media(prefers-reduced-motion:reduce){*,*:before,*:after{animation:none!important;transition:none!important;scroll-behavior:auto!important}}
+</style>
 </head>
 <body>
 <div class="layout">
 <aside class="sidebar">
-<a class="brand" href="<?= e(url('lecturer/index.php')) ?>">u learn<span>.</span></a>
+<a class="brand" href="<?= e(url('lecturer/index.php')) ?>"><svg viewBox="0 0 40 40" aria-hidden="true"><rect width="40" height="40" rx="13" fill="#715ce8"/><path d="M20 9c1.8 6.3 4.7 9.2 11 11-6.3 1.8-9.2 4.7-11 11-1.8-6.3-4.7-9.2-11-11 6.3-1.8 9.2-4.7 11-11Z" fill="white"/></svg><span>ULearn</span></a>
 <div class="nav-label">Lecturer workspace</div>
 <nav class="nav" aria-label="Lecturer navigation">
-<a href="<?= e(url('lecturer/index.php')) ?>">◫ &nbsp; Overview</a>
-<a href="<?= e(url('lecturer/index.php#modules')) ?>">▤ &nbsp; My Modules</a>
-<a href="<?= e(url('lecturer/materials.php')) ?>">▣ &nbsp; Study Materials</a>
-<a href="<?= e(url('lecturer/quizzes.php')) ?>">☷ &nbsp; Quiz Management</a>
-<a href="<?= e(url('lecturer/performance.php')) ?>">▥ &nbsp; Student Performance</a>
-<a href="<?= e(url('lecturer/question-analytics.php')) ?>">◈ &nbsp; Question Analytics</a>
-<a href="<?= e(url('lecturer/consultations.php')) ?>">◷ &nbsp; Consultations</a>
-<a href="<?= e(url('dashboard/notifications.php')) ?>">♧ &nbsp; Notifications</a>
-<a class="active" href="<?= e(url('lecturer/profile.php')) ?>" aria-current="page">⚙ &nbsp; My Profile & Settings</a>
+<a href="<?= e(url('lecturer/index.php')) ?>"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>Overview</a>
+<a href="<?= e(url('lecturer/index.php#modules')) ?>"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 4h16v16H4zM8 8h8M8 12h8M8 16h5"/></svg>My Modules</a>
+<a href="<?= e(url('lecturer/materials.php')) ?>"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 4h7l2 2 2-2h7v16h-7l-2 2-2-2H3zM12 6v16"/></svg>Study Materials</a>
+<a href="<?= e(url('lecturer/quizzes.php')) ?>"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 3h14v18H5zM9 8h6M9 12h6M9 16h4"/></svg>Quiz Management</a>
+<a href="<?= e(url('lecturer/performance.php')) ?>"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20V12m5 8V7m5 13v-9m5 9V4"/></svg>Student Performance</a>
+<a href="<?= e(url('lecturer/question-analytics.php')) ?>"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="10" cy="10" r="6"/><path d="m15 15 6 6M7 10h6M10 7v6"/></svg>Question Analytics</a>
+<a href="<?= e(url('lecturer/consultations.php')) ?>"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 4h16v13H9l-5 4zM8 9h8M8 13h5"/></svg>Consultations</a>
+<a href="<?= e(url('dashboard/notifications.php')) ?>"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9a6 6 0 0 1 12 0c0 6 3 7 3 8H3c0-1 3-2 3-8M10 21h4"/></svg>Notifications</a>
+<a class="active" href="<?= e(url('lecturer/profile.php')) ?>" aria-current="page"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-7 16-7 16 0"/></svg>My Profile & Settings</a>
 </nav>
 </aside>
 <main class="main">
@@ -163,7 +163,7 @@ $initial = strtoupper(substr(trim((string)$profile['full_name']), 0, 1));
 <?php if ($error !== ''): ?><div class="message error" role="alert"><?= e($error) ?></div><?php endif; ?>
 <div class="cards">
 <section class="card"><h2>Personal information</h2><p class="hint">Update how your name appears in ULearn.</p>
-<form method="post"><input type="hidden" name="csrf" value="<?= e(csrf()) ?>"><input type="hidden" name="action" value="update_profile"><div class="field"><label for="full_name">Full name</label><input id="full_name" name="full_name" maxlength="120" required autocomplete="name" value="<?= e((string)$profile['full_name']) ?>"></div><div class="field"><label for="username">Username</label><input id="username" name="username" maxlength="40" required value="<?= e((string)($profile['username'] ?? '')) ?>"></div><div class="field"><label for="email">Email address</label><input id="email" type="email" readonly value="<?= e((string)$profile['email']) ?>"></div><button class="btn" type="submit">Save profile</button></form></section>
+<form method="post"><input type="hidden" name="csrf" value="<?= e(csrf()) ?>"><input type="hidden" name="action" value="update_profile"><div class="field"><label for="full_name">Full name</label><input id="full_name" name="full_name" maxlength="120" required autocomplete="name" value="<?= e((string)$profile['full_name']) ?>"></div><div class="field"><label for="username">Username</label><input id="username" name="username" maxlength="40" minlength="3" pattern="[a-zA-Z][a-zA-Z0-9_.]{2,39}" autocomplete="username" required value="<?= e((string)($profile['username'] ?? '')) ?>"></div><div class="field"><label for="email">Email address</label><input id="email" type="email" readonly value="<?= e((string)$profile['email']) ?>"></div><button class="btn" type="submit">Save profile</button></form></section>
 <section class="card"><h2>Professional details</h2><p class="hint">Your teaching profile is managed by an administrator.</p>
 <div class="field"><label>Title</label><input readonly value="<?= e((string)($lecturer['title'] ?? '')) ?>"></div>
 <div class="field"><label>Designation</label><input readonly value="<?= e((string)($lecturer['designation'] ?? '')) ?>"></div>
@@ -175,22 +175,14 @@ $initial = strtoupper(substr(trim((string)$profile['full_name']), 0, 1));
 </main>
 </div>
 <script>
-(function () {
-  var button = document.getElementById('themeToggle');
-  function updateIcon() { button.textContent = document.documentElement.getAttribute('data-theme') === 'dark' ? '☀' : '☾'; }
-  updateIcon();
-  button.addEventListener('click', function () {
-    var next = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
-    document.documentElement.setAttribute('data-theme', next);
-    localStorage.setItem('ulearn-theme', next);
-    updateIcon();
-  });
-  var selector = document.querySelector('input[name=theme]:checked');
-  document.querySelectorAll('input[name=theme]').forEach(function(radio){ radio.addEventListener('change',function(){var dark=radio.value==='dark'||(radio.value==='system'&&window.matchMedia('(prefers-color-scheme: dark)').matches);document.documentElement.setAttribute('data-theme',dark?'dark':'light');updateIcon();}); });
-  selector.form.addEventListener('submit', function () {
-    var chosen = document.querySelector('input[name=theme]:checked');
-    if (chosen) localStorage.setItem('ulearn-theme', chosen.value);
-  });
+(function(){'use strict';
+const root=document.documentElement,button=document.getElementById('themeToggle'),media=matchMedia('(prefers-color-scheme: dark)');let preference=window.profileTheme||'system';
+const radios=[...document.querySelectorAll('input[name="theme"]')];
+function apply(value,persist){preference=value;const dark=value==='dark'||(value==='system'&&media.matches);root.dataset.theme=dark?'dark':'light';button.textContent=dark?'☀':'☾';button.setAttribute('aria-label',dark?'Switch to light mode':'Switch to dark mode');radios.forEach(r=>r.checked=r.value===value);if(persist)try{localStorage.setItem('ulearn-theme',value);}catch(e){}}
+apply(preference,false);button.addEventListener('click',()=>apply(root.dataset.theme==='dark'?'light':'dark',true));radios.forEach(r=>r.addEventListener('change',()=>apply(r.value,false)));media.addEventListener('change',()=>{if(preference==='system')apply(preference,false);});window.addEventListener('storage',e=>{if(e.key==='ulearn-theme'&&['light','dark','system'].includes(e.newValue))apply(e.newValue,false);});
+const appearance=radios[0]?.form;if(appearance)appearance.addEventListener('submit',()=>{const selected=radios.find(r=>r.checked);if(selected)apply(selected.value,true);});
+document.querySelectorAll('input[type="password"]').forEach(input=>{const wrap=document.createElement('div');wrap.className='password-wrap';input.before(wrap);wrap.append(input);const toggle=document.createElement('button');toggle.type='button';toggle.className='password-toggle';toggle.textContent='Show';toggle.setAttribute('aria-label','Show '+input.labels[0].textContent.toLowerCase());toggle.setAttribute('aria-pressed','false');toggle.addEventListener('click',()=>{const show=input.type==='password';input.type=show?'text':'password';toggle.textContent=show?'Hide':'Show';toggle.setAttribute('aria-pressed',String(show));toggle.setAttribute('aria-label',(show?'Hide ':'Show ')+input.labels[0].textContent.toLowerCase());});wrap.append(toggle);});
+const password=document.getElementById('new_password'),confirm=document.getElementById('confirm_password');const rules=document.createElement('div');rules.className='password-rules';rules.setAttribute('aria-live','polite');password.closest('.field').after(rules);function validate(){const valid=password.value.length>=8&&/[A-Z]/.test(password.value)&&/[0-9]/.test(password.value)&&/[^a-zA-Z0-9]/.test(password.value);password.setCustomValidity(password.value&&!valid?'Use 8+ characters, an uppercase letter, a number and a symbol.':'');confirm.setCustomValidity(confirm.value&&confirm.value!==password.value?'The new passwords do not match.':'');rules.textContent=password.value?(valid?'Password meets the requirements.':'Use 8+ characters, an uppercase letter, a number and a symbol.'):'';rules.classList.toggle('valid',valid);}password.addEventListener('input',validate);confirm.addEventListener('input',validate);
 })();
 </script>
 <?php require __DIR__.'/../includes/stage9-avatar.php'; ?>
