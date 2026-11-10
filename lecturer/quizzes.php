@@ -15,32 +15,46 @@ $profileStmt->execute([(int)$user['id']]);
 $lecturerId = (int)$profileStmt->fetchColumn();
 if ($lecturerId < 1) { http_response_code(403); exit('Your lecturer profile is not active.'); }
 
-// Quiz publishing is scoped to the lecturer's active degree/intake assignments, not modules.
-$assignedModules = []; $allowedModuleIds = [];
-$scopeStmt = $pdo->prepare('SELECT DISTINCT lda.degree_id, lda.batch_id, d.name AS degree_name, b.batch_code FROM lecturer_degree_assignments lda JOIN academic_degrees d ON d.id=lda.degree_id JOIN academic_batches b ON b.id=lda.batch_id WHERE lda.lecturer_id=? AND lda.is_active=1 AND d.is_active=1 AND b.is_active=1 ORDER BY d.name,b.batch_code');
-$scopeStmt->execute([$lecturerId]);
-$quizScopes = $scopeStmt->fetchAll(PDO::FETCH_ASSOC);
-function quizScopeKey(array $r): string { return (int)$r['degree_id'].':'.(int)$r['batch_id']; }
-function saveLecturerQuizTargets(PDO $pdo, int $quizId, int $moduleId, array $selected, array $scopes): void {
-    $allowed=[]; foreach ($scopes as $scope) $allowed[quizScopeKey($scope)]=$scope;
-    $selected=array_values(array_unique(array_map('strval',$selected)));
-    if (!$selected) throw new RuntimeException('Select at least one degree programme and intake.');
-    foreach ($selected as $key) if (!isset($allowed[$key])) throw new RuntimeException('You are not assigned to one of the selected programme/intake groups.');
-    $pdo->prepare('DELETE FROM quiz_teaching_targets WHERE quiz_id=?')->execute([$quizId]);
-    $add=$pdo->prepare('INSERT INTO quiz_teaching_targets (quiz_id,degree_id,batch_id,study_year,semester) VALUES (?,?,?,0,0)');
-    foreach ($selected as $key) { $r=$allowed[$key]; $add->execute([$quizId,$r['degree_id'],$r['batch_id']]); }
-}
-function lecturerQuizOwned(PDO $pdo, int $quizId, int $userId, array $unused): array {
-    $stmt=$pdo->prepare('SELECT id,module_id,is_published FROM quizzes WHERE id=? AND created_by=? LIMIT 1');
-    $stmt->execute([$quizId,$userId]); $quiz=$stmt->fetch(PDO::FETCH_ASSOC);
-    if (!$quiz) throw new RuntimeException('Quiz not found or access denied.');
+// Get only the active modules assigned to this lecturer through the academic curriculum.
+$assignedStmt = $pdo->prepare(
+    'SELECT DISTINCT m.id, m.module_code, m.module_name
+     FROM lecturer_module_assignments a
+     JOIN academic_curriculum c ON c.id = a.curriculum_id
+     JOIN academic_modules m ON m.id = c.module_id
+     JOIN academic_degrees d ON d.id = c.degree_id
+     JOIN academic_batches b ON b.id = c.batch_id
+     WHERE a.lecturer_id = ?
+       AND a.is_active = 1
+       AND c.is_active = 1
+       AND m.is_active = 1
+       AND d.is_active = 1
+       AND b.is_active = 1
+     ORDER BY m.module_code'
+);
+$assignedStmt->execute([$lecturerId]);
+$assignedModules = $assignedStmt->fetchAll(PDO::FETCH_ASSOC);
+$allowedModuleIds = array_map('intval', array_column($assignedModules, 'id'));
+
+function lecturerQuizOwned(PDO $pdo, int $quizId, int $userId, array $allowedModuleIds): array {
+    $stmt = $pdo->prepare('SELECT id, module_id, is_published FROM quizzes WHERE id = ? AND created_by = ? LIMIT 1');
+    $stmt->execute([$quizId, $userId]);
+    $quiz = $stmt->fetch(PDO::FETCH_ASSOC);
+    if (!$quiz || !in_array((int)$quiz['module_id'], $allowedModuleIds, true)) {
+        throw new RuntimeException('Quiz not found or you are no longer assigned to its module.');
+    }
     return $quiz;
 }
-function lecturerQuizNotifyStudents(PDO $pdo, int $moduleId, int $actorId, int $quizId, string $quizTitle, bool $updated=false): void {
-    $type=$updated?'quiz_updated':'quiz_published'; $title=$updated?'Quiz updated':'New quiz available';
-    $message=($updated?'A published quiz was updated: ':'A new quiz was published: ').$quizTitle;
-    $stmt=$pdo->prepare("INSERT INTO notifications (user_id,actor_user_id,type,title,message,target_url) SELECT DISTINCT se.student_id,?,?,?,?,? FROM student_enrollments se JOIN users u ON u.id=se.student_id AND u.role='student' JOIN quiz_teaching_targets qt ON qt.degree_id=se.degree_id AND qt.batch_id=se.batch_id AND qt.quiz_id=? WHERE se.is_active=1");
-    $stmt->execute([$actorId,$type,$title,$message,url('dashboard/quizzes.php'),$quizId]);
+
+function lecturerQuizNotifyStudents(PDO $pdo, int $moduleId, int $actorId, int $quizId, string $quizTitle, bool $updated = false): void {
+    $type = $updated ? 'quiz_updated' : 'quiz_published';
+    $title = $updated ? 'Quiz updated' : 'New quiz available';
+    $message = ($updated ? 'A published quiz was updated: ' : 'A new quiz was published: ') . $quizTitle;
+    $stmt = $pdo->prepare("INSERT INTO notifications (user_id, actor_user_id, type, title, message, target_url)
+        SELECT DISTINCT sme.user_id, ?, ?, ?, ?, ?
+        FROM student_module_enrollments sme
+        INNER JOIN users u ON u.id = sme.user_id AND u.role = 'student'
+        WHERE sme.module_id = ?");
+    $stmt->execute([$actorId, $type, $title, $message, url('dashboard/quizzes.php'), $moduleId]);
 }
 
 $error = '';
@@ -198,12 +212,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if ($action === 'create_quiz' || $action === 'update_quiz') {
             $title = trim((string)($_POST['title'] ?? ''));
             $description = trim((string)($_POST['description'] ?? ''));
-            $moduleId = null; // Programme-level quiz: no module is required.
+            $moduleId = filter_var($_POST['module_id'] ?? null, FILTER_VALIDATE_INT);
+            if (!$moduleId || !in_array((int)$moduleId, $allowedModuleIds, true)) {
+                throw new RuntimeException('Select a valid module assigned to you.');
+            }
+            $moduleId = (int)$moduleId;
             $quizType = (string)($_POST['quiz_type'] ?? 'topic');
             $duration = filter_var($_POST['duration_minutes'] ?? null, FILTER_VALIDATE_INT);
             $points = filter_var($_POST['points_per_question'] ?? null, FILTER_VALIDATE_INT);
             $availabilityMode = (string)($_POST['availability_mode'] ?? 'unlimited');
-            $selectedScopes = is_array($_POST['teaching_scopes'] ?? null) ? $_POST['teaching_scopes'] : [];
             $rawAvailableFrom = trim((string)($_POST['available_from'] ?? ''));
             $rawAvailableUntil = trim((string)($_POST['available_until'] ?? ''));
             if (!in_array($availabilityMode, ['unlimited', 'scheduled', 'open_until'], true)) {
@@ -253,7 +270,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 );
                 $stmt->execute([$moduleId, (int)$user['id'], $title, $description, $quizType, $duration, $points, $availableFrom, $availableUntil]);
                 $newId = (int)$pdo->lastInsertId();
-                try { saveLecturerQuizTargets($pdo, $newId, (int)$moduleId, $selectedScopes, $quizScopes); } catch (Throwable $ex) { $pdo->prepare('DELETE FROM quizzes WHERE id=?')->execute([$newId]); throw $ex; }
                 $_SESSION['quiz_notice'] = 'Quiz created as a draft. Add questions before publishing.';
                 quizRedirect('quiz=' . $newId);
             }
@@ -270,7 +286,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if ((int)$previous['is_published'] === 1) { $availableFrom=$previous['available_from']; $availableUntil=$previous['available_until']; }
             $stmt = $pdo->prepare('UPDATE quizzes SET module_id = ?, title = ?, description = ?, quiz_type = ?, duration_minutes = ?, points_per_question = ?, available_from = ?, available_until = ? WHERE id = ? AND created_by = ?');
             $stmt->execute([$moduleId, $title, $description, $quizType, $duration, $points, $availableFrom, $availableUntil, $quizId, (int)$user['id']]);
-            saveLecturerQuizTargets($pdo, $quizId, (int)$moduleId, $selectedScopes, $quizScopes);
             $changed = (int)$previous['module_id'] !== (int)$moduleId || (string)$previous['title'] !== $title
                 || (string)($previous['description'] ?? '') !== $description || (string)$previous['quiz_type'] !== $quizType
                 || (int)$previous['duration_minutes'] !== (int)$duration || (int)$previous['points_per_question'] !== (int)$points
@@ -434,9 +449,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $countStmt = $pdo->prepare('SELECT COUNT(*) FROM quiz_questions WHERE quiz_id = ?');
                 $countStmt->execute([$quizId]);
                 if ((int)$countStmt->fetchColumn() < 1) throw new RuntimeException('Add at least one question before publishing this quiz.');
-                $targetsCheck=$pdo->prepare('SELECT COUNT(*) FROM quiz_teaching_targets WHERE quiz_id=?');
-                $targetsCheck->execute([$quizId]);
-                if ((int)$targetsCheck->fetchColumn()===0) throw new RuntimeException('Select at least one teaching group before publishing.');
                 // Publication starts the fixed two-calendar-month availability window.
                 $pdo->prepare('UPDATE quizzes SET available_from=NOW(), available_until=DATE_ADD(NOW(), INTERVAL 2 MONTH) WHERE id=?')->execute([$quizId]);
             }
@@ -620,14 +632,21 @@ document.addEventListener('DOMContentLoaded',()=>{const b=document.getElementByI
         <input type="hidden" name="action" value="<?= $editingQuiz ? 'update_quiz' : 'create_quiz' ?>">
         <?php if ($editingQuiz): ?><input type="hidden" name="quiz_id" value="<?= (int)$editingQuiz['id'] ?>"><?php endif; ?>
         <div class="field"><label for="title">Quiz title</label><input id="title" name="title" maxlength="200" required placeholder="e.g. Sorting Algorithms — Practice 01" value="<?= e((string)($editingQuiz['title'] ?? '')) ?>"></div>
-        <div class="field"><label>Publish to degree programmes and intakes</label><p class="fine">Select all authorized programme/intake groups that should receive this quiz. No module assignment is required.</p>
-            <?php $savedTargets=[]; if ($editingQuiz) { $t=$pdo->prepare('SELECT degree_id,batch_id FROM quiz_teaching_targets WHERE quiz_id=?'); $t->execute([(int)$editingQuiz['id']]); foreach ($t->fetchAll(PDO::FETCH_ASSOC) as $r) $savedTargets[]=(int)$r['degree_id'].':'.(int)$r['batch_id']; } ?>
-            <div style="max-height:230px;overflow:auto;border:1px solid var(--border);border-radius:12px;padding:12px;display:grid;gap:9px">
-            <?php foreach ($quizScopes as $scope): $key=quizScopeKey($scope); ?>
-            <label style="display:flex;align-items:center;gap:10px;margin:0;font-weight:550;font-size:12px"><input style="width:16px;min-height:16px;accent-color:var(--accent)" type="checkbox" name="teaching_scopes[]" value="<?= e($key) ?>" <?= in_array($key,$savedTargets,true)?'checked':'' ?>><?= e((string)$scope['degree_name']) ?> · Intake <?= e((string)$scope['batch_code']) ?></label>
-            <?php endforeach; ?>
-            <?php if (!$quizScopes): ?><p class="fine">No active degree/intake assignments. Ask an administrator to assign your teaching groups.</p><?php endif; ?>
-            </div>
+        <div class="field">
+            <label for="module_id">Select module</label>
+            <p class="fine">Choose one of the modules assigned to you. The quiz will be available to students enrolled in that module.</p>
+            <?php if ($assignedModules): ?>
+                <select id="module_id" name="module_id" required>
+                    <option value="">-- Select your module --</option>
+                    <?php foreach ($assignedModules as $module): ?>
+                        <option value="<?= (int)$module['id'] ?>" <?= (int)($editingQuiz['module_id'] ?? 0) === (int)$module['id'] ? 'selected' : '' ?>>
+                            <?= e((string)$module['module_code']) ?> · <?= e((string)$module['module_name']) ?>
+                        </option>
+                    <?php endforeach; ?>
+                </select>
+            <?php else: ?>
+                <div class="empty"><strong>No assigned modules found</strong>Ask an administrator to assign modules to your lecturer account.</div>
+            <?php endif; ?>
         </div>
         <div class="field"><label for="description">Description <span style="color:var(--muted);font-weight:500">(optional)</span></label><textarea id="description" name="description" maxlength="5000" placeholder="What should students practise or learn?"><?= e((string)($editingQuiz['description'] ?? '')) ?></textarea></div>
         <div class="two">

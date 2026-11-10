@@ -47,7 +47,12 @@ function groupIcon(string $name):string {
 }
 ?>
 <div class="shell"><aside class="sidebar"><a class="brand" href="<?= e(url('lecturer/index.php')) ?>"><span class="brand-mark">U</span><span>U Learn<span style="color:var(--accent)">.</span></span></a><nav aria-label="Lecturer navigation"><div class="side-label">WORKSPACE</div><div class="side-links"><a class="side-link" href="<?= e(url('lecturer/index.php')) ?>"><?= groupIcon('overview') ?> Dashboard</a><a class="side-link active" href="<?= e(url('lecturer/index.php')) ?>#teaching-groups"><?= groupIcon('modules') ?> Teaching groups</a><a class="side-link" href="<?= e(url('lecturer/quizzes.php')) ?>"><?= groupIcon('quizzes') ?> Quizzes</a><a class="side-link" href="<?= e(url('lecturer/materials.php')) ?>"><?= groupIcon('materials') ?> Materials</a></div></nav><div class="side-foot">LECTURER WORKSPACE</div></aside>
-<div class="workspace"><header class="topbar"><span class="top-label">Teaching workspace</span><span class="top-right"><span class="status-dot"></span> Active teaching group</span></header><main class="main">
+<div class="workspace">
+    <header class="topbar">
+        <span class="top-label">Teaching workspace</span>
+        <span class="top-right"><span class="status-dot"></span> Active teaching group</span>
+        <?php require __DIR__ . '/../includes/theme-toggle-button.php'; ?>
+    </header><main class="main">
 <a class="back" href="<?= e(url('lecturer/index.php')) ?>#teaching-groups"><?= groupIcon('back') ?> All teaching groups</a>
 <div class="heading"><div><p class="eyebrow">ACADEMIC WORKSPACE</p><h1><?= e((string)$group['degree_name']) ?></h1><p class="subtitle">Intake <?= e((string)$group['batch_code']) ?> &nbsp;·&nbsp; Year <?= (int)$group['study_year'] ?> &nbsp;·&nbsp; <?= (int)$group['semester']===0?'All semesters':'Semester '.(int)$group['semester'] ?></p></div><span class="tag">Active group</span></div>
 <nav class="tabs" aria-label="Group sections"><a class="tab <?= $tab==='overview'?'active':'' ?>" href="<?= e($base.'&tab=overview') ?>"><?= groupIcon('overview') ?> Overview</a><a class="tab <?= $tab==='modules'?'active':'' ?>" href="<?= e($base.'&tab=modules') ?>"><?= groupIcon('modules') ?> Modules</a><a class="tab <?= $tab==='students'?'active':'' ?>" href="<?= e($base.'&tab=students') ?>"><?= groupIcon('students') ?> Students</a><a class="tab" href="<?= e(url('lecturer/quizzes.php')) ?>"><?= groupIcon('quizzes') ?> Quizzes</a><a class="tab" href="<?= e(url('lecturer/materials.php')) ?>"><?= groupIcon('materials') ?> Materials</a></nav>

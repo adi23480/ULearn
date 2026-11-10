@@ -25,8 +25,112 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 ?>
 <!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>AI Study Assistant · ULearn</title><link rel="stylesheet" href="<?= e(url('assets/css/style.css')) ?>"><style>
 :root{--ink:#18203b;--purple:#6656df;--soft:#f7f7fd;--line:#e4e6f3}.ai-page{min-height:100vh;background:linear-gradient(130deg,#f7f7ff,#f0f3fb);color:var(--ink);font-family:Inter,system-ui,sans-serif}.ai-shell{max-width:1180px;margin:auto;padding:25px 24px 70px}.ai-top{display:flex;justify-content:space-between;align-items:center;gap:15px;flex-wrap:wrap}.ai-logo{font-size:25px;font-weight:850;color:#22234d;text-decoration:none}.ai-logo span{color:var(--purple)}.ai-links{display:flex;gap:9px;flex-wrap:wrap}.ai-links a{padding:10px 14px;background:#fff;border:1px solid var(--line);border-radius:11px;text-decoration:none;color:#424466;font-weight:650;font-size:13px}.ai-links a.current{background:#edeaff;color:#5140c7;border-color:#dcd6ff}.ai-hero{margin:36px 0 24px}.ai-eyebrow{font-weight:800;color:#6554d7;font-size:12px;letter-spacing:.11em;text-transform:uppercase}.ai-hero h1{font-size:clamp(30px,4vw,48px);letter-spacing:-.04em;margin:10px 0}.ai-hero p{color:#666c83;max-width:690px;line-height:1.7}.ai-grid{display:grid;grid-template-columns:minmax(0,1fr) 290px;gap:20px;align-items:start}.ai-card{background:#fff;border:1px solid var(--line);border-radius:22px;padding:26px;box-shadow:0 14px 35px rgba(38,34,100,.04)}.ai-card h2{font-size:19px;margin:0 0 14px}.ai-tabs{display:flex;flex-wrap:wrap;gap:9px;margin-bottom:20px}.ai-tab{padding:10px 14px;border:1px solid #dddff0;background:#fff;border-radius:11px;cursor:pointer;font-weight:650;color:#515875}.ai-tab.selected{background:#edeaff;color:#5545c8;border-color:#cbc4ff}.ai-label{font-weight:700;display:block;margin-bottom:10px}.ai-input{width:100%;box-sizing:border-box;min-height:180px;padding:16px;border:1px solid #dce0ef;border-radius:14px;font:inherit;resize:vertical;color:#252946}.ai-input:focus{outline:3px solid #e7e2ff;border-color:#8b7cf3}.ai-submit{margin-top:16px;background:var(--purple);color:#fff;border:0;padding:15px 20px;border-radius:12px;font-weight:800;cursor:pointer;width:100%;font-size:15px}.ai-submit:disabled{opacity:.7}.ai-result{margin-top:20px;white-space:pre-wrap;line-height:1.8;color:#343b56}.ai-error{margin-top:16px;background:#fff1ef;border:1px solid #ffd0ca;padding:15px;border-radius:12px;color:#ac2c24;overflow-wrap:anywhere}.ai-side a{display:block;padding:14px;border:1px solid #e7e5f5;border-radius:12px;margin:10px 0;color:#4e46ad;text-decoration:none;font-weight:700;background:#fbfaff}.ai-side p,.ai-foot{font-size:13px;color:#747b91;line-height:1.6}.ai-foot{margin-top:15px}@media(max-width:800px){.ai-grid{grid-template-columns:1fr}.ai-shell{padding:18px 14px 50px}.ai-card{padding:18px}.ai-top{align-items:flex-start}}
+/* AI Study Assistant - Global Theme Support */
+
+.ai-page {
+    background: var(--bg);
+    color: var(--ink);
+}
+
+.ai-card {
+    background: var(--surface);
+    color: var(--ink);
+    border-color: var(--line);
+}
+
+.ai-links a,
+.ai-tab,
+.ai-input {
+    background: var(--surface);
+    color: var(--ink);
+    border-color: var(--line);
+}
+
+.ai-logo,
+.ai-hero h1,
+.ai-card h2 {
+    color: var(--ink);
+}
+
+.ai-hero p,
+.ai-side p,
+.ai-foot {
+    color: var(--muted);
+}
+
+.ai-input {
+    background: var(--surface);
+    color: var(--ink);
+}
+
+:root[data-theme="light"] {
+    --bg: #f7f7ff;
+    --surface: #ffffff;
+    --ink: #18203b;
+    --muted: #666c83;
+    --line: #e4e6f3;
+}
+
+:root[data-theme="dark"] {
+    --bg: #101522;
+    --surface: #1c2536;
+    --ink: #edf1ff;
+    --muted: #aab4ca;
+    --line: #354158;
+}
+/* Same Dashboard theme button design */
+
+.ai-top > .theme-toggle {
+    width: 42px;
+    height: 42px;
+    min-width: 42px;
+
+    display: inline-grid;
+    place-items: center;
+
+    border: 1px solid var(--line);
+    border-radius: 12px;
+
+    background: var(--surface);
+    color: #07845f;
+
+    box-shadow: 0 4px 16px #00000008;
+    cursor: pointer;
+
+    transition: transform .18s ease,
+                background .18s ease,
+                border-color .18s ease;
+}
+
+.ai-top > .theme-toggle:hover {
+    transform: translateY(-2px);
+    border-color: #07845f;
+}
+
+.ai-top > .theme-toggle .theme-icon {
+    font-size: 23px;
+    line-height: 1;
+}
+
+:root[data-theme="dark"] .ai-top > .theme-toggle {
+    color: #5ce3b5;
+}
 </style>
-<script src="<?= htmlspecialchars(url('assets/js/theme-global.js?v=20261107-2'), ENT_QUOTES, 'UTF-8') ?>"></script>
+<script src="<?= htmlspecialchars(url('assets/js/theme-global.js?v=20261110-1'), ENT_QUOTES, 'UTF-8') ?>"></script>
 <link rel="stylesheet" href="<?= e(url('assets/css/ulearn-design-system.css?v=1')) ?>">
 <script defer src="<?= e(url('assets/js/ulearn-motion.js?v=1')) ?>"></script>
-</head><body class="ai-page"><main class="ai-shell"><header class="ai-top"><a class="ai-logo" href="<?= e(url('dashboard/index.php')) ?>">u learn<span>.</span></a><nav class="ai-links" aria-label="Student navigation"><a href="<?= e(url('dashboard/index.php')) ?>">Dashboard</a><a href="<?= e(url('dashboard/quizzes.php')) ?>">Quiz Arena</a><a href="<?= e(url('dashboard/quiz-history.php')) ?>">Quiz History</a><a href="<?= e(url('dashboard/topic-analysis.php')) ?>">Topic Analysis</a><a class="current" href="<?= e(url('dashboard/ai-study.php')) ?>">✦ AI Study Assistant</a></nav></header><section class="ai-hero"><div class="ai-eyebrow">Your learning companion</div><h1>Study smarter with AI<span style="color:#6c5ce7">.</span></h1><p>Ask a question, understand a difficult concept, or make a revision plan. Your quiz results and grades are never sent automatically.</p></section><div class="ai-grid"><section class="ai-card"><h2>What would you like help with?</h2><form method="post" id="aiForm"><input type="hidden" name="csrf" value="<?= e(csrf()) ?>"><input type="hidden" name="mode" id="mode" value="<?= e($mode) ?>"><div class="ai-tabs" role="group" aria-label="Assistant mode"><button type="button" class="ai-tab <?= $mode==='explain'?'selected':'' ?>" data-mode="explain">✦ Explain a concept</button><button type="button" class="ai-tab <?= $mode==='study'?'selected':'' ?>" data-mode="study">☷ Ask a question</button><button type="button" class="ai-tab <?= $mode==='revision'?'selected':'' ?>" data-mode="revision">◎ Revision plan</button></div><label class="ai-label" for="question">Your question or study topic</label><textarea class="ai-input" name="question" id="question" minlength="8" maxlength="3500" required placeholder="Example: Explain binary search with a simple example."><?= e($question) ?></textarea><button class="ai-submit" type="submit" id="submit">Generate study help</button></form><?php if ($error !== ''): ?><div class="ai-error" role="alert"><?= e($error) ?></div><?php endif; ?><?php if ($answer !== ''): ?><article class="ai-result" aria-live="polite"><h2>AI explanation</h2><?= e($answer) ?></article><?php endif; ?><p class="ai-foot">AI can make mistakes. Verify important facts with your course materials. Responses may be sent to the configured AI provider.</p></section><aside class="ai-card ai-side"><h2>Keep learning</h2><p>Use your existing ULearn learning tools alongside the assistant.</p><a href="<?= e(url('dashboard/topic-analysis.php')) ?>">◈ Explore weak topics</a><a href="<?= e(url('dashboard/quizzes.php')) ?>">▤ Take a quiz</a><a href="<?= e(url('dashboard/quiz-history.php')) ?>">◷ Review quiz history</a><a href="<?= e(url('dashboard/index.php')) ?>">← Student dashboard</a><p>Tip: paste a question from a quiz result to get an additional explanation.</p></aside></div></main><script>document.querySelectorAll('[data-mode]').forEach(btn=>btn.addEventListener('click',()=>{document.getElementById('mode').value=btn.dataset.mode;document.querySelectorAll('[data-mode]').forEach(b=>b.classList.toggle('selected',b===btn));}));document.getElementById('aiForm').addEventListener('submit',()=>{let b=document.getElementById('submit');b.disabled=true;b.textContent='Generating your explanation…';});</script><?php require_once __DIR__ . '/../includes/student-bot.php'; ?></body></html>
+</head><body class="ai-page"><main class="ai-shell"><header class="ai-top"><a class="ai-logo" href="<?= e(url('dashboard/index.php')) ?>">u learn<span>.</span></a><nav class="ai-links" aria-label="Student navigation"><a href="<?= e(url('dashboard/index.php')) ?>">Dashboard</a><a href="<?= e(url('dashboard/quizzes.php')) ?>">Quiz Arena</a><a href="<?= e(url('dashboard/quiz-history.php')) ?>">Quiz History</a><a href="<?= e(url('dashboard/topic-analysis.php')) ?>">Topic Analysis</a><a class="current" href="<?= e(url('dashboard/ai-study.php')) ?>">✦ AI Study Assistant</a>
+</nav>
+
+<button type="button"
+        id="themeToggle"
+        class="theme-toggle"
+        title="Switch appearance"
+        aria-label="Toggle dark mode">
+
+    <span class="theme-icon" aria-hidden="true">☾</span>
+
+</button>
+
+</header>
+<section class="ai-hero"><div class="ai-eyebrow">Your learning companion</div><h1>Study smarter with AI<span style="color:#6c5ce7">.</span></h1><p>Ask a question, understand a difficult concept, or make a revision plan. Your quiz results and grades are never sent automatically.</p></section><div class="ai-grid"><section class="ai-card"><h2>What would you like help with?</h2><form method="post" id="aiForm"><input type="hidden" name="csrf" value="<?= e(csrf()) ?>"><input type="hidden" name="mode" id="mode" value="<?= e($mode) ?>"><div class="ai-tabs" role="group" aria-label="Assistant mode"><button type="button" class="ai-tab <?= $mode==='explain'?'selected':'' ?>" data-mode="explain">✦ Explain a concept</button><button type="button" class="ai-tab <?= $mode==='study'?'selected':'' ?>" data-mode="study">☷ Ask a question</button><button type="button" class="ai-tab <?= $mode==='revision'?'selected':'' ?>" data-mode="revision">◎ Revision plan</button></div><label class="ai-label" for="question">Your question or study topic</label><textarea class="ai-input" name="question" id="question" minlength="8" maxlength="3500" required placeholder="Example: Explain binary search with a simple example."><?= e($question) ?></textarea><button class="ai-submit" type="submit" id="submit">Generate study help</button></form><?php if ($error !== ''): ?><div class="ai-error" role="alert"><?= e($error) ?></div><?php endif; ?><?php if ($answer !== ''): ?><article class="ai-result" aria-live="polite"><h2>AI explanation</h2><?= e($answer) ?></article><?php endif; ?><p class="ai-foot">AI can make mistakes. Verify important facts with your course materials. Responses may be sent to the configured AI provider.</p></section><aside class="ai-card ai-side"><h2>Keep learning</h2><p>Use your existing ULearn learning tools alongside the assistant.</p><a href="<?= e(url('dashboard/topic-analysis.php')) ?>">◈ Explore weak topics</a><a href="<?= e(url('dashboard/quizzes.php')) ?>">▤ Take a quiz</a><a href="<?= e(url('dashboard/quiz-history.php')) ?>">◷ Review quiz history</a><a href="<?= e(url('dashboard/index.php')) ?>">← Student dashboard</a><p>Tip: paste a question from a quiz result to get an additional explanation.</p></aside></div></main><script>document.querySelectorAll('[data-mode]').forEach(btn=>btn.addEventListener('click',()=>{document.getElementById('mode').value=btn.dataset.mode;document.querySelectorAll('[data-mode]').forEach(b=>b.classList.toggle('selected',b===btn));}));document.getElementById('aiForm').addEventListener('submit',()=>{let b=document.getElementById('submit');b.disabled=true;b.textContent='Generating your explanation…';});</script><?php require_once __DIR__ . '/../includes/student-bot.php'; ?></body></html>

@@ -54,11 +54,19 @@ body{background:#f7f8fc;color:var(--ai-ink);margin:0;font-family:Manrope,'DM San
 @media(max-width:800px){.ai-grid{grid-template-columns:1fr}.ai-hero{padding:30px 25px}.ai-card{padding:22px}.ai-settings{grid-template-columns:1fr}.ai-shell{padding:18px 14px 50px}}
 .ai-layout{display:grid;grid-template-columns:250px minmax(0,1fr);min-height:100vh}.ai-nav{background:#fff;border-right:1px solid #e5e6f1;padding:28px 15px}.ai-nav-brand{display:block;font-size:27px;font-weight:850;color:#292744;text-decoration:none;margin:0 12px 32px}.ai-nav-brand span{color:#6556e8}.ai-nav-title{font-size:11px;letter-spacing:1.5px;color:#8889a1;text-transform:uppercase;margin:0 12px 14px;font-weight:800}.ai-nav a:not(.ai-nav-brand){display:block;padding:12px 14px;border-radius:12px;color:#66677e;text-decoration:none;font-size:13px;font-weight:700;margin-bottom:6px}.ai-nav a:hover,.ai-nav a.current{background:#efedff;color:#5d50d8}.ai-nav a.nested{margin-left:16px;font-size:12px}.ai-shell{min-width:0}@media(max-width:850px){.ai-layout{grid-template-columns:1fr}.ai-nav{border-right:0;border-bottom:1px solid #e5e6f1;padding:14px}.ai-nav-links{display:flex;flex-wrap:wrap;gap:4px}.ai-nav a:not(.ai-nav-brand){margin:0}.ai-nav-brand{margin:0 12px 10px}}
 </style>
-<script src="<?= htmlspecialchars(url('assets/js/theme-global.js?v=20261107-2'), ENT_QUOTES, 'UTF-8') ?>"></script>
+<script src="<?= htmlspecialchars(url('assets/js/theme-global.js?v=20261110-3'), ENT_QUOTES, 'UTF-8') ?>"></script>
 <link rel="stylesheet" href="<?= e(url('assets/css/ulearn-design-system.css?v=1')) ?>">
 <script defer src="<?= e(url('assets/js/ulearn-motion.js?v=1')) ?>"></script>
 </head><body><div class="ai-layout"><aside class="ai-nav"><a class="ai-nav-brand" href="<?= e(url('lecturer/index.php')) ?>">u learn<span>.</span></a><div class="ai-nav-title">Lecturer workspace</div><nav class="ai-nav-links" aria-label="Lecturer navigation"><a href="<?= e(url('lecturer/index.php')) ?>">▦ Overview</a><a href="<?= e(url('lecturer/index.php#modules')) ?>">▤ My modules</a><a href="<?= e(url('lecturer/materials.php')) ?>">▣ Study materials</a><a href="<?= e(url('lecturer/quizzes.php')) ?>">▣ Quiz management</a><a class="nested current" aria-current="page" href="<?= e(url('lecturer/gemini-test.php')) ?>">✦ Generate quiz with AI</a><a href="<?= e(url('lecturer/consultations.php')) ?>">◷ Consultations</a><a href="<?= e(url('lecturer/profile.php')) ?>">⚙ My profile</a></nav></aside><main class="ai-shell">
-<header class="ai-top"><div class="ai-brand"><span class="ai-brand-mark">✦</span> ULearn <span style="font-size:13px;color:#8c8da6;font-weight:700">/ AI Studio</span></div><a class="ai-back" href="<?= e(url('lecturer/index.php')) ?>">← Lecturer dashboard</a></header>
+<header class="ai-top">
+    <div class="ai-brand">
+        <span class="ai-brand-mark">✦</span>
+        ULearn 
+        <span style="font-size:13px;color:#8c8da6;font-weight:700">/ AI Studio</span>
+    </div>
+    <a class="ai-back" href="<?= e(url('lecturer/index.php')) ?>">← Lecturer dashboard</a>
+    <?php require __DIR__ . '/../includes/theme-toggle-button.php'; ?>
+</header>
 <section class="ai-hero"><div class="ai-eyebrow">Teaching tools · Powered by Gemini</div><h1>Turn your lecture notes into better quizzes.</h1><p>Create multiple-choice questions in seconds, review every answer, and bring the finished set into your existing ULearn quiz workflow.</p><span class="ai-pill">✦ AI-assisted · Lecturer reviewed</span></section>
 <div class="ai-grid"><section class="ai-card"><h2 class="ai-title">Create a question set</h2><p class="ai-sub">Paste lecture material, choose your preferences and let Gemini prepare a first draft.</p>
 <form method="post" id="ai-form"><input type="hidden" name="csrf" value="<?= e(csrf()) ?>">

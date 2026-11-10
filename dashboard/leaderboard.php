@@ -38,8 +38,28 @@ function rankUrl(string $period,string $search,int $page):string{return '?'.http
 ?><!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>ULearn · Leaderboard</title>
 <style>
-:root{color-scheme:light dark;--bg:#f4f7f9;--card:#fff;--text:#102139;--muted:#61758c;--line:#dce5e9;--green:#087e60;--soft:#e7f7ef}
-@media(prefers-color-scheme:dark){:root{--bg:#0c1220;--card:#161f30;--text:#eff6ff;--muted:#a5b5c9;--line:#2d3b50;--soft:#153d34}}
+:root,
+:root[data-theme="light"] {
+    color-scheme: light;
+    --bg: #f4f7f9;
+    --card: #ffffff;
+    --text: #102139;
+    --muted: #61758c;
+    --line: #dce5e9;
+    --green: #087e60;
+    --soft: #e7f7ef;
+}
+
+:root[data-theme="dark"] {
+    color-scheme: dark;
+    --bg: #0c1220;
+    --card: #161f30;
+    --text: #eff6ff;
+    --muted: #a5b5c9;
+    --line: #2d3b50;
+    --green: #5ce3b5;
+    --soft: #153d34;
+}
 *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font:15px/1.55 system-ui,-apple-system,Segoe UI,sans-serif}.wrap{max-width:1100px;margin:auto;padding:30px 20px 80px}
 nav{display:flex;justify-content:space-between;align-items:center;gap:15px;margin-bottom:25px}a{color:inherit}nav a,.tabs a{padding:10px 15px;border:1px solid var(--line);border-radius:12px;text-decoration:none;font-weight:700}
 .hero{border-radius:24px;padding:32px;background:linear-gradient(115deg,#063e39,#087d62 70%,#12677b);color:white;margin-bottom:20px}.hero h1{font-size:clamp(28px,4vw,44px);margin:6px 0}.hero p{opacity:.88}
@@ -69,8 +89,70 @@ a:hover>.ul-trophy,a:focus-visible>.ul-trophy{transform:rotate(-10deg) scale(1.1
 .podium{margin-bottom:20px}.podium h2{font-size:20px;margin:0 0 12px}.podium-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}.podium-card{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:20px 14px;display:flex;flex-direction:column;gap:8px;align-items:center;text-align:center;min-width:0;overflow-wrap:anywhere}.podium-card strong{font-size:16px}.podium-card span{color:var(--muted);font-weight:700}.podium-medal{font-weight:900;font-size:26px;color:var(--green)}.podium-1{border-color:#e6b84b;box-shadow:0 8px 28px #e6b84b22}.podium-1 .podium-medal{color:#b98a21}.podium-2 .podium-medal{color:#8394a8}.podium-3 .podium-medal{color:#b77c57}
 .rank-search{display:flex;gap:8px;margin:15px 0 8px}.rank-search input{flex:1;min-width:0;padding:12px 14px;background:var(--bg);color:var(--text);border:1px solid var(--line);border-radius:12px;font:inherit}.rank-search button{background:var(--green);color:#fff;border:0;border-radius:12px;padding:10px 18px;font-weight:750;cursor:pointer}.pager{display:flex;align-items:center;justify-content:space-between;gap:8px;padding-top:20px;flex-wrap:wrap}.pager a{border:1px solid var(--line);border-radius:10px;padding:9px 12px;text-decoration:none;font-weight:700}.pager a.disabled{opacity:.35;pointer-events:none}.sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0)}
 @media(max-width:550px){.podium-grid{gap:6px}.podium-card{padding:12px 6px}.podium-card strong{font-size:12px}.podium-card span{font-size:11px}.rank-search{flex-wrap:wrap}.rank-search button{width:100%}.person{grid-template-columns:40px minmax(0,1fr) auto}.xp{font-size:12px}}
+.ul-theme-toggle {
+    width: 42px;
+    height: 42px;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    background: var(--card);
+    color: var(--text);
+    cursor: pointer;
+    font-size: 19px;
+    margin: 5px 10px;
+}
+/* Dashboard matching theme icon */
+
+.leaderboard-top-nav {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 15px;
+}
+
+.leaderboard-top-actions {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+}
+
+.leaderboard-top-actions .theme-toggle {
+    width: 42px;
+    height: 42px;
+    display: inline-grid;
+    place-items: center;
+
+    border: 1px solid var(--line);
+    border-radius: 12px;
+
+    background: var(--card);
+    color: var(--green);
+
+    box-shadow: 0 4px 16px #00000008;
+    cursor: pointer;
+
+    transition: transform .18s ease,
+                background .18s ease,
+                border-color .18s ease;
+}
+
+.leaderboard-top-actions .theme-toggle:hover {
+    transform: translateY(-2px);
+    background: var(--soft);
+    border-color: var(--green);
+}
+
+.leaderboard-top-actions .theme-icon {
+    font-size: 23px;
+    line-height: 1;
+}
+
+@media(max-width:550px) {
+    .leaderboard-top-nav {
+        flex-wrap: wrap;
+    }
+}
 </style>
-<script src="<?= htmlspecialchars(url('assets/js/theme-global.js?v=20261107-2'), ENT_QUOTES, 'UTF-8') ?>"></script>
+<script src="<?= htmlspecialchars(url('assets/js/theme-global.js?v=20261110-1'), ENT_QUOTES, 'UTF-8') ?>"></script>
 <link rel="stylesheet" href="<?= e(url('assets/css/ulearn-community-phase4.css?v=1')) ?>">
 </head><body><aside class="ulearn-sidebar" aria-label="Student sidebar">
 <a class="ulearn-brand" href="<?=esc(url('dashboard/index.php'))?>">u learn<span>.</span></a>
@@ -92,7 +174,28 @@ a:hover>.ul-trophy,a:focus-visible>.ul-trophy{transform:rotate(-10deg) scale(1.1
 </nav>
 <div class="ulearn-user"><small>Signed in as</small><strong><?=esc($user['full_name'])?></strong></div>
 </aside><main class="wrap">
-<nav><strong>ULearn RankUp</strong><a href="<?=esc(url('dashboard/index.php'))?>">← Back to Dashboard</a></nav>
+<nav class="leaderboard-top-nav">
+    <strong>ULearn RankUp</strong>
+
+    <div class="leaderboard-top-actions">
+
+        <a href="<?=esc(url('dashboard/index.php'))?>">
+            ← Back to Dashboard
+        </a>
+
+        <button type="button"
+                id="themeToggle"
+                class="theme-toggle"
+                title="Switch appearance"
+                aria-label="Toggle dark mode">
+
+            <span class="theme-icon" aria-hidden="true">☾</span>
+
+        </button>
+
+    </div>
+</nav>
+
 <header class="hero"><div>ULearn · Learning rewards</div><h1>Student Leaderboard</h1><p>Earn XP by completing quizzes and sharing approved notes. Your effort counts.</p></header>
 <?php if($error): ?><p class="error"><?=esc($error)?></p><?php else: ?>
 <div class="tabs"><a class="<?=$period==='all'?'active':''?>" href="<?=esc(rankUrl('all',$search,1))?>">All-time</a><a class="<?=$period==='week'?'active':''?>" href="<?=esc(rankUrl('week',$search,1))?>">Last 7 days · Quiz XP</a><span class="muted" style="margin:auto 0 auto auto">Updates every 30 seconds</span></div>
