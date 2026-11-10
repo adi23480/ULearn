@@ -112,8 +112,8 @@ $initial = strtoupper(substr(trim((string)$profile['full_name']), 0, 1));
 <script>
 (function () {
   var saved = <?= json_encode($theme, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
-  var local = localStorage.getItem('ulearn-theme');
-  var pref = local === 'light' || local === 'dark' ? local : saved;
+  var local = null; try { local = localStorage.getItem('ulearn-theme'); } catch(e) {}
+  var pref = (local === 'light' || local === 'dark' || local === 'system') ? local : saved;
   var dark = pref === 'dark' || (pref === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
   document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light');
 })();
@@ -133,11 +133,12 @@ $initial = strtoupper(substr(trim((string)$profile['full_name']), 0, 1));
 #uln-settings-host a{color:var(--accent)!important}
 </style>
 <link rel="stylesheet" href="<?= e(url('assets/css/ulearn-community-phase4.css?v=1')) ?>">
+<link rel="stylesheet" href="<?= e(url('assets/css/ulearn-profile-premium.css?v=2')) ?>">
 </head>
-<body>
+<body class="profile-premium">
 <div class="layout">
-<aside class="sidebar">
-<a class="brand" href="<?= e(url('dashboard/index.php')) ?>">u learn<span>.</span></a>
+<aside class="sidebar" id="profileSidebar"><div class="side-top"><span class="side-dot"></span> NSBM GREEN UNIVERSITY <button type="button" class="mobile-close" id="closeProfileNav" aria-label="Close menu">×</button></div>
+<a class="brand" href="<?= e(url('dashboard/index.php')) ?>"><img class="brand-shield" src="<?= e(url('assets/images/nsbm-shield-only.png')) ?>" alt="NSBM shield"><span class="brand-word">uLearn<span>.</span><small>STUDENT EXPERIENCE</small></span></a>
 <div class="nav-label">Student workspace</div>
 <nav class="nav" aria-label="Student navigation">
 <a href="<?= e(url('dashboard/index.php')) ?>">▦ &nbsp; Dashboard</a>
@@ -149,39 +150,23 @@ $initial = strtoupper(substr(trim((string)$profile['full_name']), 0, 1));
 </nav>
 </aside>
 <main class="main">
-<header class="topbar"><div class="eyebrow">U LEARN / STUDENT SPACE</div><div class="top-actions"><span class="pill">Student account</span><button class="theme-btn" id="themeToggle" type="button" aria-label="Toggle light and dark mode">☾</button><form method="post" action="<?= e(url('auth/logout.php')) ?>" style="margin:0"><input type="hidden" name="csrf" value="<?= e(csrf()) ?>"><button type="submit" class="logout" style="border:0;background:none;cursor:pointer">Log out ↗</button></form></div></header>
-<section class="intro"><div class="eyebrow">Account management</div><h1>My Profile <span>&</span> Settings<span>.</span></h1><p>Manage your personal details, secure your account, and choose your preferred appearance.</p></section>
-<div class="profile-head"><div class="avatar" aria-hidden="true"><?= e($initial) ?></div><div><strong><?= e((string)$profile['full_name']) ?></strong><small><?= e((string)$profile['email']) ?></small></div></div>
+<header class="topbar"><div class="topbar-left"><button type="button" id="openProfileNav" class="mobile-menu" aria-label="Open navigation">☰</button><div class="eyebrow">WORKSPACE <span class="crumb">/ MY PROFILE</span></div></div><div class="top-actions"><span class="pill">Student account</span><button class="theme-btn" id="themeToggle" type="button" aria-label="Toggle light and dark mode">☾</button><form method="post" action="<?= e(url('auth/logout.php')) ?>" style="margin:0"><input type="hidden" name="csrf" value="<?= e(csrf()) ?>"><button type="submit" class="logout" style="border:0;background:none;cursor:pointer">Log out ↗</button></form></div></header>
+<section class="profile-hero reveal"><div class="hero-grid"></div><div class="hero-orb hero-orb-a"></div><div class="hero-orb hero-orb-b"></div><div class="hero-copy"><span class="hero-kicker"><span class="pulse-dot"></span> YOUR PERSONAL SPACE</span><h1>Make it <em>yours.</em></h1><p>One place for your identity, academic journey, security and preferences.</p><div class="hero-chips"><span>✦ Your account</span><span>◈ Your learning journey</span></div></div><div class="hero-graphic" aria-hidden="true"><div class="orbit orbit-outer"></div><div class="orbit orbit-inner"></div><div class="hero-avatar"><?= e($initial) ?></div><div class="floating-tag tag-one">✦ ULEARN</div><div class="floating-tag tag-two">✓ STUDENT</div></div></section><div class="section-heading reveal"><div><span class="eyebrow">ACCOUNT OVERVIEW</span><h2>My Profile <span>&</span> Settings</h2></div><span class="status-chip"><span class="pulse-dot"></span> Student workspace</span></div>
+<div class="profile-head reveal"><div class="avatar" aria-hidden="true"><?= e($initial) ?></div><div><strong><?= e((string)$profile['full_name']) ?></strong><small><?= e((string)$profile['email']) ?></small></div></div>
 <?php if ($notice !== ''): ?><div class="message success" role="status"><?= e($notice) ?></div><?php endif; ?>
 <?php if ($error !== ''): ?><div class="message error" role="alert"><?= e($error) ?></div><?php endif; ?>
 <div class="cards">
-<section class="card"><h2>Personal information</h2><p class="hint">Update how your name appears in ULearn.</p>
-<form method="post"><input type="hidden" name="csrf" value="<?= e(csrf()) ?>"><input type="hidden" name="action" value="update_profile"><div class="field"><label for="full_name">Full name</label><input id="full_name" name="full_name" maxlength="120" required autocomplete="name" value="<?= e((string)$profile['full_name']) ?>"></div><div class="field"><label for="email">Email address</label><input id="email" type="email" readonly value="<?= e((string)$profile['email']) ?>"></div><button class="btn" type="submit">Save profile</button></form></section>
-<section class="card"><h2>Change password</h2><p class="hint">Use at least 8 characters, one uppercase letter, one number and one symbol.</p>
-<form method="post" autocomplete="on"><input type="hidden" name="csrf" value="<?= e(csrf()) ?>"><input type="hidden" name="action" value="change_password"><div class="field"><label for="current_password">Current password</label><input id="current_password" name="current_password" type="password" autocomplete="current-password" required></div><div class="field"><label for="new_password">New password</label><input id="new_password" name="new_password" type="password" autocomplete="new-password" minlength="8" maxlength="128" required></div><div class="field"><label for="confirm_password">Confirm new password</label><input id="confirm_password" name="confirm_password" type="password" autocomplete="new-password" minlength="8" maxlength="128" required></div><button class="btn" type="submit">Change password</button></form></section>
-<section class="card wide appearance-modern"><div class="appearance-title"><div><h2>Appearance</h2><p class="hint">A space that feels right, day or night.</p></div><span class="appearance-symbol" aria-hidden="true">◐</span></div><form method="post"><input type="hidden" name="csrf" value="<?= e(csrf()) ?>"><input type="hidden" name="action" value="update_theme"><div class="theme-options" role="radiogroup" aria-label="Theme preference"><label class="theme-choice"><input type="radio" name="theme" value="light" <?= $theme === 'light' ? 'checked' : '' ?>><span class="theme-art theme-art-light"><i></i><b></b></span><strong>☀ Light</strong><small>Bright and focused</small></label><label class="theme-choice"><input type="radio" name="theme" value="dark" <?= $theme === 'dark' ? 'checked' : '' ?>><span class="theme-art theme-art-dark"><i></i><b></b></span><strong>☾ Dark</strong><small>Comfortable at night</small></label><label class="theme-choice"><input type="radio" name="theme" value="system" <?= $theme === 'system' ? 'checked' : '' ?>><span class="theme-art theme-art-system"><i></i><b></b></span><strong>◐ System</strong><small>Match your device</small></label></div><button class="btn appearance-save" type="submit">Save preference</button></form></section>
+<section class="card reveal"><div class="card-top"><span class="card-icon">♙</span><span class="card-kicker">01 / IDENTITY</span></div><h2>Personal information</h2><p class="hint">Update how your name appears in ULearn.</p>
+<form method="post"><input type="hidden" name="csrf" value="<?= e(csrf()) ?>"><input type="hidden" name="action" value="update_profile"><div class="field"><label for="full_name">Full name</label><input id="full_name" name="full_name" maxlength="120" required autocomplete="name" value="<?= e((string)$profile['full_name']) ?>"></div><div class="field"><label for="email">Email address</label><input id="email" type="email" readonly value="<?= e((string)$profile['email']) ?>"></div><button class="btn" type="submit">Save changes <span aria-hidden="true">↗</span></button></form></section>
+<section class="card reveal"><div class="card-top"><span class="card-icon">♧</span><span class="card-kicker">02 / SECURITY</span></div><h2>Change password</h2><p class="hint">Use at least 8 characters, one uppercase letter, one number and one symbol.</p>
+<form method="post" autocomplete="on"><input type="hidden" name="csrf" value="<?= e(csrf()) ?>"><input type="hidden" name="action" value="change_password"><div class="field"><label for="current_password">Current password</label><input id="current_password" name="current_password" type="password" autocomplete="current-password" required></div><div class="field"><label for="new_password">New password</label><input id="new_password" name="new_password" type="password" autocomplete="new-password" minlength="8" maxlength="128" required></div><div class="field"><label for="confirm_password">Confirm new password</label><input id="confirm_password" name="confirm_password" type="password" autocomplete="new-password" minlength="8" maxlength="128" required></div><div class="password-meter"><span id="passwordStrengthText">Password strength</span><div class="meter-track"><i id="passwordStrengthBar"></i></div></div><button class="btn" type="submit">Update password <span aria-hidden="true">↗</span></button></form></section>
+<section class="card wide appearance-modern reveal"><div class="card-top"><span class="card-icon">◐</span><span class="card-kicker">03 / PERSONALIZATION</span></div><div class="appearance-title"><div><h2>Appearance</h2><p class="hint">A space that feels right, day or night.</p></div><span class="appearance-symbol" aria-hidden="true">◐</span></div><form method="post"><input type="hidden" name="csrf" value="<?= e(csrf()) ?>"><input type="hidden" name="action" value="update_theme"><div class="theme-options" role="radiogroup" aria-label="Theme preference"><label class="theme-choice"><input type="radio" name="theme" value="light" <?= $theme === 'light' ? 'checked' : '' ?>><span class="theme-art theme-art-light"><i></i><b></b></span><strong>☀ Light</strong><small>Bright and focused</small></label><label class="theme-choice"><input type="radio" name="theme" value="dark" <?= $theme === 'dark' ? 'checked' : '' ?>><span class="theme-art theme-art-dark"><i></i><b></b></span><strong>☾ Dark</strong><small>Comfortable at night</small></label><label class="theme-choice"><input type="radio" name="theme" value="system" <?= $theme === 'system' ? 'checked' : '' ?>><span class="theme-art theme-art-system"><i></i><b></b></span><strong>◐ System</strong><small>Match your device</small></label></div><button class="btn appearance-save" type="submit">Save appearance <span aria-hidden="true">↗</span></button></form></section>
 </div>
-</main>
-</div>
-<script>
-(function () {
-  var button = document.getElementById('themeToggle');
-  function updateIcon() { button.textContent = document.documentElement.getAttribute('data-theme') === 'dark' ? '☀' : '☾'; }
-  updateIcon();
-  button.addEventListener('click', function () {
-    var next = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
-    document.documentElement.setAttribute('data-theme', next);
-    localStorage.setItem('ulearn-theme', next);
-    updateIcon();
-  });
-  var selector = document.querySelector('input[name=theme]:checked');
-  document.querySelectorAll('input[name=theme]').forEach(function(radio){ radio.addEventListener('change',function(){var dark=radio.value==='dark'||(radio.value==='system'&&window.matchMedia('(prefers-color-scheme: dark)').matches);document.documentElement.setAttribute('data-theme',dark?'dark':'light');updateIcon();}); });
-  selector.form.addEventListener('submit', function () {
-    var chosen = document.querySelector('input[name=theme]:checked');
-    if (chosen) localStorage.setItem('ulearn-theme', chosen.value);
-  });
-})();
-</script>
+<section class="settings-hub reveal" aria-label="More profile settings">
+<div class="settings-hub-heading"><div><span class="eyebrow">EXPLORE MORE</span><h2>More account options</h2><p>Everything in one place, without the clutter.</p></div><span class="hub-decor">✦</span></div>
+<div class="settings-accordion-list">
+<details class="settings-accordion reveal" id="notificationAccordion"><summary class="settings-summary"><span class="settings-summary-icon">🔔</span><span class="settings-summary-text"><strong>Notification preferences</strong><small>Browser alerts and notification permissions</small></span><span class="settings-chevron">⌄</span></summary><div class="settings-panel" id="profileNotificationSlot"><p class="settings-placeholder">Loading notification controls…</p></div></details>
+
 <?php
 $stage9Academic=$pdo->prepare('SELECT d.name degree_name,b.batch_code,p.degree_id,p.batch_id FROM student_academic_profiles p LEFT JOIN academic_degrees d ON d.id=p.degree_id LEFT JOIN academic_batches b ON b.id=p.batch_id WHERE p.user_id=? LIMIT 1');
 $stage9Academic->execute([$userId]);$stage9Academic=$stage9Academic->fetch(PDO::FETCH_ASSOC)?:[];
@@ -190,12 +175,17 @@ $stage9Intakes=$pdo->query('SELECT di.degree_id,di.batch_id,b.batch_code FROM ac
 $stage9Requests=$pdo->prepare('SELECT r.status,r.reason,r.created_at,r.admin_note,d.name degree_name,b.batch_code FROM academic_change_requests r JOIN academic_degrees d ON d.id=r.requested_degree_id JOIN academic_batches b ON b.id=r.requested_batch_id WHERE r.student_user_id=? ORDER BY r.id DESC LIMIT 5');
 $stage9Requests->execute([$userId]);$stage9Requests=$stage9Requests->fetchAll(PDO::FETCH_ASSOC);
 ?>
-<section class="stage9-card"><h2>Academic identity <span aria-label="Locked">🔒</span></h2><p>Your programme and intake are locked after registration. Only an administrator can approve a correction.</p><div class="stage9-grid"><div><small>Degree programme</small><strong><?= e((string)($stage9Academic['degree_name']??'Not assigned')) ?></strong></div><div><small>Intake</small><strong><?= e((string)($stage9Academic['batch_code']??'Not assigned')) ?></strong></div></div>
+<details class="settings-accordion academic-accordion reveal" id="academicAccordion"><summary class="settings-summary"><span class="settings-summary-icon">🎓</span><span class="settings-summary-text"><strong>Academic identity</strong><small>Degree, intake and change requests</small></span><span class="settings-chevron">⌄</span></summary><div class="settings-panel"><section class="stage9-card"><h2>Academic identity <span aria-label="Locked">🔒</span></h2><p>Your programme and intake are locked after registration. Only an administrator can approve a correction.</p><div class="stage9-grid"><div><small>Degree programme</small><strong><?= e((string)($stage9Academic['degree_name']??'Not assigned')) ?></strong></div><div><small>Intake</small><strong><?= e((string)($stage9Academic['batch_code']??'Not assigned')) ?></strong></div></div>
 <details style="margin-top:20px"><summary style="cursor:pointer;font-weight:650">Request a programme / intake change</summary><form method="post" style="margin-top:14px"><input type="hidden" name="csrf" value="<?= e(csrf()) ?>"><input type="hidden" name="action" value="stage9_request"><label for="stage9_degree">Requested programme</label><select id="stage9_degree" name="degree_id" required><option value="">Choose degree</option><?php foreach($stage9Degrees as $d): ?><option value="<?= (int)$d['id'] ?>"><?= e($d['name']) ?></option><?php endforeach ?></select><label for="stage9_batch">Requested intake</label><select id="stage9_batch" name="batch_id" required><option value="">Select a programme first</option></select><label for="stage9_reason">Reason for the change</label><textarea id="stage9_reason" name="reason" minlength="12" maxlength="1000" rows="3" required></textarea><div><button class="stage9-button">Send request to admin</button></div></form></details>
 <?php if($stage9Requests): ?><h3 style="margin-top:20px">My requests</h3><?php foreach($stage9Requests as $r): ?><p class="stage9-note"><strong><?= e(ucfirst($r['status'])) ?></strong> · <?= e($r['degree_name'].' / '.$r['batch_code']) ?> · <?= e($r['created_at']) ?><?php if($r['admin_note']): ?> · <?= e($r['admin_note']) ?><?php endif ?></p><?php endforeach ?><?php endif ?>
-</section><script>const stage9Intakes=<?= json_encode($stage9Intakes,JSON_HEX_TAG|JSON_HEX_AMP|JSON_HEX_APOS|JSON_HEX_QUOT) ?>;const stage9Deg=document.getElementById('stage9_degree'),stage9Bat=document.getElementById('stage9_batch');if(stage9Deg&&stage9Bat){stage9Deg.addEventListener('change',()=>{stage9Bat.replaceChildren(new Option('Choose intake',''));stage9Intakes.filter(i=>String(i.degree_id)===stage9Deg.value).forEach(i=>stage9Bat.add(new Option(i.batch_code,i.batch_id)))})}</script>
+</section></div></details><script>const stage9Intakes=<?= json_encode($stage9Intakes,JSON_HEX_TAG|JSON_HEX_AMP|JSON_HEX_APOS|JSON_HEX_QUOT) ?>;const stage9Deg=document.getElementById('stage9_degree'),stage9Bat=document.getElementById('stage9_batch');if(stage9Deg&&stage9Bat){stage9Deg.addEventListener('change',()=>{stage9Bat.replaceChildren(new Option('Choose intake',''));stage9Intakes.filter(i=>String(i.degree_id)===stage9Deg.value).forEach(i=>stage9Bat.add(new Option(i.batch_code,i.batch_id)))})}</script>
 
-<?php require __DIR__.'/../includes/stage9-avatar.php'; ?>
+<details class="settings-accordion reveal" id="photoAccordion"><summary class="settings-summary"><span class="settings-summary-icon">📷</span><span class="settings-summary-text"><strong>Profile photo</strong><small>Upload, change or remove your photo</small></span><span class="settings-chevron">⌄</span></summary><div class="settings-panel photo-panel"><?php require __DIR__.'/../includes/stage9-avatar.php'; ?></div></details>
+</div></section>
+</main>
+</div>
+
 <script src="<?= e(url('assets/js/notifications-live.js?v=20261107-profile-only-2')) ?>" data-base="<?= e(rtrim(url(), '/')) ?>" defer></script>
+<script src="<?= e(url('assets/js/ulearn-profile-premium.js?v=2')) ?>" defer></script>
 <?php require_once __DIR__ . '/../includes/student-bot.php'; ?></body>
 </html>
