@@ -953,15 +953,29 @@ $youtubeSearchUrl = 'https://www.youtube.com/results?search_query=' . rawurlenco
       const panel=button.closest('[data-ai-review]');
       const output=panel.querySelector('.ai-review-output');
       button.disabled=true;button.textContent='✦ Generating explanation…';
-      output.hidden=false;output.textContent='Your AI tutor is preparing a summary…';
+      output.hidden=false;
+      
+      // FIX 1: Changed textContent to innerHTML to render HTML tags properly
+      output.innerHTML='<em>Your AI tutor is preparing a summary…</em>';
+      
       try {
         const body=new URLSearchParams({csrf:csrfToken,attempt_id:button.dataset.attempt,question_id:button.dataset.question});
         const response=await fetch(endpoint,{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/x-www-form-urlencoded','Accept':'application/json'},body:body.toString()});
         const payload=await response.json();
+        
         if(!response.ok || !payload.explanation) throw new Error(payload.error||'Unable to generate an explanation right now.');
-        output.textContent=payload.explanation;
+        
+        // FIX 2: Changed textContent to innerHTML to render the final response
+        output.innerHTML=payload.explanation;
+        
         button.textContent='↻ Regenerate explanation';
-      }catch(error){output.textContent=error.message||'AI service unavailable. Please try again later.';button.textContent='✦ Try again';}
+      }catch(error){
+        
+        // FIX 3: Changed textContent to innerHTML for error messages
+        output.innerHTML=error.message||'AI service unavailable. Please try again later.';
+        button.textContent='✦ Try again';
+        
+      }
       finally{button.disabled=false;}
     });
   });
