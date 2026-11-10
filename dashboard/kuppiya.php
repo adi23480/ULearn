@@ -669,70 +669,77 @@ $base = url('dashboard/kuppiya.php');
 <title>Kuppiya Sessions — ULearn</title>
 
 
-<!-- DARK MODE JAVASCRIPT -->
-
+<!-- KUPPIYA THEME + INVITATION JAVASCRIPT -->
 <script>
-
 (function () {
+    'use strict';
+    var preferenceKey = 'ulearn-theme-preference';
+    var legacyKey = 'ulearn-theme';
 
-    try {
+    function resolveTheme() {
+        try {
+            var preference = localStorage.getItem(preferenceKey);
+            if (preference === 'system') {
+                return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+            }
+            if (preference === 'dark' || preference === 'light') return preference;
+            var legacy = localStorage.getItem(legacyKey);
+            if (legacy === 'dark' || legacy === 'light') return legacy;
+        } catch (e) {}
+        return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+    }
 
-        let theme = localStorage.getItem('ulearn-theme');
+    document.documentElement.setAttribute('data-theme', resolveTheme());
 
-        if (theme !== 'light' && theme !== 'dark') {
+    function updateThemeButton() {
+        var button = document.getElementById('themeButton');
+        if (!button) return;
+        var dark = document.documentElement.getAttribute('data-theme') === 'dark';
+        button.textContent = dark ? '\u2600' : '\u263E';
+        button.setAttribute('aria-label', dark ? 'Switch to light mode' : 'Switch to dark mode');
+        button.setAttribute('title', dark ? 'Switch to light mode' : 'Switch to dark mode');
+    }
 
-            theme = window.matchMedia('(prefers-color-scheme: dark)').matches
-                ? 'dark'
-                : 'light';
-        }
-
+    function setTheme(theme) {
         document.documentElement.setAttribute('data-theme', theme);
-
-    } catch (e) {
-
-        document.documentElement.setAttribute('data-theme', 'light');
-
+        try {
+            localStorage.setItem(preferenceKey, theme);
+            localStorage.setItem(legacyKey, theme);
+        } catch (e) {}
+        updateThemeButton();
     }
 
-})();
-
-
-/* COPY INVITATION */
-
-function copyInvite(id) {
-
-    let el = document.getElementById(id);
-
-    if (!el) return;
-
-    let value = el.value;
-
-    if (navigator.clipboard && window.isSecureContext) {
-
-        navigator.clipboard.writeText(value)
-            .then(function () {
-
-                alert('Invitation copied!');
-
-            })
-            .catch(function () {
-
-                window.prompt('Copy this link:', value);
-
+    document.addEventListener('DOMContentLoaded', function () {
+        var button = document.getElementById('themeButton');
+        if (button) {
+            button.addEventListener('click', function () {
+                var current = document.documentElement.getAttribute('data-theme');
+                setTheme(current === 'dark' ? 'light' : 'dark');
             });
+        }
+        updateThemeButton();
+    });
 
-    } else {
-
-        el.select();
-
-        document.execCommand('copy');
-
-        alert('Invitation copied!');
-
-    }
-
-}
-
+    window.copyInvite = function (id) {
+        var field = document.getElementById(id);
+        if (!field) return;
+        var value = field.value;
+        if (navigator.clipboard && window.isSecureContext) {
+            navigator.clipboard.writeText(value)
+                .then(function () { alert('Invitation copied!'); })
+                .catch(function () { window.prompt('Copy this link:', value); });
+        } else {
+            field.focus();
+            field.select();
+            try {
+                if (document.execCommand('copy')) alert('Invitation copied!');
+                else window.prompt('Copy this link:', value);
+            } catch (error) {
+                window.prompt('Copy this link:', value);
+            }
+        }
+    };
+})();
 </script>
 
 
@@ -741,6 +748,7 @@ function copyInvite(id) {
 /* LIGHT MODE */
 
 :root {
+    color-scheme: light;
     --bg: #f7f8fc;
     --surface: #ffffff;
     --text: #171927;
@@ -754,6 +762,7 @@ function copyInvite(id) {
 /* DARK MODE */
 
 :root[data-theme="dark"] {
+    color-scheme: dark;
     --bg: #0c0e16;
     --surface: #161924;
     --text: #f4f4fa;
@@ -1470,6 +1479,7 @@ textarea::placeholder {
 </style>
 
 
+<!-- Kuppiya premium UI assets -->
 <link rel="stylesheet" href="<?= e(url('assets/css/ulearn-community-phase4.css?v=1')) ?>">
 <link rel="stylesheet" href="<?= e(url('assets/css/ulearn-kuppiya-premium.css?v=3-20261110')) ?>">
 <script defer src="<?= e(url('assets/js/ulearn-kuppiya-premium.js?v=3-20261110')) ?>"></script>
@@ -1515,12 +1525,7 @@ textarea::placeholder {
 
 <div class="right">
 
-<button
-    id="themeButton"
-    class="theme-button"
-    type="button"
-    
-    aria-label="Toggle theme">☾</button>
+<button id="themeButton" class="theme-button" type="button" aria-label="Toggle theme" title="Toggle theme">â˜¾</button>
 
 <a class="avatar"
    href="<?= e(url('dashboard/profile.php')) ?>"
