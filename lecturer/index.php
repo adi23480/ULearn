@@ -882,23 +882,16 @@ if (!in_array($theme, ['light', 'dark', 'system'], true)) {
 
 
         <nav class="nav">
-
-            <a class="active" href="#overview">◫ Overview</a>
-
-            <a href="#modules">▤ My Modules</a>
-
-            <a href="<?= e(url('lecturer/materials.php')) ?>">▣ Study Materials</a>
-
-            <a href="<?= e(url('lecturer/quizzes.php')) ?>">☷ Quiz Management</a>
-            <a href="<?= e(url('lecturer/gemini-test.php')) ?>" style="margin-left:18px;font-size:12px">✦ Generate quiz with AI</a>
-
-            <a href="<?= e(url('lecturer/consultations.php')) ?>">◷ Consultations</a>
-
-            <a href="<?= e(url('dashboard/notifications.php')) ?>">♧ Notifications</a>
-
-                <a href="<?= e(url('lecturer/profile.php')) ?>">⚙ &nbsp; My Profile &amp; Settings</a>
-
-        </nav>
+    <a class="active" href="#overview">◫ Overview</a>
+    <a href="#modules">▤ My Modules</a>
+    <a href="<?= e(url('lecturer/materials.php')) ?>">▣ Study Materials</a>
+    <a href="<?= e(url('lecturer/quizzes.php')) ?>">☷ Quiz Management</a>
+    <a href="<?= e(url('lecturer/gemini-test.php')) ?>"style="margin-left:18px;font-size:12px">✦ Generate quiz with AI</a>
+    <a href="<?= e(url('lecturer/consultations.php')) ?>">◷ Consultations</a>
+    <a href="<?= e(url('dashboard/group-peer/index.php')) ?>">Group Peer &amp; Q&amp;A</a>
+    <a href="<?= e(url('dashboard/notifications.php')) ?>">♧ Notifications</a>
+    <a href="<?= e(url('lecturer/profile.php')) ?>">⚙ My Profile &amp; Settings</a>
+</nav>
 
 
 
