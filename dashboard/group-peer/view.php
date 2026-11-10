@@ -26,7 +26,28 @@ if (!$q) {
     http_response_code(404);
     exit('Question not found.');
 }
+// Check whether the current user is an active lecturer.
+$isActiveLecturer = false;
 
+if (($user['role'] ?? '') === 'lecturer') {
+    $lecturerCheck = $pdo->prepare(
+        'SELECT 1
+         FROM lecturer_profiles
+         WHERE user_id = ?
+         AND is_active = 1
+         LIMIT 1'
+    );
+
+    $lecturerCheck->execute([(int)$user['id']]);
+
+    $isActiveLecturer = (bool)$lecturerCheck->fetchColumn();
+}
+
+// Question owner or active lecturer can mark an answer as solved.
+$canSolve = (
+    (int)$q['user_id'] === (int)$user['id']
+    || $isActiveLecturer
+);
 $answers = $pdo->prepare(
     "SELECT a.*, u.full_name, u.role,
     lp.is_active lecturer_active
@@ -63,7 +84,11 @@ qa_header('Discussion');
   <div class="thread-actions" aria-label="Question actions">
    <form method="post" action="<?= e(url('dashboard/group-peer/vote.php')) ?>"><input type="hidden" name="csrf" value="<?= e(csrf()) ?>"><input type="hidden" name="question_id" value="<?= $id ?>"><input type="hidden" name="vote" value="1"><button type="submit" class="<?= (int)($q['my_vote'] ?? 0) === 1 ? 'vote-active' : '' ?>" aria-label="Upvote question">↑ Upvote</button></form>
    <span class="thread-score" aria-label="Question score"><?= (int)$q['votes'] ?></span>
-   <form method="post" action="<?= e(url('dashboard/group-peer/vote.php')) ?>"><input type="hidden" name="csrf" value="<?= e(csrf()) ?>"><input type="hidden" name="question_id" value="<?= $id ?>"><input type="hidden" name="vote" value="-1"><button type="submit" class="<?= (int)($q['my_vote'] ?? 0) === -1 ? 'vote-active' : '' ?>" aria-label="Downvote question">↓</button></form>
+   <form method="post" action="<?= e(url('dashboard/group-peer/vote.php')) ?>"><input type="hidden" name="csrf" value="<?= e(csrf()) ?>"><input type="hidden" name="question_id" value="<?= $id ?>"><input type="hidden" name="vote" value="-1"><button type="submit"
+    class="<?= (int)($q['my_vote'] ?? 0) === -1 ? 'vote-active' : '' ?>"
+    aria-label="Downvote question">
+    ↓ Downvote
+</button></form>
    <a href="#qa-answer-form">↳ Write an answer</a><span class="thread-meta-pill">◌ <?= count($answers) ?> answers</span>
    <?php if ((int)$q['user_id'] === (int)$user['id']): ?><a href="<?= e(url('dashboard/group-peer/edit-question.php?id='.$id)) ?>">Edit</a><form method="post" action="<?= e(url('dashboard/group-peer/delete-question.php')) ?>" onsubmit="return confirm('Delete this question?')"><input type="hidden" name="csrf" value="<?= e(csrf()) ?>"><input type="hidden" name="id" value="<?= $id ?>"><button class="thread-danger" type="submit">Delete</button></form><?php endif; ?>
   </div>
@@ -78,7 +103,20 @@ qa_header('Discussion');
   <?php if (!empty($a['code_snippet'])): ?><div class="thread-code"><pre id="answer-code-<?= (int)$a['id'] ?>"><code><?= e($a['code_snippet']) ?></code></pre><button type="button" onclick="copyCode('answer-code-<?= (int)$a['id'] ?>')">Copy code</button></div><?php endif; ?>
   <div class="thread-actions">
    <?php if ((int)$a['user_id']===(int)$user['id']): ?><a href="<?= e(url('dashboard/group-peer/edit-answer.php?id='.(int)$a['id'])) ?>">Edit answer</a><form method="post" action="<?= e(url('dashboard/group-peer/delete-answer.php')) ?>" onsubmit="return confirm('Delete this answer?')"><input type="hidden" name="csrf" value="<?= e(csrf()) ?>"><input type="hidden" name="id" value="<?= (int)$a['id'] ?>"><button class="thread-danger" type="submit">Delete</button></form><?php endif; ?>
-   <?php if ((int)$q['user_id']===(int)$user['id'] && !$q['is_solved']): ?><form method="post" action="<?= e(url('dashboard/group-peer/solve.php')) ?>"><input type="hidden" name="csrf" value="<?= e(csrf()) ?>"><input type="hidden" name="question_id" value="<?= $id ?>"><input type="hidden" name="answer_id" value="<?= (int)$a['id'] ?>"><button type="submit" class="thread-solve-button">✓ Accept as solution</button></form><?php endif; ?>
+   <?php if ($canSolve && !$accepted): ?>
+    <form method="post"
+          action="<?= e(url('dashboard/group-peer/solve.php')) ?>">
+
+        <input type="hidden" name="csrf" value="<?= e(csrf()) ?>">
+        <input type="hidden" name="question_id" value="<?= $id ?>">
+        <input type="hidden" name="answer_id" value="<?= (int)$a['id'] ?>">
+
+        <button type="submit" class="thread-solve-button">
+            ✓ <?= !empty($q['is_solved']) ? 'Change accepted answer' : 'Accept as solution' ?>
+        </button>
+
+    </form>
+<?php endif; ?>
   </div>
  </article>
  <?php endforeach; ?>

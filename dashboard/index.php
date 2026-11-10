@@ -1844,21 +1844,23 @@ $initial = strtoupper(substr($firstName, 0, 1));
 
                 </a>
 
-<a class="feature" href="<?= e(url('dashboard/group-peer/index.php')) ?>" style="display:block;text-decoration:none;color:inherit;cursor:pointer" aria-label="Open Group Peer and Q&amp;A">
+<a class="feature"
+   href="<?= e(url('dashboard/group-peer/index.php')) ?>"
+   style="display:block;text-decoration:none;color:inherit;cursor:pointer"
+   aria-label="Open Group Peer and Q&A">
 
-                    <div class="symbol">◎</div>
+    <div class="symbol">◎</div>
 
-                    <h3>Group Peer & Q&A</h3>
+    <h3>Group Peer &amp; Q&A</h3>
 
-                    <p>
+    <p>
+        Connect with students and discuss
+        difficult topics.
+    </p>
 
-                        Connect with students and discuss
+    <span class="pill">Explore Q&A ↗</span>
 
-                        difficult topics.
-
-                    </p>
-
-                </a>
+</a>
 
             </div>
 
