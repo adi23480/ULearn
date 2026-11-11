@@ -53,139 +53,16 @@ body{background:#f7f8fc;color:var(--ai-ink);margin:0;font-family:Manrope,'DM San
 .ai-result-card{margin-top:22px}.ai-result-text{min-height:330px;font-family:ui-monospace,SFMono-Regular,Consolas,monospace;font-size:13px}.ai-result-actions{display:flex;gap:12px;flex-wrap:wrap}.ai-result-actions .ai-action{width:auto;flex:1;margin-top:18px}.ai-outline{background:#fff;color:#534bcb;border:1px solid #d9d5ff}.ai-outline:hover{background:#f4f2ff}.ai-footer{font-size:12px;color:#8b8da2;margin-top:25px;text-align:center}
 @media(max-width:800px){.ai-grid{grid-template-columns:1fr}.ai-hero{padding:30px 25px}.ai-card{padding:22px}.ai-settings{grid-template-columns:1fr}.ai-shell{padding:18px 14px 50px}}
 .ai-layout{display:grid;grid-template-columns:250px minmax(0,1fr);min-height:100vh}.ai-nav{background:#fff;border-right:1px solid #e5e6f1;padding:28px 15px}.ai-nav-brand{display:block;font-size:27px;font-weight:850;color:#292744;text-decoration:none;margin:0 12px 32px}.ai-nav-brand span{color:#6556e8}.ai-nav-title{font-size:11px;letter-spacing:1.5px;color:#8889a1;text-transform:uppercase;margin:0 12px 14px;font-weight:800}.ai-nav a:not(.ai-nav-brand){display:block;padding:12px 14px;border-radius:12px;color:#66677e;text-decoration:none;font-size:13px;font-weight:700;margin-bottom:6px}.ai-nav a:hover,.ai-nav a.current{background:#efedff;color:#5d50d8}.ai-nav a.nested{margin-left:16px;font-size:12px}.ai-shell{min-width:0}@media(max-width:850px){.ai-layout{grid-template-columns:1fr}.ai-nav{border-right:0;border-bottom:1px solid #e5e6f1;padding:14px}.ai-nav-links{display:flex;flex-wrap:wrap;gap:4px}.ai-nav a:not(.ai-nav-brand){margin:0}.ai-nav-brand{margin:0 12px 10px}}
-
-html[data-theme="light"] body,
-body {
-    color: #20213d;
-}
-
-html[data-theme="light"] .ai-card,
-html[data-theme="light"] .ai-nav {
-    background: #ffffff;
-}
-
-html[data-theme="light"] .ai-title,
-html[data-theme="light"] .ai-side-title,
-html[data-theme="light"] .ai-step strong,
-html[data-theme="light"] .ai-label {
-    color: #20213d;
-}
-
-html[data-theme="light"] .ai-sub,
-html[data-theme="light"] .ai-step p {
-    color: #73768c;
-}
-
-html[data-theme="light"] .ai-textarea,
-html[data-theme="light"] .ai-input {
-    background: #ffffff;
-    color: #262746;
-}
-
-html[data-theme="light"] .ai-textarea::placeholder {
-    color: #9293a5;
-    opacity: 1;
-}
-
-/* Dark Mode */
-html[data-theme="dark"] body {
-    background: #111827 !important;
-    color: #f1f5f9 !important;
-}
-
-html[data-theme="dark"] .ai-nav,
-html[data-theme="dark"] .ai-card {
-    background: #1e293b !important;
-    border-color: #334155 !important;
-}
-
-html[data-theme="dark"] .ai-nav-brand,
-html[data-theme="dark"] .ai-title,
-html[data-theme="dark"] .ai-side-title,
-html[data-theme="dark"] .ai-step strong,
-html[data-theme="dark"] .ai-label {
-    color: #f1f5f9 !important;
-}
-
-html[data-theme="dark"] .ai-nav a:not(.ai-nav-brand) {
-    color: #cbd5e1;
-}
-
-html[data-theme="dark"] .ai-nav a:hover,
-html[data-theme="dark"] .ai-nav a.current {
-    background: #373064;
-    color: #c4b5fd;
-}
-
-html[data-theme="dark"] .ai-sub,
-html[data-theme="dark"] .ai-step p,
-html[data-theme="dark"] .ai-meta,
-html[data-theme="dark"] .ai-footer {
-    color: #cbd5e1 !important;
-}
-
-html[data-theme="dark"] .ai-textarea,
-html[data-theme="dark"] .ai-input {
-    background: #0f172a !important;
-    color: #f8fafc !important;
-    border-color: #475569 !important;
-}
-
-html[data-theme="dark"] .ai-textarea::placeholder {
-    color: #94a3b8 !important;
-    opacity: 1;
-}
-
-html[data-theme="dark"] .ai-back {
-    background: #1e293b;
-    color: #e2e8f0;
-    border-color: #475569;
-}
-
-html[data-theme="dark"] .ai-notice {
-    background: #292449;
-    color: #ddd6fe;
-    border-color: #51458b;
-}
-
-html[data-theme="dark"] .ai-error {
-    background: #451f27;
-    color: #fecaca;
-    border-color: #7f303b;
-}
-
-html[data-theme="dark"] .ai-outline {
-    background: #29304a;
-    color: #c4b5fd;
-    border-color: #6258e8;
-}
-
-html[data-theme="dark"] .ai-step-num {
-    background: #373064;
-    color: #c4b5fd;
-}
-
-html[data-theme="dark"] .ai-footer {
-    color: #94a3b8 !important;
-}
 </style>
-<script src="<?= htmlspecialchars(url('assets/js/theme-global.js?v=20261110-3'), ENT_QUOTES, 'UTF-8') ?>"></script>
+<script src="<?= htmlspecialchars(url('assets/js/theme-global.js?v=20261107-2'), ENT_QUOTES, 'UTF-8') ?>"></script>
 <link rel="stylesheet" href="<?= e(url('assets/css/ulearn-design-system.css?v=1')) ?>">
 <script defer src="<?= e(url('assets/js/ulearn-motion.js?v=1')) ?>"></script>
-</head><body><div class="ai-layout"><aside class="ai-nav"><a class="ai-nav-brand" href="<?= e(url('lecturer/index.php')) ?>">u learn<span>.</span></a><div class="ai-nav-title">Lecturer workspace</div><nav class="ai-nav-links" aria-label="Lecturer navigation"><a href="<?= e(url('lecturer/index.php')) ?>">▦ Overview</a><a href="<?= e(url('lecturer/index.php#modules')) ?>">▤ My modules</a><a href="<?= e(url('lecturer/materials.php')) ?>">▣ Study materials</a><a href="<?= e(url('lecturer/quizzes.php')) ?>">▣ Quiz management</a><a class="nested current" aria-current="page" href="<?= e(url('lecturer/gemini-test.php')) ?>">✦ Generate quiz with AI</a><a href="<?= e(url('lecturer/consultations.php')) ?>">◷ Consultations</a><a href="<?= e(url('lecturer/profile.php')) ?>">⚙ My profile</a></nav></aside><main class="ai-shell">
-<header class="ai-top">
-    <div class="ai-brand">
-        <span class="ai-brand-mark">✦</span>
-        ULearn 
-        <span style="font-size:13px;color:#8c8da6;font-weight:700">/ AI Studio</span>
-    </div>
-    <a class="ai-back" href="<?= e(url('lecturer/index.php')) ?>">← Lecturer dashboard</a>
-    <?php require __DIR__ . '/../includes/theme-toggle-button.php'; ?>
-</header>
+</head><body><div class="ai-layout"><aside class="ai-nav"><?php require __DIR__ . '/../includes/brand-logo.php'; ?><div class="ai-nav-title">Lecturer workspace</div><nav class="ai-nav-links" aria-label="Lecturer navigation"><a href="<?= e(url('lecturer/index.php')) ?>">▦ Overview</a><a href="<?= e(url('lecturer/index.php#modules')) ?>">▤ My modules</a><a href="<?= e(url('lecturer/materials.php')) ?>">▣ Study materials</a><a href="<?= e(url('lecturer/quizzes.php')) ?>">▣ Quiz management</a><a class="nested current" aria-current="page" href="<?= e(url('lecturer/gemini-test.php')) ?>">✦ Generate quiz with AI</a><a href="<?= e(url('lecturer/consultations.php')) ?>">◷ Consultations</a><a href="<?= e(url('lecturer/profile.php')) ?>">⚙ My profile</a></nav></aside><main class="ai-shell">
+<header class="ai-top"><?php require __DIR__ . '/../includes/brand-logo.php'; ?><a class="ai-back" href="<?= e(url('lecturer/index.php')) ?>">← Lecturer dashboard</a></header>
 <section class="ai-hero"><div class="ai-eyebrow">Teaching tools · Powered by Gemini</div><h1>Turn your lecture notes into better quizzes.</h1><p>Create multiple-choice questions in seconds, review every answer, and bring the finished set into your existing ULearn quiz workflow.</p><span class="ai-pill">✦ AI-assisted · Lecturer reviewed</span></section>
 <div class="ai-grid"><section class="ai-card"><h2 class="ai-title">Create a question set</h2><p class="ai-sub">Paste lecture material, choose your preferences and let Gemini prepare a first draft.</p>
 <form method="post" id="ai-form"><input type="hidden" name="csrf" value="<?= e(csrf()) ?>">
-<label class="ai-label" for="s ource">Lecture notes or reference material</label><textarea class="ai-textarea" id="source" name="source" maxlength="20000" minlength="30" required placeholder="Paste at least 30 characters of lecture notes here..." oninput="document.getElementById('char-count').textContent=this.value.length.toLocaleString() + ' / 20,000 characters' "><?= e($source) ?></textarea><div class="ai-meta"><span>Use specific, factual notes for stronger questions.</span><span id="char-count"><?= mb_strlen($source) ?> / 20,000 characters</span></div>
+<label class="ai-label" for="source">Lecture notes or reference material</label><textarea class="ai-textarea" id="source" name="source" maxlength="20000" minlength="30" required placeholder="Paste at least 30 characters of lecture notes here..." oninput="document.getElementById('char-count').textContent=this.value.length.toLocaleString() + ' / 20,000 characters' "><?= e($source) ?></textarea><div class="ai-meta"><span>Use specific, factual notes for stronger questions.</span><span id="char-count"><?= mb_strlen($source) ?> / 20,000 characters</span></div>
 <div class="ai-settings"><div><label class="ai-label" for="count">Number of questions</label><input class="ai-input" id="count" name="count" type="number" min="1" max="20" value="<?= (int)$count ?>" required></div><div><label class="ai-label" for="difficulty">Difficulty level</label><select class="ai-input" id="difficulty" name="difficulty"><?php foreach (['Easy','Medium','Hard'] as $level): ?><option value="<?= e($level) ?>" <?= $difficulty === $level ? 'selected' : '' ?>><?= e($level) ?></option><?php endforeach; ?></select></div></div>
 <button class="ai-action" type="submit" id="generate-button">✦ Generate quiz questions</button></form>
 <?php if ($error !== ''): ?><div class="ai-error" role="alert"><?= e($error) ?></div><?php endif; ?>

@@ -1250,13 +1250,7 @@ $initial = strtoupper(substr($firstName, 0, 1));
 
     <aside class="sidebar" id="studentSidebar">
 
-        <a class="brand ul-brand-lockup" href="<?= e(url()) ?>" aria-label="U Learn home">
-            <span class="ul-brand-name">u learn<span>.</span></span>
-            <span class="ul-nsbm-brand" aria-label="NSBM Green University">
-              <span class="ul-nsbm-emblem" aria-hidden="true"><svg viewBox="0 0 40 46" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M20 2 37 8v14c0 11-8 17-17 22C11 39 3 33 3 22V8L20 2Z" fill="#002147" stroke="#63D88B" stroke-width="2"/><path d="M20 34c-9-5-11-12-8-19 6 1 9 5 8 10 1-8 5-12 12-13 1 11-4 18-12 22Z" fill="#33CC33"/><path d="M20 36V17" stroke="#F7FFF9" stroke-width="2" stroke-linecap="round"/></svg></span>
-              <span class="ul-nsbm-wordmark"><strong>NSBM</strong><small>GREEN UNIVERSITY</small></span>
-            </span>
-        </a>
+        <?php require __DIR__ . '/includes/brand-logo.php'; ?>
 
         <nav aria-label="Student navigation">
 
