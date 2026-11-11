@@ -36,9 +36,10 @@ $base=url('lecturer/teaching-group.php').'?id='.(int)$group['id'];
 </style>
 <script>(function(){try{let t=localStorage.getItem('ulearn-theme');if(t!=='light'&&t!=='dark'){const p=<?= json_encode($theme) ?>;t=p==='system'?(matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light'):p;}document.documentElement.dataset.theme=t;}catch(e){}})();</script>
 
-<script src="<?= htmlspecialchars(url('assets/js/theme-global.js?v=20261107-2'), ENT_QUOTES, 'UTF-8') ?>"></script>
-<link rel="stylesheet" href="<?= e(url('assets/css/lecturer-premium-v5.css?v=1')) ?>">
-<script defer src="<?= e(url('assets/js/lecturer-premium-v5.js?v=1')) ?>"></script>
+
+
+
+<link rel="stylesheet" href="<?= e(url('assets/css/lecturer-purple-premium.css')) ?>?v=20261111">
 </head><body>
 <?php
 function groupIcon(string $name):string {
@@ -47,12 +48,7 @@ function groupIcon(string $name):string {
 }
 ?>
 <div class="shell"><aside class="sidebar"><a class="brand" href="<?= e(url('lecturer/index.php')) ?>"><span class="brand-mark">U</span><span>U Learn<span style="color:var(--accent)">.</span></span></a><nav aria-label="Lecturer navigation"><div class="side-label">WORKSPACE</div><div class="side-links"><a class="side-link" href="<?= e(url('lecturer/index.php')) ?>"><?= groupIcon('overview') ?> Dashboard</a><a class="side-link active" href="<?= e(url('lecturer/index.php')) ?>#teaching-groups"><?= groupIcon('modules') ?> Teaching groups</a><a class="side-link" href="<?= e(url('lecturer/quizzes.php')) ?>"><?= groupIcon('quizzes') ?> Quizzes</a><a class="side-link" href="<?= e(url('lecturer/materials.php')) ?>"><?= groupIcon('materials') ?> Materials</a></div></nav><div class="side-foot">LECTURER WORKSPACE</div></aside>
-<div class="workspace">
-    <header class="topbar">
-        <span class="top-label">Teaching workspace</span>
-        <span class="top-right"><span class="status-dot"></span> Active teaching group</span>
-        <?php require __DIR__ . '/../includes/theme-toggle-button.php'; ?>
-    </header><main class="main">
+<div class="workspace"><header class="topbar"><span class="top-label">Teaching workspace</span><span class="top-right"><span class="status-dot"></span> Active teaching group</span></header><main class="main">
 <a class="back" href="<?= e(url('lecturer/index.php')) ?>#teaching-groups"><?= groupIcon('back') ?> All teaching groups</a>
 <div class="heading"><div><p class="eyebrow">ACADEMIC WORKSPACE</p><h1><?= e((string)$group['degree_name']) ?></h1><p class="subtitle">Intake <?= e((string)$group['batch_code']) ?> &nbsp;·&nbsp; Year <?= (int)$group['study_year'] ?> &nbsp;·&nbsp; <?= (int)$group['semester']===0?'All semesters':'Semester '.(int)$group['semester'] ?></p></div><span class="tag">Active group</span></div>
 <nav class="tabs" aria-label="Group sections"><a class="tab <?= $tab==='overview'?'active':'' ?>" href="<?= e($base.'&tab=overview') ?>"><?= groupIcon('overview') ?> Overview</a><a class="tab <?= $tab==='modules'?'active':'' ?>" href="<?= e($base.'&tab=modules') ?>"><?= groupIcon('modules') ?> Modules</a><a class="tab <?= $tab==='students'?'active':'' ?>" href="<?= e($base.'&tab=students') ?>"><?= groupIcon('students') ?> Students</a><a class="tab" href="<?= e(url('lecturer/quizzes.php')) ?>"><?= groupIcon('quizzes') ?> Quizzes</a><a class="tab" href="<?= e(url('lecturer/materials.php')) ?>"><?= groupIcon('materials') ?> Materials</a></nav>
@@ -75,4 +71,5 @@ function groupIcon(string $name):string {
 <div class="tool-grid"><a class="tool-link" href="<?= e(url('lecturer/quizzes.php')) ?>"><span class="tool-icon"><?= groupIcon('quizzes') ?></span><span><strong>Quiz management</strong><small>Create and manage assessments</small></span><span class="tool-arrow">→</span></a><a class="tool-link" href="<?= e(url('lecturer/materials.php')) ?>"><span class="tool-icon"><?= groupIcon('materials') ?></span><span><strong>Learning materials</strong><small>Upload and manage resources</small></span><span class="tool-arrow">→</span></a></div>
 <?php endif; ?>
 <p class="note">Module access is controlled by individual lecturer assignments. Teaching group membership alone does not grant module permissions.</p>
-</div></main></div></div><script src="<?= e(url('assets/js/scroll-position.js')) ?>" defer></script></body></html>
+</div></main></div></div><script src="<?= e(url('assets/js/scroll-position.js')) ?>" defer></script><script src="<?= e(url('assets/js/lecturer-purple-premium.js')) ?>?v=20261111" defer></script>
+</body></html>

@@ -117,7 +117,7 @@ if (!in_array($theme, ['light', 'dark', 'system'], true)) {
 <body class="ul3-explore">
 <main class="container">
     <header class="top">
-        <a class="brand ex-brand" href="<?= e(url('dashboard/index.php')) ?>" aria-label="ULearn dashboard"><img src="<?= e(url('assets/images/nsbm-shield-only.png')) ?>" width="38" height="42" alt=""><span class="ex-wordmark"><b>u</b>Learn<span>.</span></span></a>
+        <?php require __DIR__ . '/../includes/brand-logo.php'; ?>
         <div class="ex-top-actions">
             <button type="button" id="ex-theme-toggle" class="ex-theme-toggle" aria-label="Switch color theme" title="Switch light/dark theme"><span class="ex-theme-icon" aria-hidden="true">☾</span><span class="ex-theme-label">Dark mode</span></button>
             <a class="back" href="<?= e(url('dashboard/index.php')) ?>">← Back to dashboard</a>

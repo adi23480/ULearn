@@ -15,46 +15,32 @@ $profileStmt->execute([(int)$user['id']]);
 $lecturerId = (int)$profileStmt->fetchColumn();
 if ($lecturerId < 1) { http_response_code(403); exit('Your lecturer profile is not active.'); }
 
-// Get only the active modules assigned to this lecturer through the academic curriculum.
-$assignedStmt = $pdo->prepare(
-    'SELECT DISTINCT m.id, m.module_code, m.module_name
-     FROM lecturer_module_assignments a
-     JOIN academic_curriculum c ON c.id = a.curriculum_id
-     JOIN academic_modules m ON m.id = c.module_id
-     JOIN academic_degrees d ON d.id = c.degree_id
-     JOIN academic_batches b ON b.id = c.batch_id
-     WHERE a.lecturer_id = ?
-       AND a.is_active = 1
-       AND c.is_active = 1
-       AND m.is_active = 1
-       AND d.is_active = 1
-       AND b.is_active = 1
-     ORDER BY m.module_code'
-);
-$assignedStmt->execute([$lecturerId]);
-$assignedModules = $assignedStmt->fetchAll(PDO::FETCH_ASSOC);
-$allowedModuleIds = array_map('intval', array_column($assignedModules, 'id'));
-
-function lecturerQuizOwned(PDO $pdo, int $quizId, int $userId, array $allowedModuleIds): array {
-    $stmt = $pdo->prepare('SELECT id, module_id, is_published FROM quizzes WHERE id = ? AND created_by = ? LIMIT 1');
-    $stmt->execute([$quizId, $userId]);
-    $quiz = $stmt->fetch(PDO::FETCH_ASSOC);
-    if (!$quiz || !in_array((int)$quiz['module_id'], $allowedModuleIds, true)) {
-        throw new RuntimeException('Quiz not found or you are no longer assigned to its module.');
-    }
+// Quiz publishing is scoped to the lecturer's active degree/intake assignments, not modules.
+$assignedModules = []; $allowedModuleIds = [];
+$scopeStmt = $pdo->prepare('SELECT DISTINCT lda.degree_id, lda.batch_id, d.name AS degree_name, b.batch_code FROM lecturer_degree_assignments lda JOIN academic_degrees d ON d.id=lda.degree_id JOIN academic_batches b ON b.id=lda.batch_id WHERE lda.lecturer_id=? AND lda.is_active=1 AND d.is_active=1 AND b.is_active=1 ORDER BY d.name,b.batch_code');
+$scopeStmt->execute([$lecturerId]);
+$quizScopes = $scopeStmt->fetchAll(PDO::FETCH_ASSOC);
+function quizScopeKey(array $r): string { return (int)$r['degree_id'].':'.(int)$r['batch_id']; }
+function saveLecturerQuizTargets(PDO $pdo, int $quizId, int $moduleId, array $selected, array $scopes): void {
+    $allowed=[]; foreach ($scopes as $scope) $allowed[quizScopeKey($scope)]=$scope;
+    $selected=array_values(array_unique(array_map('strval',$selected)));
+    if (!$selected) throw new RuntimeException('Select at least one degree programme and intake.');
+    foreach ($selected as $key) if (!isset($allowed[$key])) throw new RuntimeException('You are not assigned to one of the selected programme/intake groups.');
+    $pdo->prepare('DELETE FROM quiz_teaching_targets WHERE quiz_id=?')->execute([$quizId]);
+    $add=$pdo->prepare('INSERT INTO quiz_teaching_targets (quiz_id,degree_id,batch_id,study_year,semester) VALUES (?,?,?,0,0)');
+    foreach ($selected as $key) { $r=$allowed[$key]; $add->execute([$quizId,$r['degree_id'],$r['batch_id']]); }
+}
+function lecturerQuizOwned(PDO $pdo, int $quizId, int $userId, array $unused): array {
+    $stmt=$pdo->prepare('SELECT id,module_id,is_published FROM quizzes WHERE id=? AND created_by=? LIMIT 1');
+    $stmt->execute([$quizId,$userId]); $quiz=$stmt->fetch(PDO::FETCH_ASSOC);
+    if (!$quiz) throw new RuntimeException('Quiz not found or access denied.');
     return $quiz;
 }
-
-function lecturerQuizNotifyStudents(PDO $pdo, int $moduleId, int $actorId, int $quizId, string $quizTitle, bool $updated = false): void {
-    $type = $updated ? 'quiz_updated' : 'quiz_published';
-    $title = $updated ? 'Quiz updated' : 'New quiz available';
-    $message = ($updated ? 'A published quiz was updated: ' : 'A new quiz was published: ') . $quizTitle;
-    $stmt = $pdo->prepare("INSERT INTO notifications (user_id, actor_user_id, type, title, message, target_url)
-        SELECT DISTINCT sme.user_id, ?, ?, ?, ?, ?
-        FROM student_module_enrollments sme
-        INNER JOIN users u ON u.id = sme.user_id AND u.role = 'student'
-        WHERE sme.module_id = ?");
-    $stmt->execute([$actorId, $type, $title, $message, url('dashboard/quizzes.php'), $moduleId]);
+function lecturerQuizNotifyStudents(PDO $pdo, int $moduleId, int $actorId, int $quizId, string $quizTitle, bool $updated=false): void {
+    $type=$updated?'quiz_updated':'quiz_published'; $title=$updated?'Quiz updated':'New quiz available';
+    $message=($updated?'A published quiz was updated: ':'A new quiz was published: ').$quizTitle;
+    $stmt=$pdo->prepare("INSERT INTO notifications (user_id,actor_user_id,type,title,message,target_url) SELECT DISTINCT se.student_id,?,?,?,?,? FROM student_enrollments se JOIN users u ON u.id=se.student_id AND u.role='student' JOIN quiz_teaching_targets qt ON qt.degree_id=se.degree_id AND qt.batch_id=se.batch_id AND qt.quiz_id=? WHERE se.is_active=1");
+    $stmt->execute([$actorId,$type,$title,$message,url('dashboard/quizzes.php'),$quizId]);
 }
 
 $error = '';
@@ -212,15 +198,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if ($action === 'create_quiz' || $action === 'update_quiz') {
             $title = trim((string)($_POST['title'] ?? ''));
             $description = trim((string)($_POST['description'] ?? ''));
-            $moduleId = filter_var($_POST['module_id'] ?? null, FILTER_VALIDATE_INT);
-            if (!$moduleId || !in_array((int)$moduleId, $allowedModuleIds, true)) {
-                throw new RuntimeException('Select a valid module assigned to you.');
-            }
-            $moduleId = (int)$moduleId;
+            $moduleId = null; // Programme-level quiz: no module is required.
             $quizType = (string)($_POST['quiz_type'] ?? 'topic');
             $duration = filter_var($_POST['duration_minutes'] ?? null, FILTER_VALIDATE_INT);
             $points = filter_var($_POST['points_per_question'] ?? null, FILTER_VALIDATE_INT);
             $availabilityMode = (string)($_POST['availability_mode'] ?? 'unlimited');
+            $selectedScopes = is_array($_POST['teaching_scopes'] ?? null) ? $_POST['teaching_scopes'] : [];
             $rawAvailableFrom = trim((string)($_POST['available_from'] ?? ''));
             $rawAvailableUntil = trim((string)($_POST['available_until'] ?? ''));
             if (!in_array($availabilityMode, ['unlimited', 'scheduled', 'open_until'], true)) {
@@ -270,6 +253,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 );
                 $stmt->execute([$moduleId, (int)$user['id'], $title, $description, $quizType, $duration, $points, $availableFrom, $availableUntil]);
                 $newId = (int)$pdo->lastInsertId();
+                try { saveLecturerQuizTargets($pdo, $newId, (int)$moduleId, $selectedScopes, $quizScopes); } catch (Throwable $ex) { $pdo->prepare('DELETE FROM quizzes WHERE id=?')->execute([$newId]); throw $ex; }
                 $_SESSION['quiz_notice'] = 'Quiz created as a draft. Add questions before publishing.';
                 quizRedirect('quiz=' . $newId);
             }
@@ -286,6 +270,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if ((int)$previous['is_published'] === 1) { $availableFrom=$previous['available_from']; $availableUntil=$previous['available_until']; }
             $stmt = $pdo->prepare('UPDATE quizzes SET module_id = ?, title = ?, description = ?, quiz_type = ?, duration_minutes = ?, points_per_question = ?, available_from = ?, available_until = ? WHERE id = ? AND created_by = ?');
             $stmt->execute([$moduleId, $title, $description, $quizType, $duration, $points, $availableFrom, $availableUntil, $quizId, (int)$user['id']]);
+            saveLecturerQuizTargets($pdo, $quizId, (int)$moduleId, $selectedScopes, $quizScopes);
             $changed = (int)$previous['module_id'] !== (int)$moduleId || (string)$previous['title'] !== $title
                 || (string)($previous['description'] ?? '') !== $description || (string)$previous['quiz_type'] !== $quizType
                 || (int)$previous['duration_minutes'] !== (int)$duration || (int)$previous['points_per_question'] !== (int)$points
@@ -449,6 +434,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $countStmt = $pdo->prepare('SELECT COUNT(*) FROM quiz_questions WHERE quiz_id = ?');
                 $countStmt->execute([$quizId]);
                 if ((int)$countStmt->fetchColumn() < 1) throw new RuntimeException('Add at least one question before publishing this quiz.');
+                $targetsCheck=$pdo->prepare('SELECT COUNT(*) FROM quiz_teaching_targets WHERE quiz_id=?');
+                $targetsCheck->execute([$quizId]);
+                if ((int)$targetsCheck->fetchColumn()===0) throw new RuntimeException('Select at least one teaching group before publishing.');
                 // Publication starts the fixed two-calendar-month availability window.
                 $pdo->prepare('UPDATE quizzes SET available_from=NOW(), available_until=DATE_ADD(NOW(), INTERVAL 2 MONTH) WHERE id=?')->execute([$quizId]);
             }
@@ -588,9 +576,10 @@ document.addEventListener('DOMContentLoaded',()=>{const b=document.getElementByI
 *{box-sizing:border-box}html{scroll-behavior:auto}body{margin:0;background:var(--bg);color:var(--text);font-family:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif;line-height:1.6}a{color:inherit;text-decoration:none}button,input,select,textarea{font:inherit}button{cursor:pointer}.layout{display:grid;grid-template-columns:250px minmax(0,1fr);min-height:100vh}.sidebar{background:var(--surface);border-right:1px solid var(--border);padding:28px 15px;display:flex;flex-direction:column;gap:30px}.brand{font-size:27px;font-weight:850;letter-spacing:-1.7px;padding:0 14px}.brand span,.accent-dot{color:var(--accent)}.nav-label{padding:0 14px;color:var(--muted);font-size:10px;letter-spacing:1.7px;font-weight:850;text-transform:uppercase}.nav{display:grid;gap:7px}.nav a{display:flex;align-items:center;gap:12px;padding:12px 14px;border-radius:13px;color:var(--muted);font-size:13px;font-weight:700;transition:.2s}.nav a:hover,.nav a.active{background:var(--accent-light);color:var(--accent)}.nav .ico{width:19px;text-align:center;font-size:16px}.nav a.subnav{margin-left:15px;font-size:12px;border-left:2px solid var(--border);border-radius:0 10px 10px 0}.sidebar-foot{margin-top:auto;padding:16px 14px;border:1px solid var(--border);border-radius:15px;color:var(--muted);font-size:11px}.main{min-width:0;padding:28px clamp(18px,4vw,54px) 60px}.topbar{display:flex;justify-content:space-between;align-items:center;gap:15px;margin-bottom:52px}.crumb{font-size:11px;letter-spacing:1.6px;text-transform:uppercase;color:var(--muted);font-weight:850}.top-actions{display:flex;align-items:center;gap:12px}.role{font-size:10px;color:var(--muted);font-weight:850;letter-spacing:1.2px;text-transform:uppercase}.theme-btn{width:42px;height:42px;border:1px solid var(--border);border-radius:12px;background:var(--surface);color:var(--text);font-size:18px}.logout{font-size:12px;color:var(--muted);font-weight:750}.intro{margin-bottom:30px;animation:rise .4s ease both}.eyebrow{font-size:11px;letter-spacing:1.7px;text-transform:uppercase;color:var(--muted);font-weight:850}h1{font-size:clamp(38px,5vw,62px);line-height:1.08;letter-spacing:-.06em;margin:14px 0;font-weight:820}h1 span{color:var(--accent)}.subtitle{color:var(--muted);font-size:16px;max-width:700px;margin:0;line-height:1.8}.stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px;margin:28px 0}.stat{background:var(--surface);border:1px solid var(--border);border-radius:19px;padding:20px 22px;box-shadow:var(--shadow)}.stat-label{color:var(--muted);font-size:12px;font-weight:700}.stat-number{font-size:30px;letter-spacing:-1px;font-weight:820;margin-top:8px}.stat-foot{color:var(--muted);font-size:11px;margin-top:3px}.columns{display:grid;grid-template-columns:minmax(300px,.9fr) minmax(0,1.35fr);gap:20px;align-items:start}.card{background:var(--surface);border:1px solid var(--border);border-radius:22px;padding:25px;box-shadow:var(--shadow);min-width:0;animation:rise .45s ease both}.card-head{display:flex;justify-content:space-between;align-items:flex-start;gap:14px;margin-bottom:20px}.kicker{color:var(--accent);font-size:10px;letter-spacing:1.5px;font-weight:850;text-transform:uppercase}.card h2{font-size:20px;letter-spacing:-.6px;margin:4px 0 7px}.hint{font-size:12px;color:var(--muted);margin:0;line-height:1.7}.field{margin-top:16px}label{display:block;font-size:12px;font-weight:750;margin-bottom:7px}input,select,textarea{width:100%;background:var(--surface-alt);color:var(--text);border:1px solid var(--border);border-radius:12px;padding:12px 13px;outline:none;transition:border-color .2s,box-shadow .2s}input,select{min-height:46px}textarea{min-height:82px;resize:vertical}input:focus,select:focus,textarea:focus{border-color:var(--accent);box-shadow:0 0 0 3px color-mix(in srgb,var(--accent) 18%,transparent)}.two{display:grid;grid-template-columns:1fr 1fr;gap:12px}.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;padding:11px 15px;border-radius:12px;border:1px solid var(--border);background:var(--surface-alt);color:var(--text);font-size:12px;font-weight:800;transition:transform .18s,border-color .18s}.btn:hover{transform:translateY(-1px);border-color:var(--accent)}.btn-primary{background:linear-gradient(110deg,#5d4ae0,#8571fa);border-color:transparent;color:#fff;box-shadow:0 9px 22px rgba(103,86,232,.2)}.btn-small{padding:8px 10px;font-size:11px}.btn-danger{color:var(--red)}.full{width:100%;margin-top:20px}.message{padding:13px 15px;border-radius:12px;margin-bottom:18px;font-size:13px}.success{background:var(--green-bg);color:var(--green)}.error{background:var(--red-bg);color:var(--red)}.badge{display:inline-flex;align-items:center;gap:6px;padding:6px 10px;border-radius:999px;background:var(--accent-light);color:var(--accent);font-size:10px;font-weight:850;white-space:nowrap}.badge.published{background:var(--green-bg);color:var(--green)}.badge.draft{background:var(--surface-alt);color:var(--muted)}.quiz-list{display:grid;gap:12px}.quiz-item{padding:16px;border:1px solid var(--border);border-radius:16px;background:var(--surface);transition:border-color .2s,transform .2s}.quiz-item:hover{border-color:color-mix(in srgb,var(--accent) 55%,var(--border));transform:translateY(-1px)}.quiz-title{font-size:15px;font-weight:800;letter-spacing:-.3px}.quiz-meta{font-size:11px;color:var(--muted);margin-top:7px;display:flex;gap:8px;flex-wrap:wrap}.quiz-actions{display:flex;gap:7px;flex-wrap:wrap;margin-top:13px}.empty{border:1px dashed var(--border);border-radius:16px;padding:30px 18px;text-align:center;color:var(--muted);font-size:12px}.empty strong{display:block;color:var(--text);font-size:14px;margin-bottom:6px}.section-gap{margin-top:20px}.question-item{border:1px solid var(--border);border-radius:15px;padding:16px;margin-top:12px}.question-text{font-size:13px;font-weight:750;white-space:pre-wrap;overflow-wrap:anywhere}.options{display:grid;gap:7px;margin-top:12px}.option{font-size:11px;color:var(--muted);padding:8px 10px;border-radius:9px;background:var(--surface-alt);overflow-wrap:anywhere}.option.correct{color:var(--green);background:var(--green-bg)}.topline{display:flex;justify-content:space-between;gap:12px;align-items:flex-start}.separator{height:1px;background:var(--border);margin:20px 0}.back-link{display:inline-flex;color:var(--accent);font-size:12px;font-weight:800;margin-bottom:14px}.fine{font-size:11px;color:var(--muted);margin-top:9px}@keyframes rise{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}@media(max-width:1100px){.layout{grid-template-columns:210px minmax(0,1fr)}.columns{grid-template-columns:1fr}.sidebar{padding-inline:10px}}@media(max-width:720px){.layout{grid-template-columns:1fr}.sidebar{padding:14px;gap:14px;border-right:0;border-bottom:1px solid var(--border)}.sidebar .nav{display:flex;overflow:auto}.sidebar .nav a{white-space:nowrap}.sidebar-foot,.nav-label{display:none}.main{padding:20px 15px 42px}.topbar{margin-bottom:34px}.stats{grid-template-columns:1fr 1fr}.stat:last-child{grid-column:1/-1}.card{padding:19px}.two{grid-template-columns:1fr}.top-actions{gap:8px}}@media(prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;transition-duration:.01ms!important;scroll-behavior:auto!important}}
 </style>
 
-<script src="<?= htmlspecialchars(url('assets/js/theme-global.js?v=20261107-2'), ENT_QUOTES, 'UTF-8') ?>"></script>
-<link rel="stylesheet" href="<?= e(url('assets/css/lecturer-premium-v5.css?v=1')) ?>">
-<script defer src="<?= e(url('assets/js/lecturer-premium-v5.js?v=1')) ?>"></script>
+
+
+
+<link rel="stylesheet" href="<?= e(url('assets/css/lecturer-purple-premium.css')) ?>?v=20261111">
 </head>
 <body>
 <div class="layout">
@@ -632,21 +621,14 @@ document.addEventListener('DOMContentLoaded',()=>{const b=document.getElementByI
         <input type="hidden" name="action" value="<?= $editingQuiz ? 'update_quiz' : 'create_quiz' ?>">
         <?php if ($editingQuiz): ?><input type="hidden" name="quiz_id" value="<?= (int)$editingQuiz['id'] ?>"><?php endif; ?>
         <div class="field"><label for="title">Quiz title</label><input id="title" name="title" maxlength="200" required placeholder="e.g. Sorting Algorithms — Practice 01" value="<?= e((string)($editingQuiz['title'] ?? '')) ?>"></div>
-        <div class="field">
-            <label for="module_id">Select module</label>
-            <p class="fine">Choose one of the modules assigned to you. The quiz will be available to students enrolled in that module.</p>
-            <?php if ($assignedModules): ?>
-                <select id="module_id" name="module_id" required>
-                    <option value="">-- Select your module --</option>
-                    <?php foreach ($assignedModules as $module): ?>
-                        <option value="<?= (int)$module['id'] ?>" <?= (int)($editingQuiz['module_id'] ?? 0) === (int)$module['id'] ? 'selected' : '' ?>>
-                            <?= e((string)$module['module_code']) ?> · <?= e((string)$module['module_name']) ?>
-                        </option>
-                    <?php endforeach; ?>
-                </select>
-            <?php else: ?>
-                <div class="empty"><strong>No assigned modules found</strong>Ask an administrator to assign modules to your lecturer account.</div>
-            <?php endif; ?>
+        <div class="field"><label>Publish to degree programmes and intakes</label><p class="fine">Select all authorized programme/intake groups that should receive this quiz. No module assignment is required.</p>
+            <?php $savedTargets=[]; if ($editingQuiz) { $t=$pdo->prepare('SELECT degree_id,batch_id FROM quiz_teaching_targets WHERE quiz_id=?'); $t->execute([(int)$editingQuiz['id']]); foreach ($t->fetchAll(PDO::FETCH_ASSOC) as $r) $savedTargets[]=(int)$r['degree_id'].':'.(int)$r['batch_id']; } ?>
+            <div style="max-height:230px;overflow:auto;border:1px solid var(--border);border-radius:12px;padding:12px;display:grid;gap:9px">
+            <?php foreach ($quizScopes as $scope): $key=quizScopeKey($scope); ?>
+            <label style="display:flex;align-items:center;gap:10px;margin:0;font-weight:550;font-size:12px"><input style="width:16px;min-height:16px;accent-color:var(--accent)" type="checkbox" name="teaching_scopes[]" value="<?= e($key) ?>" <?= in_array($key,$savedTargets,true)?'checked':'' ?>><?= e((string)$scope['degree_name']) ?> · Intake <?= e((string)$scope['batch_code']) ?></label>
+            <?php endforeach; ?>
+            <?php if (!$quizScopes): ?><p class="fine">No active degree/intake assignments. Ask an administrator to assign your teaching groups.</p><?php endif; ?>
+            </div>
         </div>
         <div class="field"><label for="description">Description <span style="color:var(--muted);font-weight:500">(optional)</span></label><textarea id="description" name="description" maxlength="5000" placeholder="What should students practise or learn?"><?= e((string)($editingQuiz['description'] ?? '')) ?></textarea></div>
         <div class="two">
@@ -948,5 +930,6 @@ document.querySelectorAll('form').forEach(function(form){
   });
 })();
 </script>
+<script src="<?= e(url('assets/js/lecturer-purple-premium.js')) ?>?v=20261111" defer></script>
 </body>
 </html>

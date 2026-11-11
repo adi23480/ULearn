@@ -3,7 +3,9 @@
 declare(strict_types=1);
 
 
+
 require_once __DIR__ . '/../config/bootstrap.php';
+
 
 
 $user = require_login();
@@ -747,13 +749,6 @@ if (!in_array($theme, ['light', 'dark', 'system'], true)) {
 
         }
 
-
-    /* Keep lecturer quick actions separate even before external styles load. */
-    .ul-workspace-actions{display:flex;flex-wrap:wrap;align-items:center;gap:12px;margin:24px 0 28px}
-    .ul-workspace-actions a{display:inline-flex;align-items:center;justify-content:center;min-height:42px;padding:10px 16px;border:1px solid var(--border);border-radius:12px;background:var(--card);color:var(--text);font-size:13px;font-weight:700;text-decoration:none;line-height:1.4;transition:transform .18s,border-color .18s,background .18s}
-    .ul-workspace-actions a:hover{transform:translateY(-2px);border-color:var(--accent);background:var(--soft);color:var(--accent)}
-    .ul-workspace-actions a:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
-    @media(max-width:600px){.ul-workspace-actions{gap:9px}.ul-workspace-actions a{width:100%;justify-content:flex-start}}
     </style>
 
 
@@ -855,9 +850,10 @@ if (!in_array($theme, ['light', 'dark', 'system'], true)) {
     </script>
 
 
-<script src="<?= htmlspecialchars(url('assets/js/theme-global.js?v=20261107-2'), ENT_QUOTES, 'UTF-8') ?>"></script>
-<link rel="stylesheet" href="<?= e(url('assets/css/lecturer-premium-v5.css?v=1')) ?>">
-<script defer src="<?= e(url('assets/js/lecturer-premium-v5.js?v=1')) ?>"></script>
+
+
+
+<link rel="stylesheet" href="<?= e(url('assets/css/lecturer-purple-premium.css')) ?>?v=20261111">
 </head>
 
 
@@ -887,16 +883,23 @@ if (!in_array($theme, ['light', 'dark', 'system'], true)) {
 
 
         <nav class="nav">
-    <a class="active" href="#overview">◫ Overview</a>
-    <a href="#modules">▤ My Modules</a>
-    <a href="<?= e(url('lecturer/materials.php')) ?>">▣ Study Materials</a>
-    <a href="<?= e(url('lecturer/quizzes.php')) ?>">☷ Quiz Management</a>
-    <a href="<?= e(url('lecturer/gemini-test.php')) ?>"style="margin-left:18px;font-size:12px">✦ Generate quiz with AI</a>
-    <a href="<?= e(url('lecturer/consultations.php')) ?>">◷ Consultations</a>
-    <a href="<?= e(url('dashboard/group-peer/index.php')) ?>">Group Peer &amp; Q&amp;A</a>
-    <a href="<?= e(url('lecturer/notifications.php')) ?>">♧ Notifications</a>
-    <a href="<?= e(url('lecturer/profile.php')) ?>">⚙ My Profile &amp; Settings</a>
-</nav>
+
+            <a class="active" href="#overview">◫ Overview</a>
+
+            <a href="#modules">▤ My Modules</a>
+
+            <a href="<?= e(url('lecturer/materials.php')) ?>">▣ Study Materials</a>
+
+            <a href="<?= e(url('lecturer/quizzes.php')) ?>">☷ Quiz Management</a>
+            <a href="<?= e(url('lecturer/gemini-test.php')) ?>" style="margin-left:18px;font-size:12px">✦ Generate quiz with AI</a>
+
+            <a href="<?= e(url('lecturer/consultations.php')) ?>">◷ Consultations</a>
+
+            <a href="<?= e(url('dashboard/notifications.php')) ?>">♧ Notifications</a>
+
+                <a href="<?= e(url('lecturer/profile.php')) ?>">⚙ &nbsp; My Profile &amp; Settings</a>
+
+        </nav>
 
 
 
@@ -922,7 +925,7 @@ if (!in_array($theme, ['light', 'dark', 'system'], true)) {
 
             <div class="topbar-right">
 
-                <a class="notification-button" href="<?= e(url('lecturer/notifications.php')) ?>"
+                <a class="notification-button" href="<?= e(url('dashboard/notifications.php')) ?>"
 
                    aria-label="Notifications<?= $unreadNotifications ? ': ' . $unreadNotifications . ' unread' : '' ?>"
 
@@ -1075,7 +1078,7 @@ if (!in_array($theme, ['light', 'dark', 'system'], true)) {
 
                 <div class="stat-label">
 
-                    <a href="<?= e(url('lecturer/notifications.php')) ?>" style="color:var(--accent)">Unread notifications ↗</a>
+                    <a href="<?= e(url('dashboard/notifications.php')) ?>" style="color:var(--accent)">Unread notifications ↗</a>
 
                 </div>
 
@@ -1236,7 +1239,7 @@ if (!in_array($theme, ['light', 'dark', 'system'], true)) {
 
                 View your personal notifications and university announcements
 
-                in the <a href="<?= e(url('lecturer/notifications.php')) ?>" style="color:var(--accent)">Notification Center ↗</a>.
+                in the <a href="<?= e(url('dashboard/notifications.php')) ?>" style="color:var(--accent)">Notification Center ↗</a>.
 
                 Automatic activity alerts will be connected in the next stage.
 
@@ -1256,6 +1259,7 @@ if (!in_array($theme, ['light', 'dark', 'system'], true)) {
 
     <script src="<?= e(url('assets/js/scroll-position.js')) ?>" defer></script>
 <script src="<?= e(url('assets/js/notifications-live.js')) ?>" data-base="<?= e(rtrim(url(), '/')) ?>" defer></script>
+<script src="<?= e(url('assets/js/lecturer-purple-premium.js')) ?>?v=20261111" defer></script>
 </body>
 
 </html>

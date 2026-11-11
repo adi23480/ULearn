@@ -656,15 +656,6 @@ try {
 
 $base = url('dashboard/kuppiya.php');
 
-// Count unread notifications for badge consistency
-$unreadNotificationsStmt = $pdo->prepare('SELECT COUNT(*) FROM notifications WHERE user_id = ? AND is_read = 0');
-$unreadNotificationsStmt->execute([$uid]);
-$unreadNotifications = (int)$unreadNotificationsStmt->fetchColumn();
-
-// Fetch note contribution points for sidebar bottom display
-$notePointsStmt = $pdo->prepare('SELECT COALESCE(SUM(points), 0) FROM student_note_points WHERE user_id = ?');
-$notePointsStmt->execute([$uid]);
-$notePoints = (int)$notePointsStmt->fetchColumn();
 ?>
 
 <!doctype html>
@@ -678,77 +669,70 @@ $notePoints = (int)$notePointsStmt->fetchColumn();
 <title>Kuppiya Sessions — ULearn</title>
 
 
-<!-- KUPPIYA THEME + INVITATION JAVASCRIPT -->
+<!-- DARK MODE JAVASCRIPT -->
+
 <script>
+
 (function () {
-    'use strict';
-    var preferenceKey = 'ulearn-theme-preference';
-    var legacyKey = 'ulearn-theme';
 
-    function resolveTheme() {
-        try {
-            var preference = localStorage.getItem(preferenceKey);
-            if (preference === 'system') {
-                return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
-            }
-            if (preference === 'dark' || preference === 'light') return preference;
-            var legacy = localStorage.getItem(legacyKey);
-            if (legacy === 'dark' || legacy === 'light') return legacy;
-        } catch (e) {}
-        return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
-    }
+    try {
 
-    document.documentElement.setAttribute('data-theme', resolveTheme());
+        let theme = localStorage.getItem('ulearn-theme');
 
-    function updateThemeButton() {
-        var button = document.getElementById('themeButton');
-        if (!button) return;
-        var dark = document.documentElement.getAttribute('data-theme') === 'dark';
-        button.textContent = dark ? '\u2600' : '\u263E';
-        button.setAttribute('aria-label', dark ? 'Switch to light mode' : 'Switch to dark mode');
-        button.setAttribute('title', dark ? 'Switch to light mode' : 'Switch to dark mode');
-    }
+        if (theme !== 'light' && theme !== 'dark') {
 
-    function setTheme(theme) {
+            theme = window.matchMedia('(prefers-color-scheme: dark)').matches
+                ? 'dark'
+                : 'light';
+        }
+
         document.documentElement.setAttribute('data-theme', theme);
-        try {
-            localStorage.setItem(preferenceKey, theme);
-            localStorage.setItem(legacyKey, theme);
-        } catch (e) {}
-        updateThemeButton();
+
+    } catch (e) {
+
+        document.documentElement.setAttribute('data-theme', 'light');
+
     }
 
-    document.addEventListener('DOMContentLoaded', function () {
-        var button = document.getElementById('themeButton');
-        if (button) {
-            button.addEventListener('click', function () {
-                var current = document.documentElement.getAttribute('data-theme');
-                setTheme(current === 'dark' ? 'light' : 'dark');
-            });
-        }
-        updateThemeButton();
-    });
-
-    window.copyInvite = function (id) {
-        var field = document.getElementById(id);
-        if (!field) return;
-        var value = field.value;
-        if (navigator.clipboard && window.isSecureContext) {
-            navigator.clipboard.writeText(value)
-                .then(function () { alert('Invitation copied!'); })
-                .catch(function () { window.prompt('Copy this link:', value); });
-        } else {
-            field.focus();
-            field.select();
-            try {
-                if (document.execCommand('copy')) alert('Invitation copied!');
-                else window.prompt('Copy this link:', value);
-            } catch (error) {
-                window.prompt('Copy this link:', value);
-            }
-        }
-    };
 })();
+
+
+/* COPY INVITATION */
+
+function copyInvite(id) {
+
+    let el = document.getElementById(id);
+
+    if (!el) return;
+
+    let value = el.value;
+
+    if (navigator.clipboard && window.isSecureContext) {
+
+        navigator.clipboard.writeText(value)
+            .then(function () {
+
+                alert('Invitation copied!');
+
+            })
+            .catch(function () {
+
+                window.prompt('Copy this link:', value);
+
+            });
+
+    } else {
+
+        el.select();
+
+        document.execCommand('copy');
+
+        alert('Invitation copied!');
+
+    }
+
+}
+
 </script>
 
 
@@ -757,38 +741,26 @@ $notePoints = (int)$notePointsStmt->fetchColumn();
 /* LIGHT MODE */
 
 :root {
-    color-scheme: light;
     --bg: #f7f8fc;
     --surface: #ffffff;
-    --surface-alt: #f1f2f8;
     --text: #171927;
     --muted: #777b90;
     --border: #e7e8f0;
     --accent: #6756e8;
-    --accent-light: #f0edff;
-    --shadow: 0 10px 40px rgba(30,30,60,.04);
-    --green: #087e60;
-    --soft: #e7f7ef;
-    --soft-accent: #f0edff;
+    --soft: #f0edff;
 }
 
 
 /* DARK MODE */
 
 :root[data-theme="dark"] {
-    color-scheme: dark;
     --bg: #0c0e16;
     --surface: #161924;
-    --surface-alt: #202431;
     --text: #f4f4fa;
     --muted: #a0a4b6;
     --border: #2b2e3c;
     --accent: #a99aff;
-    --accent-light: #292440;
-    --shadow: none;
-    --green: #5ce3b5;
-    --soft: #153d34;
-    --soft-accent: #292440;
+    --soft: #292440;
 }
 
 
@@ -823,9 +795,6 @@ a {
     background: var(--surface);
     border-right: 1px solid var(--border);
     padding: 32px 20px;
-    display: flex;
-    flex-direction: column;
-    gap: 40px;
 }
 
 
@@ -833,7 +802,8 @@ a {
     font-size: 26px;
     font-weight: 800;
     letter-spacing: -1.5px;
-    padding-left: 12px;
+    display: block;
+    margin: 0 0 45px 12px;
 }
 
 
@@ -858,50 +828,21 @@ a {
 }
 
 
-.nav {
-    display: grid;
-    gap: 6px;
-}
-
-
 .nav a {
-    display: flex;
-    align-items: center;
-    gap: 12px;
+    display: block;
     padding: 12px 14px;
     border-radius: 12px;
     font-size: 14px;
     font-weight: 600;
+    margin-bottom: 6px;
 }
 
 
-.nav a:hover {
-    background: var(--surface-alt);
-}
-
-
+.nav a:hover,
 .nav a.active {
-    background: var(--soft-accent);
+    background: var(--soft);
     color: var(--accent);
 }
-
-
-.ul-nav-icon {
-    width: 20px;
-    height: 20px;
-    flex-shrink: 0;
-}
-
-
-.sidebar-bottom {
-    margin-top: auto;
-    border: 1px solid var(--border);
-    border-radius: 16px;
-    padding: 16px;
-    font-size: 13px;
-}
-.sidebar-bottom strong { display: block; overflow-wrap: anywhere; }
-.sidebar-bottom small { color: var(--muted); overflow-wrap: anywhere; }
 
 
 main {
@@ -915,7 +856,7 @@ main {
     align-items: center;
     justify-content: space-between;
     gap: 20px;
-    margin-bottom: 40px;
+    margin-bottom: 50px;
 }
 
 
@@ -923,27 +864,6 @@ main {
     display: flex;
     align-items: center;
     gap: 16px;
-}
-
-
-/* NOTIFICATION BELL */
-.notification-bell {
-    width: 42px; height: 42px; position: relative;
-    display: inline-grid; place-items: center;
-    background: var(--surface); color: var(--text);
-    border: 1px solid var(--border); border-radius: 12px;
-    box-shadow: var(--shadow);
-    transition: transform .18s ease, background .18s ease, border-color .18s ease;
-}
-.notification-bell:hover { transform: translateY(-2px); background: var(--soft-accent); border-color: var(--accent); }
-.notification-bell svg { width: 21px; height: 21px; stroke: currentColor; fill: none; stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; }
-.notification-count {
-    position: absolute; top: -8px; right: -9px;
-    min-width: 20px; height: 20px; padding: 0 5px;
-    display: inline-grid; place-items: center;
-    border-radius: 999px; background: #e34878; color: #fff;
-    border: 2px solid var(--bg); font-size: 10px; font-weight: 800;
-    line-height: 1;
 }
 
 
@@ -962,7 +882,7 @@ main {
 }
 
 .theme-button:hover {
-    background: var(--soft-accent);
+    background: var(--soft);
     color: var(--accent);
     transform: scale(1.05);
 }
@@ -972,19 +892,12 @@ main {
     width: 40px;
     height: 40px;
     border-radius: 50%;
-    background: var(--soft-accent);
+    background: var(--soft);
     color: var(--accent);
     display: grid;
     place-items: center;
     font-weight: 800;
 }
-
-
-.logout {
-    background: transparent; border: 0; color: var(--muted);
-    font-size: 13px; font-weight: 650; cursor: pointer;
-}
-.logout:hover { color: var(--text); }
 
 
 h1 {
@@ -1094,7 +1007,7 @@ textarea::placeholder {
 
 
 .btn:hover {
-    background: var(--soft-accent);
+    background: var(--soft);
     color: var(--accent);
 }
 
@@ -1115,7 +1028,7 @@ textarea::placeholder {
     padding: 13px 16px;
     margin: 15px 0;
     border-radius: 10px;
-    background: var(--soft-accent);
+    background: var(--soft);
     color: var(--text);
 }
 
@@ -1149,7 +1062,7 @@ textarea::placeholder {
 
 
 .tab.active {
-    background: var(--soft-accent);
+    background: var(--soft);
     color: var(--accent);
     border-color: var(--accent);
 }
@@ -1159,7 +1072,7 @@ textarea::placeholder {
     display: inline-block;
     padding: 5px 11px;
     border-radius: 20px;
-    background: var(--soft-accent);
+    background: var(--soft);
     color: var(--accent);
     font-size: 12px;
     font-weight: 700;
@@ -1237,7 +1150,7 @@ textarea::placeholder {
     align-items: center;
     gap: 12px;
     padding: 20px 23px;
-    background: linear-gradient(120deg, var(--surface), var(--soft-accent));
+    background: linear-gradient(120deg, var(--surface), var(--soft));
     border-bottom: 1px solid var(--border);
 }
 
@@ -1317,7 +1230,7 @@ textarea::placeholder {
 
 
 .chat-bubble-system {
-    background: var(--soft-accent);
+    background: var(--soft);
     border: 1px solid var(--border);
     color: var(--muted);
     text-align: center;
@@ -1431,7 +1344,7 @@ textarea::placeholder {
     display: grid;
     place-items: center;
     border-radius: 50%;
-    background: var(--soft-accent);
+    background: var(--soft);
     color: var(--accent);
     font-weight: 800;
 }
@@ -1450,22 +1363,21 @@ textarea::placeholder {
 }
 
 
-@media(max-width:900px) {
+@media(max-width:850px) {
 
     .layout {
         grid-template-columns: 1fr;
     }
 
     .sidebar {
-        border-right: 0; border-bottom: 1px solid var(--border); padding: 18px; gap: 18px;
+        padding: 18px;
+        border-right: none;
+        border-bottom: 1px solid var(--border);
     }
 
     .brand {
-        margin-bottom: 0; padding-left: 0;
+        margin-bottom: 20px;
     }
-
-    .nav { display: flex; flex-wrap: wrap; }
-    .sidebar-bottom { display: none; }
 
     .room-grid {
         grid-template-columns: 1fr;
@@ -1528,23 +1440,23 @@ textarea::placeholder {
 
 
 /* Premium Kuppiya scheduler */
-.kp-scheduler{min-width:0}.kp-schedule-heading,.kp-calendar-head,.kp-times-head{display:flex;align-items:center;justify-content:space-between;gap:12px}.kp-schedule-heading{margin-bottom:18px}.kp-schedule-heading label{font-weight:750;font-size:16px}.kp-schedule-heading p{margin:4px 0 0}.kp-zone{font-size:11px;color:var(--muted);border:1px solid var(--border);padding:8px 10px;border-radius:999px;white-space:nowrap}.kp-schedule-layout{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,1fr);gap:16px}.kp-calendar,.kp-times{border:1px solid var(--border);border-radius:18px;padding:17px;background:var(--surface);min-width:0}.kp-calendar-head{margin-bottom:15px}.kp-calendar-head strong,.kp-times-head strong{font-size:14px}.kp-nav{border:1px solid var(--border);background:var(--surface);color:var(--text);width:32px;height:32px;border-radius:10px;font-size:24px;line-height:1;cursor:pointer}.kp-nav:disabled{opacity:.3;cursor:not-allowed}.kp-day-names,.kp-calendar-days{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:5px;text-align:center}.kp-day-names{margin-bottom:7px}.kp-day-names span{font-size:11px;color:var(--muted);padding:7px 0}.kp-date{border:1px solid transparent;background:transparent;color:var(--text);border-radius:10px;min-height:39px;cursor:pointer;font:inherit;font-size:13px;transition:background .15s,border-color .15s}.kp-date:hover:not(:disabled),.kp-time:hover:not(:disabled){background:var(--soft-accent);border-color:var(--accent)}.kp-date:disabled,.kp-time:disabled{opacity:.25;cursor:not-allowed}.kp-date.kp-picked,.kp-time.kp-picked{background:var(--accent);color:#fff;border-color:var(--accent);font-weight:700}.kp-date.kp-today:not(.kp-picked){border-color:var(--accent)}.kp-times-head{align-items:start;margin-bottom:13px;flex-wrap:wrap}.kp-times-head .meta{font-size:11px}.kp-time-choices{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;max-height:270px;overflow-y:auto;align-content:start;padding-right:3px}.kp-time{border:1px solid var(--border);background:var(--surface);color:var(--text);border-radius:10px;padding:11px 3px;font:inherit;font-size:12px;cursor:pointer;transition:background .15s,border-color .15s}.kp-selection{margin-top:12px;border-radius:11px;background:var(--soft-accent);color:var(--accent);padding:11px 14px;font-size:12px;font-weight:650}@media(max-width:760px){.kp-schedule-layout{grid-template-columns:1fr}.kp-zone{display:none}.kp-calendar,.kp-times{padding:13px}.kp-time-choices{max-height:205px}}
+.kp-scheduler{min-width:0}.kp-schedule-heading,.kp-calendar-head,.kp-times-head{display:flex;align-items:center;justify-content:space-between;gap:12px}.kp-schedule-heading{margin-bottom:18px}.kp-schedule-heading label{font-weight:750;font-size:16px}.kp-schedule-heading p{margin:4px 0 0}.kp-zone{font-size:11px;color:var(--muted);border:1px solid var(--border);padding:8px 10px;border-radius:999px;white-space:nowrap}.kp-schedule-layout{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,1fr);gap:16px}.kp-calendar,.kp-times{border:1px solid var(--border);border-radius:18px;padding:17px;background:var(--surface);min-width:0}.kp-calendar-head{margin-bottom:15px}.kp-calendar-head strong,.kp-times-head strong{font-size:14px}.kp-nav{border:1px solid var(--border);background:var(--surface);color:var(--text);width:32px;height:32px;border-radius:10px;font-size:24px;line-height:1;cursor:pointer}.kp-nav:disabled{opacity:.3;cursor:not-allowed}.kp-day-names,.kp-calendar-days{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:5px;text-align:center}.kp-day-names{margin-bottom:7px}.kp-day-names span{font-size:11px;color:var(--muted);padding:7px 0}.kp-date{border:1px solid transparent;background:transparent;color:var(--text);border-radius:10px;min-height:39px;cursor:pointer;font:inherit;font-size:13px;transition:background .15s,border-color .15s}.kp-date:hover:not(:disabled),.kp-time:hover:not(:disabled){background:var(--soft);border-color:var(--accent)}.kp-date:disabled,.kp-time:disabled{opacity:.25;cursor:not-allowed}.kp-date.kp-picked,.kp-time.kp-picked{background:var(--accent);color:#fff;border-color:var(--accent);font-weight:700}.kp-date.kp-today:not(.kp-picked){border-color:var(--accent)}.kp-times-head{align-items:start;margin-bottom:13px;flex-wrap:wrap}.kp-times-head .meta{font-size:11px}.kp-time-choices{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;max-height:270px;overflow-y:auto;align-content:start;padding-right:3px}.kp-time{border:1px solid var(--border);background:var(--surface);color:var(--text);border-radius:10px;padding:11px 3px;font:inherit;font-size:12px;cursor:pointer;transition:background .15s,border-color .15s}.kp-selection{margin-top:12px;border-radius:11px;background:var(--soft);color:var(--accent);padding:11px 14px;font-size:12px;font-weight:650}@media(max-width:760px){.kp-schedule-layout{grid-template-columns:1fr}.kp-zone{display:none}.kp-calendar,.kp-times{padding:13px}.kp-time-choices{max-height:205px}}
 
 
 /* Stage 7: refined session discovery */
 .kp-toolbar{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin:18px 0 22px}
 .kp-search{flex:1;min-width:220px;position:relative}
 .kp-search input{width:100%;padding:13px 16px 13px 42px;border:1px solid var(--border);border-radius:14px;background:var(--surface);color:var(--text);font:inherit;outline:none;transition:border-color .2s,box-shadow .2s}
-.kp-search input:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--soft-accent)}
+.kp-search input:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--soft)}
 .kp-search:before{content:'⌕';position:absolute;left:16px;top:6px;font-size:25px;color:var(--muted)}
 .kp-filters{display:flex;gap:6px;flex-wrap:wrap}
 .kp-filter{border:1px solid var(--border);background:var(--surface);color:var(--muted);padding:10px 14px;border-radius:12px;font:inherit;font-size:13px;cursor:pointer;transition:all .2s}
-.kp-filter[aria-pressed="true"]{background:var(--soft-accent);color:var(--accent);border-color:var(--accent);font-weight:700}
+.kp-filter[aria-pressed="true"]{background:var(--soft);color:var(--accent);border-color:var(--accent);font-weight:700}
 .kp-session-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,300px),1fr));gap:16px}
 .kp-session-card{border:1px solid var(--border);background:var(--surface);border-radius:20px;padding:22px;display:flex;flex-direction:column;gap:14px;min-width:0;transition:transform .2s,border-color .2s,box-shadow .2s}
 .kp-session-card:hover{transform:translateY(-3px);border-color:var(--accent);box-shadow:0 12px 32px rgba(20,20,40,.07)}
 .kp-session-top,.kp-session-bottom{display:flex;align-items:center;justify-content:space-between;gap:10px}
-.kp-tag{font-size:11px;font-weight:750;letter-spacing:.02em;padding:5px 10px;border-radius:99px;background:var(--soft-accent);color:var(--accent)}
+.kp-tag{font-size:11px;font-weight:750;letter-spacing:.02em;padding:5px 10px;border-radius:99px;background:var(--soft);color:var(--accent)}
 .kp-tag.neutral{background:var(--bg);color:var(--muted)}
 .kp-session-card h3{font-size:18px;line-height:1.3;letter-spacing:-.35px;margin:0;overflow-wrap:anywhere}
 .kp-session-details{display:grid;gap:8px;font-size:13px;color:var(--muted)}
@@ -1558,7 +1470,6 @@ textarea::placeholder {
 </style>
 
 
-<!-- Kuppiya premium UI assets -->
 <link rel="stylesheet" href="<?= e(url('assets/css/ulearn-community-phase4.css?v=1')) ?>">
 <link rel="stylesheet" href="<?= e(url('assets/css/ulearn-kuppiya-premium.css?v=3-20261110')) ?>">
 <script defer src="<?= e(url('assets/js/ulearn-kuppiya-premium.js?v=3-20261110')) ?>"></script>
@@ -1569,41 +1480,27 @@ textarea::placeholder {
 
 <div class="layout">
 
-<aside class="sidebar" id="studentSidebar">
+<aside class="sidebar">
 
-<a class="brand" href="<?= e(url('dashboard/index.php')) ?>">
-    <img class="kp-nsbm-logo" src="<?= e(url('assets/images/nsbm-shield-only.png')) ?>" alt="NSBM shield" width="42" height="47" decoding="async"><span class="kp-wordmark">uLearn<span>.</span></span>
-</a>
+<?php require __DIR__ . '/../includes/brand-logo.php'; ?>
 
-<button type="button" class="kp-mobile-nav-toggle" id="kpMobileNavToggle" aria-expanded="false" aria-controls="kpSidebarNav">☰ <span>Workspace menu</span></button>
-<div class="nav-label">YOUR WORKSPACE</div>
-<nav class="nav" id="kpSidebarNav" aria-label="Student navigation">
+<button type="button" class="kp-mobile-nav-toggle" id="kpMobileNavToggle" aria-expanded="false" aria-controls="kpSidebarNav">☰ <span>Workspace menu</span></button><div class="nav-label">YOUR WORKSPACE</div>
 
-    <div class="nav ul-nav">
-        <a href="<?= e(url('dashboard/index.php')) ?>"><svg class="ul-nav-icon" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="9" rx="1"/><rect x="14" y="3" width="7" height="5" rx="1"/><rect x="14" y="12" width="7" height="9" rx="1"/><rect x="3" y="16" width="7" height="5" rx="1"/></svg><span>Overview</span></a>
-        <a href="<?= e(url('dashboard/index.php#modules')) ?>"><svg class="ul-nav-icon" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 7v14M3 18V4a1 1 0 0 1 1-1h5a3 3 0 0 1 3 3 3 3 0 0 1 3-3h5a1 1 0 0 1 1 1v14h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z"/></svg><span>My Modules</span></a>
-        <a href="<?= e(url('dashboard/explore.php')) ?>"><svg class="ul-nav-icon" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="m16 8-2 6-6 2 2-6z"/></svg><span>Explore & Enroll</span></a>
-        <a href="<?= e(url('dashboard/notes-library.php')) ?>"><svg class="ul-nav-icon" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="8" y="7" width="12" height="14" rx="2"/><path d="M16 7V5a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h2"/></svg><span>Notes Library</span></a>
-        <a href="<?= e(url('dashboard/notes.php')) ?>"><svg class="ul-nav-icon" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V8m-4 4 4-4 4 4M4 17a5 5 0 0 1 1-9 7 7 0 0 1 13 0 5 5 0 0 1 2 9"/></svg><span>Upload Notes</span></a>
-        <a href="<?= e(url('dashboard/quiz-history.php')) ?>"><svg class="ul-nav-icon" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-7M3 3v6h6M12 7v5l3 2"/></svg><span>Quiz History</span></a>
-        <a href="<?= e(url('dashboard/learning-insights.php')) ?>"><svg class="ul-nav-icon" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="m3 17 6-6 4 4 8-8M15 7h6v6"/></svg><span>Learning Insights</span></a>
-        <a href="<?= e(url('dashboard/analytics.php')) ?>"><svg class="ul-nav-icon" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20V12h4v8M10 20V4h4v16M16 20v-9h4v9M2 20h20"/></svg><span>Performance Analytics</span></a>
-        <a href="<?= e(url('dashboard/topic-analysis.php')) ?>"><svg class="ul-nav-icon" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1"/></svg><span>Topic Weaknesses</span></a>
-        <a href="<?= e(url('dashboard/ai-study.php')) ?>"><svg class="ul-nav-icon" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="m12 3 1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8zM19 17l.7 1.3L21 19l-1.3.7L19 21l-.7-1.3L17 19l1.3-.7z"/></svg><span>AI Study Assistant</span></a>
-        <a href="<?= e(url('dashboard/consultations.php')) ?>"><svg class="ul-nav-icon" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M20 11V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v10l4-3h11a2 2 0 0 0 2-1zM9 16v3a2 2 0 0 0 2 2h8l3 2v-9"/></svg><span>Consultations</span></a>
-        <a class="active" href="<?= e($base) ?>"><svg class="ul-nav-icon" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3"/><path d="M3 20v-2a6 6 0 0 1 12 0v2M17 5a3 3 0 0 1 0 6M17 15a5 5 0 0 1 4 5"/></svg><span>Kuppiya Sessions</span></a>
-        <a href="<?= e(url('dashboard/leaderboard.php')) ?>"><svg class="ul-nav-icon" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M7 4h10v7a5 5 0 0 1-10 0zM7 6H4v3a4 4 0 0 0 4 4m9-7h3v3a4 4 0 0 1-4 4M12 16v4m-4 1h8"/></svg><span>Leaderboard</span></a>
-        <a href="<?= e(url('dashboard/notifications.php')) ?>"><svg class="ul-nav-icon" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4"/></svg><span>Notifications</span></a>
-        <a href="<?= e(url('dashboard/profile.php')) ?>"><svg class="ul-nav-icon" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M4 17h16"/><circle cx="8" cy="7" r="2"/><circle cx="16" cy="17" r="2"/></svg><span>My Profile & Settings</span></a>
-    </div>
+<nav class="nav" id="kpSidebarNav">
+
+<a href="<?= e(url('dashboard/index.php')) ?>">◫ Overview</a>
+
+<a href="<?= e(url('dashboard/index.php')) ?>#modules">▤ My Modules</a>
+
+<a href="<?= e(url('dashboard/explore.php')) ?>">⊕ Explore &amp; Enroll</a>
+
+<a href="<?= e(url('dashboard/quizzes.php')) ?>">◇ Quiz Arena</a>
+
+<a href="<?= e(url('dashboard/consultations.php')) ?>">◎ Consultations</a>
+
+<a class="active" href="<?= e($base) ?>">♧ Kuppiya Sessions</a>
+
 </nav>
-
-<div class="sidebar-bottom">
-    <small>Signed in as</small>
-    <strong><?= e((string)$user['full_name']) ?></strong>
-    <small><?= e((string)($user['email'] ?? '')) ?></small>
-    <small style="display:block;margin-top:12px"><?= $notePoints ?> contribution points</small>
-</div>
 
 </aside>
 
@@ -1616,28 +1513,18 @@ textarea::placeholder {
 
 <div class="right">
 
-<a class="notification-bell" href="<?= e(url('dashboard/notifications.php')) ?>"
-   aria-label="Notifications: <?= $unreadNotifications ?> unread"
-   title="<?= $unreadNotifications ?> unread notifications">
-    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9"/><path d="M10 21h4"/></svg>
-    <?php if ($unreadNotifications > 0): ?>
-        <span class="notification-count" aria-hidden="true"><?= $unreadNotifications > 99 ? '99+' : $unreadNotifications ?></span>
-    <?php endif; ?>
-</a>
-<button id="themeButton" class="theme-button" type="button" aria-label="Toggle theme" title="Toggle theme">☾</button>
+<button
+    id="themeButton"
+    class="theme-button"
+    type="button"
+    
+    aria-label="Toggle theme">☾</button>
 
 <a class="avatar"
    href="<?= e(url('dashboard/profile.php')) ?>"
    title="My Profile">
     <?= e($initial) ?>
 </a>
-
-<form method="post" action="<?= e(url('auth/logout.php')) ?>" style="margin:0">
-    <input type="hidden" name="csrf" value="<?= e(csrf()) ?>">
-    <button type="submit" class="logout">
-        Log out ↗
-    </button>
-</form>
 
 </div>
 

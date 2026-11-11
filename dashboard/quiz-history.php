@@ -97,7 +97,7 @@ function historyScore($value): string {
 <div class="qh-progress" aria-hidden="true"></div><div class="qh-page-wipe" aria-hidden="true"></div>
 <main class="wrap">
 <header class="top qh-top">
-    <a class="qh-brand" href="index.php" aria-label="ULearn Dashboard"><img src="../assets/images/nsbm-shield-only.png" width="39" height="44" alt=""><span><b>u</b>Learn<i>.</i></span></a>
+    <?php require __DIR__ . '/../includes/brand-logo.php'; ?>
     <nav class="qh-topnav" aria-label="Main navigation"><a class="button" href="quizzes.php">✦ Quiz Arena</a><a class="button" href="index.php">← Dashboard</a><button type="button" class="button qh-theme" id="qh-theme" aria-label="Toggle dark mode"><span id="qh-theme-icon">☾</span> <span id="qh-theme-text">Dark mode</span></button></nav>
 </header>
 <?php if ($error !== ''): ?><div class="error" role="alert"><?= e($error) ?></div><?php endif; ?>
