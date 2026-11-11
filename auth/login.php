@@ -7,6 +7,11 @@ require_once __DIR__ . '/../config/bootstrap.php';
 |--------------------------------------------------------------------------
 | U LEARN - ROLE BASED LOGIN
 |--------------------------------------------------------------------------
+| student    -> Student Dashboard
+| lecturer   -> Lecturer Dashboard
+| admin      -> Admin Dashboard
+| main_admin -> Admin Dashboard
+|--------------------------------------------------------------------------
 */
 
 function loginDestination(string $role): string
@@ -25,12 +30,15 @@ function loginDestination(string $role): string
     }
 }
 
-// Already logged in? Send user to correct dashboard.
+// Already logged in? Send user to the correct dashboard.
 $currentUser = me();
 
 if ($currentUser) {
     go(loginDestination((string)$currentUser['role']));
 }
+
+$loggedOut = !empty($_SESSION['auth_logged_out']);
+unset($_SESSION['auth_logged_out']);
 
 $error = '';
 $email = '';
@@ -58,8 +66,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 id,
                 password_hash,
                 email_verified_at,
-                account_status,
-                session_version,
+                account_status, session_version,
                 role
              FROM users
              WHERE email = ? OR username = ?
@@ -81,9 +88,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $error = 'Invalid email or password.';
 
         } elseif ($user['account_status'] === 'suspended') {
-
             $error = 'This account is suspended. Contact the administrator.';
-
         } elseif (empty($user['email_verified_at'])) {
 
             $error = 'Please verify your email before logging in.';
@@ -115,8 +120,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 session_regenerate_id(true);
 
                 $_SESSION['uid'] = (int)$user['id'];
-                $_SESSION['session_version'] =
-                    (int)$user['session_version'];
+                $_SESSION['session_version'] = (int)$user['session_version'];
 
                 unset($_SESSION['attempts']['login']);
 
@@ -133,60 +137,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 ob_start();
 ?>
 
-<style>
-.password-wrapper {
-    position: relative;
-    width: 100%;
-}
-
-.password-wrapper input {
-    width: 100%;
-    padding-right: 48px !important;
-    box-sizing: border-box;
-}
-
-.password-toggle {
-    position: absolute;
-    right: 12px;
-    top: 50%;
-    transform: translateY(-50%);
-    width: 30px;
-    height: 30px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 0;
-    border: none;
-    background: transparent;
-    color: #888;
-    cursor: pointer;
-    z-index: 2;
-}
-
-.password-toggle:hover {
-    color: #555;
-}
-
-.password-toggle svg {
-    width: 19px;
-    height: 19px;
-    stroke: currentColor;
-    fill: none;
-    stroke-width: 2;
-    stroke-linecap: round;
-    stroke-linejoin: round;
-}
-
-.password-toggle svg[hidden] {
-    display: none !important;
-}
-</style>
-
 <h2>Welcome back</h2>
 
 <p class="sub">
     Log in to continue your U Learn journey.
 </p>
+
+<?php if ($loggedOut): ?>
+    <div class="message success" role="status">You’re logged out. See you again soon.</div>
+<?php endif; ?>
 
 <?php if ($error): ?>
 
@@ -215,7 +174,7 @@ ob_start();
             id="email"
             name="email"
             value="<?= e($email) ?>"
-            autocomplete="username"
+            autocomplete="email"
             required
         >
 
@@ -227,42 +186,13 @@ ob_start();
             Password
         </label>
 
-        <div class="password-wrapper">
-
-            <input
-                type="password"
-                id="password"
-                name="password"
-                autocomplete="current-password"
-                required
-            >
-
-            <button
-                type="button"
-                class="password-toggle"
-                id="togglePassword"
-                aria-label="Show password"
-                aria-pressed="false"
-            >
-
-                <!-- Eye icon -->
-                <svg class="icon-eye" viewBox="0 0 24 24" aria-hidden="true">
-                    <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z"/>
-                    <circle cx="12" cy="12" r="3"/>
-                </svg>
-
-                <!-- Eye slash icon -->
-                <svg class="icon-eye-off" viewBox="0 0 24 24"
-                     aria-hidden="true" hidden>
-                    <path d="M3 3l18 18"/>
-                    <path d="M10.6 10.6a2 2 0 0 0 2.8 2.8"/>
-                    <path d="M9.9 5.2A10.5 10.5 0 0 1 12 5c6.5 0 10 7 10 7a16 16 0 0 1-3.1 3.9"/>
-                    <path d="M6.2 6.2C3.5 8 2 12 2 12s3.5 7 10 7a10 10 0 0 0 3-.5"/>
-                </svg>
-
-            </button>
-
-        </div>
+        <input
+            type="password"
+            id="password"
+            name="password"
+            autocomplete="current-password"
+            required
+        >
 
     </div>
 
@@ -278,39 +208,6 @@ ob_start();
         Create an account
     </a>
 </p>
-
-<script>
-document.addEventListener('DOMContentLoaded', function () {
-
-    const password = document.getElementById('password');
-    const toggle = document.getElementById('togglePassword');
-
-    const eye = toggle.querySelector('.icon-eye');
-    const eyeOff = toggle.querySelector('.icon-eye-off');
-
-    toggle.addEventListener('click', function () {
-
-        const isHidden = password.type === 'password';
-
-        password.type = isHidden ? 'text' : 'password';
-
-        eye.hidden = isHidden;
-        eyeOff.hidden = !isHidden;
-
-        toggle.setAttribute(
-            'aria-label',
-            isHidden ? 'Hide password' : 'Show password'
-        );
-
-        toggle.setAttribute(
-            'aria-pressed',
-            isHidden ? 'true' : 'false'
-        );
-
-    });
-
-});
-</script>
 
 <?php
 $content = ob_get_clean();
