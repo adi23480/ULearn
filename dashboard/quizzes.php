@@ -827,7 +827,7 @@ body{background:var(--quiz-bg);color:var(--quiz-text)}.quiz-wrap{max-width:1080p
 
 
 
-<script src="<?= htmlspecialchars(url('assets/js/theme-global.js?v=20261107-2'), ENT_QUOTES, 'UTF-8') ?>"></script>
+<script src="<?= htmlspecialchars(url('assets/js/theme-global.js?v=20261111b'), ENT_QUOTES, 'UTF-8') ?>"></script>
 <link rel="stylesheet" href="<?= e(url('assets/css/ulearn-design-system.css?v=1')) ?>">
 <script defer src="<?= e(url('assets/js/ulearn-motion.js?v=1')) ?>"></script>
 <link rel="stylesheet" href="<?= e(url('assets/css/ulearn-student-workspaces.css?v=3')) ?>">

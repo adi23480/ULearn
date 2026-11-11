@@ -1,0 +1,25 @@
+/* ULearn unified palette, safe overlay for existing theme variables. */
+html[data-ulearn-palette="purple"] {color-scheme:light!important;--accent:#7053bb;--accent-light:#eee8fb;--soft:#f0ebfb;--bg:#f8f7fd;--card:#fff;--surface:#fff;--border:#e8e2f2;--text:#29243c;--muted:#706a81;--ul-identity-bg:linear-gradient(110deg,#352267,#58398c 60%,#7755aa)!important;}
+html[data-ulearn-palette="green"][data-theme="light"] {color-scheme:light!important;--accent:#087b60;--accent-light:#e0f6ed;--soft:#e7f7f0;--bg:#f6faf8;--card:#fff;--surface:#fff;--border:#dbece5;--text:#172f29;--muted:#607970;--ul-identity-bg:linear-gradient(110deg,#006445,#006b65 65%,#00758c)!important;}
+html[data-ulearn-palette="green"][data-theme="dark"] {color-scheme:dark!important;--accent:#43d5a1;--accent-light:#173f35;--soft:#173b37;--bg:#0b211e;--card:#12312b;--surface:#12312b;--border:#294940;--text:#effaf5;--muted:#a8c4b9;--ul-identity-bg:linear-gradient(110deg,#064536,#075a4c 58%,#087166)!important;}
+/* Keep the logo legible in both palettes. */
+html[data-ulearn-palette="purple"] .ulearn-shared-brand .ulearn-brand-word,html[data-ulearn-palette="green"][data-theme="light"] .ulearn-shared-brand .ulearn-brand-word{color:#1d2c35!important}
+html[data-ulearn-palette="green"][data-theme="dark"] .ulearn-shared-brand .ulearn-brand-word{color:#f7fffc!important}
+/* Theme choices in Profile use the actual three palette previews. */
+.theme-art-light{background:#f3faf6!important;color:#b6e4d0!important}.theme-art-light i{background:#087b60!important}
+.theme-art-dark{background:#0b211e!important;color:#245447!important}.theme-art-dark i{background:#174b3e!important}
+.theme-art-system{background:#f4f0fd!important;color:#d6c7f5!important}.theme-art-system i{background:#7053bb!important}
+
+/* Step 4A: explicit purple light palette takes priority over legacy page themes. */
+html[data-ulearn-preference="system"] { color-scheme:light!important; --bg:#f8f7fd; --card:#fff; --surface:#fff; --input:#fff; --text:#29243c; --muted:#706a81; --border:#e8e2f2; --accent:#7053bb; --accent-light:#eee8fb; --soft:#f0ebfb; --ul-identity-bg:linear-gradient(110deg,#352267,#58398c 60%,#7755aa)!important; }
+html[data-ulearn-preference="system"] body { color-scheme:light; }
+html[data-ulearn-preference="system"] .ul-student-identity-hero.ul-welcome { background:linear-gradient(110deg,#352267,#58398c 60%,#7755aa)!important; }
+html[data-ulearn-preference="light"] .ul-student-identity-hero.ul-welcome { background:linear-gradient(110deg,#006445,#006b65 65%,#00758c)!important; }
+html[data-ulearn-preference="dark"] .ul-student-identity-hero.ul-welcome { background:linear-gradient(110deg,#064536,#075a4c 58%,#087166)!important; }
+
+/* 4B: Normalize page-specific quiz tokens to the active palette. */
+html[data-ulearn-palette="purple"] {--quiz-bg:#f8f7fd;--quiz-card:#fff;--quiz-text:#29243c;--quiz-muted:#706a81;--quiz-border:#e8e2f2;--quiz-accent:#7053bb;--quiz-soft:#f0ebfb}
+html[data-ulearn-preference="light"] {--quiz-bg:#f6faf8;--quiz-card:#fff;--quiz-text:#172f29;--quiz-muted:#607970;--quiz-border:#dbece5;--quiz-accent:#087b60;--quiz-soft:#e7f7f0}
+html[data-ulearn-preference="dark"] {--quiz-bg:#0b211e;--quiz-card:#12312b;--quiz-text:#effaf5;--quiz-muted:#a8c4b9;--quiz-border:#294940;--quiz-accent:#43d5a1;--quiz-soft:#173b37}
+/* Legacy pages that use --surface instead of --card. */
+html[data-ulearn-preference="system"] body,html[data-ulearn-preference="light"] body,html[data-ulearn-preference="dark"] body {background:var(--bg);color:var(--text)}

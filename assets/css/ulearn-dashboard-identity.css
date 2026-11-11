@@ -1,0 +1,23 @@
+/* Step 3: dashboard header only. Does not alter dashboard logic or global themes. */
+:root { --ul-identity-bg:linear-gradient(110deg,#006445 0%,#006b65 65%,#00758c 100%); --ul-identity-text:#fff; --ul-identity-muted:#d5f8e9; --ul-identity-pill:rgba(255,255,255,.14); }
+/* Existing dark/system-resolved theme receives the purple treatment. */
+html[data-theme="dark"] { --ul-identity-bg:linear-gradient(110deg,#064536 0%,#075a4c 58%,#087166 100%); --ul-identity-muted:#d5f8e9; --ul-identity-pill:rgba(255,255,255,.13); }
+/* Future explicit purple light-mode preference can set data-ulearn-palette="purple" on html. */
+html[data-ulearn-palette="purple"] { --ul-identity-bg:linear-gradient(110deg,#352267 0%,#58398c 60%,#7755aa 100%); --ul-identity-muted:#f0e8ff; --ul-identity-pill:rgba(255,255,255,.15); }
+.ul-student-identity-hero.ul-welcome{box-sizing:border-box;position:relative;isolation:isolate;overflow:hidden;display:flex;align-items:center;justify-content:space-between;gap:28px;min-height:280px;padding:38px 44px!important;border-radius:24px!important;background:var(--ul-identity-bg)!important;color:var(--ul-identity-text)!important;box-shadow:0 12px 30px rgba(9,47,42,.12);transition:background .3s ease,box-shadow .3s ease}
+.ul-student-identity-hero::before,.ul-student-identity-hero::after{content:"";position:absolute;pointer-events:none;z-index:-1;border-radius:50%;background:rgba(255,255,255,.075)}
+.ul-student-identity-hero::before{width:320px;height:320px;right:-70px;top:-165px}
+.ul-student-identity-hero::after{width:230px;height:230px;right:120px;bottom:-155px}
+.ul-identity-hero-content{position:relative;z-index:1;min-width:0;max-width:calc(100% - 170px)}
+.ul-student-identity-hero .ul-identity-greeting{margin:0 0 8px;color:var(--ul-identity-muted)!important;font-size:clamp(16px,1.8vw,23px);font-weight:600}
+.ul-student-identity-hero h1{margin:0 0 7px!important;color:#fff!important;font-size:clamp(26px,2.9vw,42px)!important;line-height:1.16!important;letter-spacing:-.025em;overflow-wrap:anywhere}
+.ul-student-identity-hero .ul-identity-student-number{margin:0 0 19px;color:var(--ul-identity-muted)!important;font-size:14px;font-weight:600}
+.ul-student-identity-hero .ul-identity-degree{margin:0 0 17px;color:#fff!important;font-size:clamp(14px,1.4vw,18px);font-weight:600;line-height:1.5}
+.ul-identity-pills{display:flex;flex-wrap:wrap;gap:9px}
+.ul-identity-pill{display:inline-flex;align-items:center;max-width:100%;padding:8px 13px;border-radius:999px;background:var(--ul-identity-pill);border:1px solid rgba(255,255,255,.15);color:#fff!important;font-size:13px;font-weight:650;line-height:1.3}
+.ul-identity-portrait{flex:0 0 144px;width:144px;height:144px;border:6px solid rgba(255,255,255,.45);border-radius:50%;display:grid;place-items:center;background:rgba(255,255,255,.18);color:#fff!important;text-decoration:none;box-shadow:0 12px 35px rgba(0,0,0,.1);z-index:1;transition:transform .2s ease}
+.ul-identity-portrait:hover{transform:scale(1.035)}
+.ul-identity-portrait span{font-size:56px;font-weight:800;line-height:1}
+@media(max-width:720px){.ul-student-identity-hero.ul-welcome{padding:28px 24px!important;min-height:235px;gap:14px}.ul-identity-hero-content{max-width:calc(100% - 90px)}.ul-identity-portrait{width:78px;height:78px;flex-basis:78px;border-width:4px}.ul-identity-portrait span{font-size:34px}}
+@media(max-width:460px){.ul-student-identity-hero.ul-welcome{align-items:flex-start;flex-direction:column-reverse}.ul-identity-hero-content{max-width:100%}.ul-identity-portrait{align-self:flex-end}}
+@media(prefers-reduced-motion:reduce){.ul-student-identity-hero,.ul-identity-portrait{transition:none}}

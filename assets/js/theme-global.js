@@ -7,6 +7,7 @@
     const key = 'ulearn-theme-preference';
     const legacyKey = 'ulearn-theme';
     const api = '/ulearn/theme-preference.php';
+    // System Default is ULearn Purple Light, not the OS appearance.
     const media = window.matchMedia('(prefers-color-scheme: dark)');
 
     const valid = value =>
@@ -33,9 +34,7 @@
     let pendingSave = false;
 
     function resolved() {
-        return preference === 'system'
-            ? (media.matches ? 'dark' : 'light')
-            : preference;
+        return preference === 'dark' ? 'dark' : 'light';
     }
 
     function updateIcons(theme) {
@@ -77,6 +76,8 @@
 
         applying = true;
         root.dataset.theme = theme;
+        root.dataset.ulearnPalette = preference === 'system' ? 'purple' : 'green';
+        root.dataset.ulearnPreference = preference;
         root.style.colorScheme = theme;
 
         updateIcons(theme);
@@ -157,6 +158,15 @@
         }
     }
 
+    // Shared palette stylesheet, independent of existing page-specific CSS.
+    if (!document.getElementById('ulearn-palette-styles')) {
+        const sheet = document.createElement('link');
+        sheet.id = 'ulearn-palette-styles';
+        sheet.rel = 'stylesheet';
+        sheet.href = '/ulearn/assets/css/ulearn-palette-unified.css?v=20261111b';
+        document.head.appendChild(sheet);
+    }
+
     apply();
     loadPreference();
 
@@ -176,39 +186,17 @@
 
         if (!button) return;
 
-        const next = resolved() === 'dark' ? 'light' : 'dark';
+        const next = preference === 'dark' ? 'light' : 'dark';
 
         queueMicrotask(() => choose(next));
     }, true);
 
-    document.addEventListener('change', event => {
-        const target = event.target;
-
-        if (
-            target instanceof HTMLInputElement &&
-            target.matches('input[name="theme"]') &&
-            valid(target.value)
-        ) {
-            choose(target.value);
-        }
-    }, true);
-
-    document.addEventListener('submit', event => {
-        const form = event.target;
-
-        if (!(form instanceof HTMLFormElement)) return;
-
-        const selected = form.querySelector(
-            'input[name="theme"]:checked'
-        );
-
-        if (selected && valid(selected.value)) {
-            choose(selected.value);
-        }
-    }, true);
+    // Profile theme radios are saved by the existing PHP form POST.
+    // Do not also send an asynchronous theme write: it can arrive after
+    // the form POST and overwrite the user's final selection.
 
     const observer = new MutationObserver(() => {
-        if (!applying && root.dataset.theme !== resolved()) {
+        if (!applying && (root.dataset.theme !== resolved() || root.dataset.ulearnPalette !== (preference === 'system' ? 'purple' : 'green'))) {
             apply();
         }
     });

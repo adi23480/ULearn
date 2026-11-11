@@ -1,8 +1,18 @@
 <?php
-// All site logos use this single image. Replace assets/images/ulearn-logo.png.
-$ulearnLogoFile = __DIR__ . '/../assets/images/ulearn-logo.png';
-$ulearnLogoVersion = is_file($ulearnLogoFile) ? (string) filemtime($ulearnLogoFile) : '1';
+// Shared presentational brand: the original two-slash mark + "ulearn.".
+// No authentication, routing, database, or JavaScript changes.
 ?>
-<div class="ulearn-shared-brand" role="img" aria-label="ULearn" style="display:block!important;position:relative!important;width:180px!important;max-width:100%!important;height:48px!important;flex-shrink:0!important;overflow:hidden!important;border-radius:10px!important;background:#03131f!important;margin:0 0 22px!important;padding:0!important;cursor:default!important;line-height:0!important">
-<img src="<?= e(url('assets/images/ulearn-logo.png')) ?>?v=<?= e($ulearnLogoVersion) ?>" alt="" aria-hidden="true" decoding="async" style="display:block!important;position:absolute!important;left:50%!important;top:50%!important;width:200%!important;max-width:none!important;height:auto!important;max-height:none!important;transform:translate(-50%,-50%)!important;object-fit:contain!important;border:0!important;border-radius:0!important;margin:0!important;padding:0!important;filter:none!important">
+<style>
+.ulearn-shared-brand .ulearn-brand-word { color: #17333d !important; }
+html[data-theme="dark"] .ulearn-shared-brand .ulearn-brand-word { color: #f7fffc !important; }
+.ulearn-shared-brand .ulearn-brand-dot { color: #00b981 !important; }
+</style>
+<div class="ulearn-shared-brand" role="img" aria-label="//ulearn." style="display:inline-flex;align-items:center;gap:10px;max-width:100%;min-height:46px;margin:0 0 22px;line-height:1;vertical-align:middle;flex-shrink:0;">
+  <span aria-hidden="true" style="display:grid;place-items:center;width:43px;height:43px;flex:0 0 43px;border-radius:13px;background:linear-gradient(145deg,#8170ff,#5744d5);box-shadow:0 8px 20px rgba(81,66,197,.18);">
+    <svg viewBox="0 0 64 64" width="30" height="30" fill="none" aria-hidden="true" focusable="false" style="display:block;">
+      <path d="M17 43 33 19" stroke="white" stroke-width="6" stroke-linecap="round"/>
+      <path d="M31 43 47 19" stroke="white" stroke-width="6" stroke-linecap="round"/>
+    </svg>
+  </span>
+  <span aria-hidden="true" class="ulearn-brand-word" style="font-family:Inter,ui-sans-serif,system-ui,-apple-system,'Segoe UI',sans-serif;font-size:27px;font-weight:750;letter-spacing:-1.2px;white-space:nowrap;">ulearn<span class="ulearn-brand-dot">.</span></span>
 </div>
