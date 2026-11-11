@@ -190,7 +190,7 @@ body{font-family:Inter,ui-sans-serif,system-ui,-apple-system,'Segoe UI',sans-ser
 @media(max-width:650px){.cards{grid-template-columns:1fr}.filters{grid-template-columns:1fr}.shell{padding:18px 15px 55px}.detailhead{flex-direction:column}.viewer{min-height:380px}.hero{align-items:stretch;flex-direction:column}.rating-form{align-items:stretch;flex-direction:column;gap:14px}.rating-submit{width:100%}}
 @media(prefers-reduced-motion:reduce){.btn,.card{transition:none!important}.btn:hover,.card:hover{transform:none}}
 </style>
-<script src="<?= htmlspecialchars(url('assets/js/theme-global.js?v=20261107-2'), ENT_QUOTES, 'UTF-8') ?>"></script>
+<script src="<?= htmlspecialchars(url('assets/js/theme-global.js?v=20261111b'), ENT_QUOTES, 'UTF-8') ?>"></script>
 <link rel="stylesheet" href="<?= e(url('assets/css/ulearn-design-system.css?v=1')) ?>">
 <script defer src="<?= e(url('assets/js/ulearn-motion.js?v=1')) ?>"></script>
 <link rel="stylesheet" href="<?= e(url('assets/css/ulearn-student-workspaces.css?v=3')) ?>">

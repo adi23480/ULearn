@@ -120,11 +120,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
                 unset($_SESSION['attempts']['login']);
 
-                go(
-                    loginDestination(
-                        (string)$user['role']
-                    )
-                );
+                // Show the welcome sequence only after verified credentials.
+                // The intro page consumes this one-time session flag.
+                $_SESSION['ulearn_post_login_intro'] = true;
+                go('auth/welcome.php');
             }
         }
     }

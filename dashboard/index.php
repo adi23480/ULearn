@@ -1240,6 +1240,7 @@ $initial = strtoupper(substr($firstName, 0, 1));
 <script defer src="<?= e(url('assets/js/ulearn-dashboard-v5.js?v=511')) ?>"></script>
 <link rel="stylesheet" href="<?= e(url('assets/css/ulearn-dashboard-v51.css?v=511')) ?>">
 <link rel="stylesheet" href="<?= e(url('assets/css/ulearn-dashboard-v52.css?v=20261110')) ?>">
+<link rel="stylesheet" href="<?= e(url('assets/css/ulearn-dashboard-identity.css?v=1')) ?>">
 <script defer src="<?= e(url('assets/js/ulearn-dashboard-v52.js?v=20261110')) ?>"></script>
 </head>
 
@@ -1368,28 +1369,22 @@ $initial = strtoupper(substr($firstName, 0, 1));
 
         </header>
 
-        <section class="ul-welcome ul-hero-v2" aria-label="Welcome">
-            <div class="ul-hero-content">
-                <div class="ul-hero-kicker"><span class="ul-live-dot" aria-hidden="true"></span> YOUR PERSONAL LEARNING SPACE</div>
-                <p class="ul-hero-pretitle">A better way to learn, every day.</p>
-                <h1>Welcome back,<br><span><?= e($firstName) ?>.</span></h1>
-                <a class="ul52-student-chip" href="<?= e(url('dashboard/profile.php')) ?>" aria-label="View student profile">
-                    <span class="ul52-student-avatar"><?= e($initial) ?></span>
-                    <span><b><?= e($firstName) ?></b><small>ID: <?= e((string)($u['student_number'] ?? $userId)) ?></small></span>
-                </a>
-                <p class="lead">Your academic journey, learning resources and next steps — all in one place.</p>
-                <div class="ul-quick-actions">
-                    <a class="ul-quick primary" href="<?= e(url('dashboard/explore.php')) ?>">Explore modules <span aria-hidden="true">→</span></a>
-                    <a class="ul-quick" href="<?= e(url('dashboard/quiz-history.php')) ?>">Quiz history <span aria-hidden="true">→</span></a>
-                </div>
+        <section class="ul-welcome ul-student-identity-hero" aria-label="Student overview">
+            <div class="ul-identity-hero-content">
+                <p class="ul-identity-greeting">Welcome back,</p>
+                <h1><?= e($u['full_name']) ?></h1>
+                <p class="ul-identity-student-number">Student ID: <?= e((string)($u['student_number'] ?? $userId)) ?></p>
+                <?php if ($profile): ?>
+                    <p class="ul-identity-degree"><span aria-hidden="true">&#127891;</span> <?= e((string)$profile['degree_name']) ?><?php if (!empty($profile['batch_code'])): ?> &middot; <?= e((string)$profile['batch_code']) ?> Intake<?php endif; ?></p>
+                    <div class="ul-identity-pills">
+                        <?php if (!empty($profile['university_name'])): ?><span class="ul-identity-pill"><?= e((string)$profile['university_name']) ?></span><?php endif; ?>
+                        <span class="ul-identity-pill">Year <?= (int)($profile['current_year'] ?? 1) ?> &middot; Semester <?= (int)($profile['current_semester'] ?? 1) ?></span>
+                    </div>
+                <?php else: ?>
+                    <p class="ul-identity-degree">Your academic learning space</p>
+                <?php endif; ?>
             </div>
-            <div class="ul-hero-visual ul52-carousel" role="region" aria-label="NSBM campus photo slideshow">
-                <div class="ul52-photo is-active" style="background-image:url('<?= e(url('assets/images/ulearn-campus-hero.jpg')) ?>')"></div>
-                <div class="ul52-photo" style="background-image:url('https://library.nsbm.ac.lk/NSBM-Library/nsbm-pics/landscape-picture-of-the-library.jpg')"></div>
-                <div class="ul52-photo" style="background-image:url('https://upload.wikimedia.org/wikipedia/commons/9/92/NSBM_Green_University_-_Hostel.jpg')"></div>
-                <div class="ul-hero-visual-label">DISCOVER · PRACTICE · GROW</div>
-                <div class="ul52-dots" aria-label="Campus slideshow"><button class="is-active" type="button" data-ul52-slide="0" aria-label="Photo 1"></button><button type="button" data-ul52-slide="1" aria-label="Photo 2"></button><button type="button" data-ul52-slide="2" aria-label="Photo 3"></button></div>
-            </div>
+            <a class="ul-identity-portrait" href="<?= e(url('dashboard/profile.php')) ?>" aria-label="View my profile"><span><?= e($initial) ?></span></a>
         </section>
 
         <section class="ul-overview-grid" aria-label="Learning overview">
