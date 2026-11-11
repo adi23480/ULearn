@@ -141,7 +141,7 @@ html{scroll-behavior:smooth}body{line-height:1.5}button,input,select{font:inheri
 <body>
 <div class="layout">
 <aside class="sidebar">
-<a class="brand" href="<?= e(url('lecturer/index.php')) ?>"><svg viewBox="0 0 40 40" aria-hidden="true"><rect width="40" height="40" rx="13" fill="#715ce8"/><path d="M20 9c1.8 6.3 4.7 9.2 11 11-6.3 1.8-9.2 4.7-11 11-1.8-6.3-4.7-9.2-11-11 6.3-1.8 9.2-4.7 11-11Z" fill="white"/></svg><span>ULearn</span></a>
+<?php require __DIR__ . '/../includes/brand-logo.php'; ?>
 <div class="nav-label">Lecturer workspace</div>
 <nav class="nav" aria-label="Lecturer navigation">
 <a href="<?= e(url('lecturer/index.php')) ?>"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>Overview</a>

@@ -44,6 +44,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $scope=$pdo->prepare('SELECT COUNT(*) FROM academic_degrees d JOIN academic_degree_intakes adi ON adi.degree_id=d.id JOIN academic_batches b ON b.id=adi.batch_id WHERE d.id=? AND d.awarding_university_id=? AND b.id=? AND adi.is_active=1 AND d.is_active=1 AND b.is_active=1 AND d.duration_years>=?');
             $scope->execute([$degreeId,$universityId,$batchId,$studyYear]);
             if (!(int)$scope->fetchColumn()) throw new RuntimeException('This programme/intake/year combination is unavailable.');
+            // Programme-level invitation does not require a curriculum/module row.
+            // Module assignments are managed separately after lecturer activation.
             if (!filter_var($email, FILTER_VALIDATE_EMAIL)) throw new RuntimeException('Enter a valid email.');
             if (!in_array($title, ['Mr.','Mrs.','Ms.','Dr.','Prof.'], true)) throw new RuntimeException('Invalid title.');
             if (mb_strlen($department)>150 || mb_strlen($designation)>150) throw new RuntimeException('Department/designation too long.');
@@ -155,894 +157,98 @@ $activeCount = count(array_filter(
 $universities=$pdo->query('SELECT id,name FROM awarding_universities ORDER BY name')->fetchAll(PDO::FETCH_ASSOC);
 $degrees=$pdo->query('SELECT id,name,awarding_university_id AS university_id,duration_years FROM academic_degrees WHERE is_active=1 ORDER BY name')->fetchAll(PDO::FETCH_ASSOC);
 $intakes=$pdo->query('SELECT adi.degree_id,adi.batch_id,b.batch_code FROM academic_degree_intakes adi JOIN academic_batches b ON b.id=adi.batch_id WHERE adi.is_active=1 AND b.is_active=1 ORDER BY b.batch_code DESC')->fetchAll(PDO::FETCH_ASSOC);
+// Invitation years are derived from each degree's duration; semesters 1 and 2 are available for each year.
+// Use existing department/designation records where available, plus common starter options.
 $departments=array_values(array_unique(array_merge(['Computing','Engineering','Business','Information Technology'],array_filter($pdo->query("SELECT DISTINCT department FROM lecturer_profiles WHERE department IS NOT NULL AND department<>''")->fetchAll(PDO::FETCH_COLUMN)))));
 $designations=array_values(array_unique(array_merge(['Assistant Lecturer','Lecturer','Senior Lecturer','Visiting Lecturer','Professor'],array_filter($pdo->query("SELECT DISTINCT designation FROM lecturer_profiles WHERE designation IS NOT NULL AND designation<>''")->fetchAll(PDO::FETCH_COLUMN)))));
 sort($departments);sort($designations);
-
-$fullName = (string)($admin['full_name'] ?? 'Administrator');
-$nameParts = preg_split('/\s+/', trim($fullName));
-$firstName = $nameParts[0] ?: 'Administrator';
-$initial = strtoupper(substr($firstName, 0, 1));
-$roleLabel = $admin['role'] === 'main_admin' ? 'Main Administrator' : 'Administrator';
 $theme = (string)($admin['theme'] ?? 'system');
-
-$notificationStmt = $pdo->prepare(
-    "SELECT COUNT(*) FROM notifications WHERE user_id = ? AND is_read = 0"
-);
-$notificationStmt->execute([(int)$admin['id']]);
-$unreadNotifications = (int)$notificationStmt->fetchColumn();
 ?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Manage Lecturers — U Learn</title>
+<title>Manage Lecturers — ULearn</title>
 <script>
-    try {
-        const saved = localStorage.getItem('ulearn-theme') || <?= json_encode($theme, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
-        const theme = saved === 'system'
-            ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')
-            : saved;
-        document.documentElement.dataset.theme = theme;
-        localStorage.setItem('ulearn-theme', theme);
-    } catch (error) {}
+const preferredTheme = <?= json_encode($theme) ?>;
+const savedTheme = localStorage.getItem('ulearn-theme');
+const systemDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+document.documentElement.dataset.theme = ['light','dark'].includes(savedTheme) ? savedTheme : (['light','dark'].includes(preferredTheme) ? preferredTheme : (systemDark ? 'dark' : 'light'));
+function toggleTheme(){const next=document.documentElement.dataset.theme==='dark'?'light':'dark';document.documentElement.dataset.theme=next;localStorage.setItem('ulearn-theme',next);updateThemeButton();}
+function updateThemeButton(){const b=document.getElementById('themeButton');if(b){const dark=document.documentElement.dataset.theme==='dark';b.textContent=dark?'☀':'☾';b.setAttribute('aria-label',dark?'Switch to light mode':'Switch to dark mode');}}
+document.addEventListener('DOMContentLoaded',updateThemeButton);
 </script>
 <style>
-    :root {
-        color-scheme: light;
-        --bg: #f7f8fc;
-        --surface: #ffffff;
-        --surface-alt: #f1f2f8;
-        --text: #171927;
-        --muted: #777b90;
-        --border: #e7e8f0;
-        --accent: #6756e8;
-        --accent-light: #f0edff;
-        --shadow: 0 10px 40px rgba(30,30,60,.04);
-        --green: #087e60;
-        --soft: #e7f7ef;
-    }
-    :root[data-theme="dark"] {
-        color-scheme: dark;
-        --bg: #0c0e16;
-        --surface: #161924;
-        --surface-alt: #202431;
-        --text: #f4f4fa;
-        --muted: #a0a4b6;
-        --border: #2b2e3c;
-        --accent: #a99aff;
-        --accent-light: #292440;
-        --shadow: none;
-        --green: #5ce3b5;
-        --soft: #153d34;
-    }
-    * { box-sizing: border-box; }
-    html { scroll-behavior: smooth; }
-    body {
-        margin: 0;
-        background: var(--bg);
-        color: var(--text);
-        font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif;
-        line-height: 1.6;
-    }
-    a { color: inherit; text-decoration: none; }
-    button, select { font: inherit; }
-    button { cursor: pointer; }
-    
-    .layout {
-        display: grid;
-        grid-template-columns: 250px minmax(0, 1fr);
-        min-height: 100vh;
-    }
-    .sidebar {
-        background: var(--surface);
-        border-right: 1px solid var(--border);
-        padding: 32px 20px;
-        display: flex;
-        flex-direction: column;
-        gap: 40px;
-    }
-    .brand {
-        font-size: 26px;
-        font-weight: 800;
-        letter-spacing: -1.5px;
-        padding-left: 12px;
-    }
-    .brand span { color: var(--accent); }
-    .nav-label, .eyebrow {
-        font-size: 11px;
-        font-weight: 750;
-        letter-spacing: 1.7px;
-        text-transform: uppercase;
-        color: var(--muted);
-    }
-    .nav-label { margin: 0 12px 14px; }
-    .nav { display: grid; gap: 6px; }
-    .nav a {
-        display: flex;
-        align-items: center;
-        gap: 12px;
-        padding: 12px 14px;
-        border-radius: 12px;
-        font-size: 14px;
-        font-weight: 600;
-        transition: background .2s, color .2s;
-    }
-    .nav a:hover { background: var(--surface-alt); }
-    .nav a.active {
-        background: var(--accent-light);
-        color: var(--accent);
-    }
-    .ul-nav-icon {
-        width: 20px;
-        height: 20px;
-        flex-shrink: 0;
-    }
-    .sidebar-bottom {
-        margin-top: auto;
-        border: 1px solid var(--border);
-        border-radius: 16px;
-        padding: 16px;
-        font-size: 13px;
-    }
-    .sidebar-bottom strong {
-        display: block;
-        overflow-wrap: anywhere;
-    }
-    .sidebar-bottom small {
-        color: var(--muted);
-        overflow-wrap: anywhere;
-    }
-    .main {
-        min-width: 0;
-        padding: 34px clamp(20px, 5vw, 76px) 80px;
-    }
-    .topbar {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        gap: 20px;
-        margin-bottom: 40px;
-    }
-    .topbar-right {
-        display: flex;
-        align-items: center;
-        gap: 16px;
-    }
-    .notification-bell {
-        width: 42px; height: 42px; position: relative;
-        display: inline-grid; place-items: center;
-        background: var(--surface); color: var(--text);
-        border: 1px solid var(--border); border-radius: 12px;
-        box-shadow: var(--shadow);
-        transition: transform .18s ease, background .18s ease, border-color .18s ease;
-    }
-    .notification-bell:hover { transform: translateY(-2px); background: var(--accent-light); border-color: var(--accent); }
-    .notification-bell svg { width: 21px; height: 21px; stroke: currentColor; fill: none; stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; }
-    .notification-count {
-        position: absolute; top: -8px; right: -9px;
-        min-width: 20px; height: 20px; padding: 0 5px;
-        display: inline-grid; place-items: center;
-        border-radius: 999px; background: #e34878; color: #fff;
-        border: 2px solid var(--bg); font-size: 10px; font-weight: 800;
-        line-height: 1;
-    }
-    .theme-toggle {
-        border: 1px solid var(--border);
-        background: var(--surface);
-        color: var(--text);
-        border-radius: 12px;
-        width: 42px;
-        height: 42px;
-        display: grid;
-        place-items: center;
-        font-size: 18px;
-        box-shadow: var(--shadow);
-        transition: transform .18s ease, background .18s ease, border-color .18s ease;
-    }
-    .theme-toggle:hover {
-        background: var(--accent-light);
-        border-color: var(--accent);
-        transform: translateY(-2px);
-    }
-    .avatar {
-        width: 40px;
-        height: 40px;
-        border-radius: 50%;
-        background: var(--accent-light);
-        color: var(--accent);
-        display: grid;
-        place-items: center;
-        font-weight: 800;
-        transition: transform .18s ease;
-    }
-    .avatar:hover { transform: translateY(-2px); }
-    .logout {
-        background: transparent;
-        border: 0;
-        color: var(--muted);
-        font-size: 13px;
-        font-weight: 650;
-        cursor: pointer;
-    }
-    .logout:hover { color: var(--text); }
-    h1, h2, h3, p { margin-top: 0; }
-    
-    .hero {
-        border-radius: 24px;
-        padding: 32px;
-        background: linear-gradient(115deg, #063e39, #087d62 70%, #12677b);
-        color: white;
-        margin-bottom: 30px;
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        gap: 20px;
-    }
-    .hero h1 { font-size: clamp(28px, 4vw, 44px); margin: 6px 0; letter-spacing: -1.5px; }
-    .hero p { opacity: .88; margin-bottom: 0; max-width: 600px; }
-    .hero .pill {
-        display: inline-flex;
-        align-items: center;
-        padding: 8px 16px;
-        border-radius: 100px;
-        background: rgba(255, 255, 255, 0.15);
-        backdrop-filter: blur(8px);
-        color: #fff;
-        font-size: 12px;
-        font-weight: 750;
-        white-space: nowrap;
-        border: 1px solid rgba(255, 255, 255, 0.2);
-    }
-    
-    .grid {
-        display: grid;
-        grid-template-columns: minmax(320px, .9fr) minmax(0, 1.2fr);
-        gap: 24px;
-        align-items: start;
-    }
-    .card {
-        background: var(--surface);
-        border: 1px solid var(--border);
-        border-radius: 20px;
-        padding: 28px;
-        box-shadow: var(--shadow);
-    }
-    .form-top {
-        display: flex;
-        align-items: flex-start;
-        gap: 15px;
-        margin-bottom: 20px;
-    }
-    .form-icon {
-        width: 40px;
-        height: 40px;
-        border-radius: 12px;
-        background: var(--accent-light);
-        color: var(--accent);
-        display: grid;
-        place-items: center;
-        flex-shrink: 0;
-    }
-    .form-icon svg { width: 20px; height: 20px; }
-    .card h2 {
-        font-size: 18px;
-        letter-spacing: -.5px;
-        margin: 0 0 4px;
-    }
-    .hint {
-        color: var(--muted);
-        font-size: 13px;
-        margin: 0;
-    }
-    .kicker {
-        display: block;
-        color: var(--accent);
-        font-size: 11px;
-        letter-spacing: 1.5px;
-        font-weight: 750;
-        text-transform: uppercase;
-        margin-bottom: 4px;
-    }
-    .divider {
-        height: 1px;
-        background: var(--border);
-        margin: 20px 0;
-    }
-    .field { margin-top: 16px; }
-    label {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        gap: 8px;
-        color: var(--text);
-        font-size: 12px;
-        font-weight: 750;
-        margin: 0 0 6px;
-    }
-    .optional {
-        color: var(--muted);
-        font-size: 10px;
-        font-weight: 650;
-        text-transform: uppercase;
-    }
-    .input-wrap { position: relative; }
-    .input-wrap svg {
-        position: absolute;
-        left: 14px;
-        top: 50%;
-        width: 17px;
-        height: 17px;
-        transform: translateY(-50%);
-        color: var(--muted);
-        pointer-events: none;
-    }
-    input, select {
-        display: block;
-        width: 100%;
-        min-height: 46px;
-        background: var(--surface-alt);
-        color: var(--text);
-        border: 1px solid var(--border);
-        border-radius: 12px;
-        padding: 10px 14px;
-        outline: none;
-        transition: border-color .2s, box-shadow .2s;
-    }
-    .input-wrap input { padding-left: 40px; }
-    input:focus, select:focus {
-        border-color: var(--accent);
-        box-shadow: 0 0 0 3px var(--accent-light);
-        background: var(--surface);
-    }
-    select { padding-right: 36px; }
-    .field-note {
-        color: var(--muted);
-        font-size: 11px;
-        margin: 6px 0 0;
-    }
-    .form-row {
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-        gap: 12px;
-    }
-    .primary {
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        gap: 10px;
-        width: 100%;
-        min-height: 48px;
-        margin-top: 22px;
-        border: 0;
-        border-radius: 12px;
-        background: var(--accent);
-        color: #fff;
-        font-size: 13px;
-        font-weight: 750;
-        cursor: pointer;
-        transition: background .2s, transform .2s;
-    }
-    .primary:hover {
-        filter: brightness(1.05);
-        transform: translateY(-1px);
-    }
-    .primary svg { width: 16px; height: 16px; }
-    .security {
-        display: flex;
-        align-items: flex-start;
-        gap: 8px;
-        color: var(--muted);
-        font-size: 11px;
-        line-height: 1.5;
-        margin-top: 14px;
-    }
-    .security svg {
-        flex-shrink: 0;
-        width: 14px;
-        height: 14px;
-        margin-top: 2px;
-        color: var(--accent);
-    }
-    .directory-head {
-        display: flex;
-        align-items: flex-start;
-        justify-content: space-between;
-        gap: 15px;
-        margin-bottom: 15px;
-    }
-    .count {
-        display: inline-flex;
-        align-items: center;
-        gap: 6px;
-        white-space: nowrap;
-        padding: 6px 10px;
-        border-radius: 999px;
-        background: var(--accent-light);
-        color: var(--accent);
-        font-size: 11px;
-        font-weight: 800;
-    }
-    .summary {
-        display: flex;
-        gap: 10px;
-        align-items: center;
-        margin-bottom: 20px;
-        padding: 12px 14px;
-        border: 1px solid var(--border);
-        background: var(--surface-alt);
-        border-radius: 12px;
-        color: var(--muted);
-        font-size: 12px;
-    }
-    .summary svg {
-        width: 16px;
-        height: 16px;
-        color: var(--accent);
-        flex-shrink: 0;
-    }
-    .lecturer {
-        padding: 16px 0;
-        border-top: 1px solid var(--border);
-    }
-    .lecturer:first-of-type { border-top: none; }
-    .lecturer-head {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        gap: 12px;
-    }
-    .lecturer-name {
-        font-size: 14px;
-        font-weight: 750;
-    }
-    .status {
-        display: inline-flex;
-        align-items: center;
-        gap: 6px;
-        padding: 4px 8px;
-        border-radius: 999px;
-        background: #e8fbf2;
-        color: #176b49;
-        font-size: 10px;
-        font-weight: 800;
-    }
-    .status.off {
-        background: #fff0f2;
-        color: #a52b47;
-    }
-    .details {
-        color: var(--muted);
-        font-size: 12px;
-        line-height: 1.6;
-        margin: 6px 0 10px;
-        overflow-wrap: anywhere;
-    }
-    .small-btn {
-        padding: 6px 12px;
-        border: 1px solid var(--border);
-        border-radius: 8px;
-        background: var(--surface);
-        color: var(--text);
-        font-size: 11px;
-        font-weight: 700;
-        cursor: pointer;
-        transition: background .2s, border-color .2s;
-    }
-    .small-btn:hover {
-        border-color: var(--accent);
-        color: var(--accent);
-    }
-    .empty {
-        padding: 36px 20px;
-        text-align: center;
-        border: 1px dashed var(--border);
-        border-radius: 14px;
-        background: var(--surface-alt);
-    }
-    .empty-icon {
-        width: 48px;
-        height: 48px;
-        margin: 0 auto 12px;
-        display: grid;
-        place-items: center;
-        border-radius: 14px;
-        background: var(--accent-light);
-        color: var(--accent);
-    }
-    .empty-icon svg { width: 24px; height: 24px; }
-    .empty strong { display: block; font-size: 14px; }
-    .empty p { max-width: 320px; margin: 6px auto 0; color: var(--muted); font-size: 12px; }
-
-    .message {
-        padding: 12px 16px;
-        border-radius: 12px;
-        margin-bottom: 24px;
-        font-size: 13px;
-        border: 1px solid transparent;
-    }
-    .success { background: #e8fbf2; color: #176b49; border-color: rgba(23,107,73,.15); }
-    .error { background: #fff0f2; color: #a52b47; border-color: rgba(165,43,71,.15); }
-
-    .stage9-management {
-        margin: 4px 0 12px;
-        padding: 10px 12px;
-        border: 1px solid var(--border);
-        border-radius: 14px;
-        background: var(--surface-alt);
-    }
-    .stage9-management summary {
-        cursor: pointer;
-        font-weight: 750;
-        font-size: 12px;
-        text-transform: uppercase;
-        letter-spacing: 1.2px;
-        color: var(--muted);
-    }
-    .stage9-management a {
-        display: flex;
-        align-items: center;
-        gap: 10px;
-        padding: 10px 12px;
-        margin-top: 6px;
-        border-radius: 10px;
-        color: var(--text);
-        font-size: 13px;
-        font-weight: 600;
-    }
-    .stage9-management a:hover {
-        background: var(--accent-light);
-        color: var(--accent);
-    }
-
-    .footer {
-        margin-top: 50px;
-        padding-top: 20px;
-        border-top: 1px solid var(--border);
-        font-size: 12px;
-        color: var(--muted);
-    }
-
-    @media (max-width: 900px) {
-        .layout { grid-template-columns: 1fr; }
-        .sidebar {
-            border-right: 0;
-            border-bottom: 1px solid var(--border);
-            padding: 18px;
-            gap: 18px;
-        }
-        .nav { display: flex; flex-wrap: wrap; }
-        .sidebar-bottom { display: none; }
-        .main { padding-top: 25px; }
-        .topbar { margin-bottom: 35px; }
-    }
-    @media (max-width: 600px) {
-        .main { padding: 24px 18px 60px; }
-        .grid { grid-template-columns: 1fr; }
-        .topbar { flex-wrap: wrap; }
-        .form-row { grid-template-columns: 1fr; }
-    }
+:root{color-scheme:light;--bg:#f5f6fc;--card:rgba(255,255,255,.88);--solid:#fff;--text:#171827;--muted:#74798e;--line:rgba(111,116,150,.18);--accent:#7157f2;--accent2:#5d43e6;--soft:#f0edff;--input:#f8f8fd;--shadow:0 24px 70px rgba(37,34,86,.08);--okbg:#e8fbf2;--ok:#176b49;--badbg:#fff0f2;--bad:#a52b47}
+[data-theme=dark]{color-scheme:dark;--bg:#0b0c14;--card:rgba(24,26,39,.9);--solid:#181a27;--text:#f5f5fb;--muted:#a2a7bd;--line:rgba(169,171,207,.15);--accent:#aa98ff;--accent2:#8d75ff;--soft:#29233f;--input:#202231;--shadow:0 24px 70px rgba(0,0,0,.2);--okbg:#142b25;--ok:#9be8c4;--badbg:#321d28;--bad:#ffb0c0}
+*{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0;min-height:100vh;background:radial-gradient(ellipse at 12% 0%,rgba(126,102,255,.12),transparent 34rem),radial-gradient(ellipse at 96% 28%,rgba(84,177,255,.07),transparent 28rem),var(--bg);color:var(--text);font-family:Inter,ui-sans-serif,-apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif;line-height:1.6;-webkit-font-smoothing:antialiased}button,input,select{font:inherit}button{cursor:pointer}.wrap{width:min(1320px,100%);margin:auto;padding:26px clamp(18px,4vw,54px) 76px}.topbar,.top-actions,.heading,.lecturer-head{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap}.topbar{min-height:48px}.brand{font-size:27px;font-weight:850;letter-spacing:-1.7px;text-decoration:none;color:var(--text)}.brand span,h1 span{color:var(--accent)}.top-actions{gap:18px}.eyebrow{color:var(--muted);font-size:11px;letter-spacing:1.8px;font-weight:850;text-transform:uppercase}.theme-btn{width:44px;height:44px;display:grid;place-items:center;background:var(--card);color:var(--text);border:1px solid var(--line);border-radius:15px;font-size:20px;transition:.2s}.theme-btn:hover{transform:translateY(-2px);border-color:var(--accent)}.intro{margin:clamp(44px,7vw,78px) 0 34px;max-width:820px;animation:rise .55s ease both}.intro .eyebrow{display:flex;align-items:center;gap:10px}.intro .eyebrow:before{content:"";width:25px;height:2px;background:var(--accent);border-radius:9px}h1{font-size:clamp(40px,6.3vw,70px);letter-spacing:-.065em;line-height:1.02;margin:18px 0 17px;font-weight:820}.subtitle{color:var(--muted);max-width:660px;font-size:clamp(15px,1.7vw,18px);margin:0;line-height:1.8}.grid{display:grid;grid-template-columns:minmax(310px,.82fr) minmax(0,1.35fr);gap:24px;align-items:start}.card{position:relative;min-width:0;padding:clamp(22px,3vw,32px);background:var(--card);border:1px solid var(--line);border-radius:26px;box-shadow:var(--shadow);backdrop-filter:blur(18px);overflow:hidden;animation:rise .65s ease both}.card:before{content:"";position:absolute;inset:0 0 auto;height:1px;background:linear-gradient(90deg,transparent,rgba(170,152,255,.7),transparent);pointer-events:none}.directory{animation-delay:.1s}.form-top{display:flex;align-items:flex-start;gap:15px;margin-bottom:25px}.form-icon{width:52px;height:52px;flex:0 0 52px;display:grid;place-items:center;border-radius:17px;color:white;background:linear-gradient(145deg,#8c78ff,#6245e8);box-shadow:0 12px 26px rgba(113,87,242,.28)}.form-icon svg{width:24px;height:24px}.card h2{font-size:21px;margin:0 0 7px;letter-spacing:-.7px;font-weight:800}.hint{color:var(--muted);font-size:13px;margin:0;line-height:1.75}.kicker{display:block;color:var(--accent);font-size:10px;letter-spacing:1.7px;font-weight:850;text-transform:uppercase;margin-bottom:4px}.divider{height:1px;background:var(--line);margin:22px 0 20px}.field{margin-top:18px}label{display:flex;align-items:center;justify-content:space-between;gap:8px;color:var(--text);font-size:12px;font-weight:750;margin:0 0 8px}.optional{color:var(--muted);font-size:10px;font-weight:650;letter-spacing:.4px;text-transform:uppercase}.input-wrap{position:relative}.input-wrap svg{position:absolute;left:15px;top:50%;width:17px;height:17px;transform:translateY(-50%);color:var(--muted);pointer-events:none}input,select{display:block;width:100%;min-height:52px;background:var(--input);color:var(--text);border:1px solid var(--line);border-radius:14px;padding:13px 15px;outline:none;transition:border-color .2s,box-shadow .2s,background .2s}.input-wrap input{padding-left:44px}input::placeholder{color:#85899d;opacity:.85}input:focus,select:focus{border-color:var(--accent);box-shadow:0 0 0 4px rgba(113,87,242,.15);background:var(--solid)}select{padding-right:42px}.field-note{color:var(--muted);font-size:11px;margin:7px 0 0}.form-row{display:grid;grid-template-columns:1fr 1fr;gap:14px}.primary{display:flex;align-items:center;justify-content:center;gap:11px;width:100%;min-height:54px;margin-top:26px;padding:14px 18px;border:1px solid rgba(255,255,255,.14);border-radius:15px;background:linear-gradient(110deg,var(--accent2),var(--accent));color:#fff;font-size:13px;font-weight:800;box-shadow:0 13px 28px rgba(105,78,232,.23);transition:transform .2s,box-shadow .2s,filter .2s}.primary:hover{transform:translateY(-2px);box-shadow:0 17px 32px rgba(105,78,232,.32);filter:saturate(1.08)}.primary svg{width:17px;height:17px;transition:transform .2s}.primary:hover svg{transform:translateX(3px)}.security{display:flex;align-items:flex-start;gap:9px;color:var(--muted);font-size:11px;line-height:1.6;margin-top:16px}.security svg{flex:0 0 15px;width:15px;height:15px;margin-top:2px;color:var(--accent)}.directory-head{display:flex;align-items:flex-start;justify-content:space-between;gap:18px;margin-bottom:9px}.count{display:inline-flex;align-items:center;gap:8px;white-space:nowrap;padding:8px 12px;border:1px solid rgba(113,87,242,.2);border-radius:999px;background:var(--soft);color:var(--accent);font-size:11px;font-weight:800}.count:before{content:"";width:6px;height:6px;border-radius:50%;background:currentColor;box-shadow:0 0 0 4px rgba(113,87,242,.12)}.summary{display:flex;gap:10px;align-items:center;margin:20px 0 23px;padding:13px 15px;border:1px solid var(--line);background:var(--input);border-radius:15px;color:var(--muted);font-size:12px}.summary svg{width:17px;height:17px;color:var(--accent);flex:0 0 17px}.lecturer{padding:20px 0;border-top:1px solid var(--line)}.lecturer:first-of-type{border-top:none}.lecturer-name{font-size:15px;font-weight:800;letter-spacing:-.2px}.status{display:inline-flex;align-items:center;gap:7px;padding:6px 10px;border-radius:999px;background:var(--okbg);color:var(--ok);font-size:10px;font-weight:850}.status:before{content:"";width:6px;height:6px;border-radius:50%;background:currentColor}.status.off{background:var(--badbg);color:var(--bad)}.details{color:var(--muted);font-size:12px;line-height:1.9;margin:10px 0 14px;overflow-wrap:anywhere}.small-btn{padding:9px 13px;border:1px solid var(--line);border-radius:11px;background:var(--input);color:var(--text);font-size:11px;font-weight:750;transition:.2s}.small-btn:hover{border-color:var(--accent);color:var(--accent)}.empty{padding:42px 20px;text-align:center;border:1px dashed var(--line);border-radius:18px;background:rgba(127,127,127,.025)}.empty-icon{width:56px;height:56px;margin:0 auto 15px;display:grid;place-items:center;border-radius:18px;background:var(--soft);color:var(--accent)}.empty-icon svg{width:27px;height:27px}.empty strong{display:block;font-size:14px}.empty p{max-width:340px;margin:7px auto 0;color:var(--muted);font-size:12px;line-height:1.8}.message{padding:14px 17px;border-radius:14px;margin:0 0 22px;font-size:13px;border:1px solid transparent;animation:rise .3s ease both}.success{background:var(--okbg);color:var(--ok);border-color:rgba(23,107,73,.15)}.error{background:var(--badbg);color:var(--bad);border-color:rgba(165,43,71,.15)}@keyframes rise{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}@media(prefers-reduced-motion:reduce){*,*:before,*:after{animation-duration:.01ms!important;transition-duration:.01ms!important;scroll-behavior:auto!important}}@media(max-width:900px){.grid{grid-template-columns:1fr}.directory{order:2}.form-card{order:1}}@media(max-width:540px){.wrap{padding:20px 15px 48px}.intro{margin:48px 0 25px}h1{letter-spacing:-.05em}.card{border-radius:21px;padding:21px}.form-row{grid-template-columns:1fr;gap:0}.top-actions{gap:11px}}
 </style>
 
 <script src="<?= htmlspecialchars(url('assets/js/theme-global.js?v=20261107-2'), ENT_QUOTES, 'UTF-8') ?>"></script>
-<link rel="stylesheet" href="<?= e(url('assets/css/ulearn-design-system.css?v=1')) ?>">
-<script defer src="<?= e(url('assets/js/ulearn-motion.js?v=1')) ?>"></script>
+<link rel="stylesheet" href="<?= e(url('assets/css/admin-unified-v1.css?v=1')) ?>">
 </head>
 <body>
-
-<div class="layout">
-    <aside class="sidebar" id="adminSidebar">
-        <a class="brand" href="<?= e(url('admin/index.php')) ?>">
-            u learn<span>.</span>
-        </a>
-
-        <nav aria-label="Admin navigation">
-            <p class="nav-label">System management</p>
-            <details open class="stage9-management">
-                <summary>System Access</summary>
-                <a href="<?= e(url('admin/users.php')) ?>">
-                    <svg class="ul-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
-                    All Registered Users
-                </a>
-                <a href="<?= e(url('admin/change-requests.php')) ?>">
-                    <svg class="ul-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
-                    Academic Requests
-                </a>
-            </details>
-
-            <p class="nav-label" style="margin-top: 18px;">Your workspace</p>
-
-            <div class="nav ul-nav">
-                <a href="<?= e(url('admin/index.php')) ?>">
-                    <svg class="ul-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
-                    <span>Overview</span>
-                </a>
-                <a class="active" href="<?= e(url('admin/lecturers.php')) ?>">
-                    <svg class="ul-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
-                    <span>Lecturers</span>
-                </a>
-                <a href="<?= e(url('admin/academics.php')) ?>">
-                    <svg class="ul-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
-                    <span>Academics</span>
-                </a>
-                <a href="<?= e(url('admin/universities.php')) ?>">
-                     <svg class="ul-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="m2 9 10-5 10 5-10 5z"/><path d="M6 12v5c4 3 8 3 12 0v-5M22 9v7"/></svg>
-                     <span>Universities</span>
-                </a>
-                <a href="<?= e(url('admin/quizzes.php')) ?>">
-                    <svg class="ul-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
-                    <span>Quizzes</span>
-                </a>
-                <a href="<?= e(url('admin/assignments.php')) ?>">
-                    <svg class="ul-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-2 2"/><path d="M14 11a5 5 0 0 0-7 0l-3 3a5 5 0 0 0 7 7l2-2"/></svg>
-                    <span>Assignments</span>
-                </a>
-                <a href="<?= e(url('admin/announcements.php')) ?>">
-                    <svg class="ul-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
-                    <span>Announcements</span>
-                </a>
-                <a href="<?= e(url('admin/platform-settings.php')) ?>">
-                    <svg class="ul-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
-                    <span>Platform Settings</span>
-                </a>
-                <a href="<?= e(url('admin/profile.php')) ?>">
-                    <svg class="ul-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
-                    <span>My Profile &amp; Settings</span>
-                </a>
-                <a href="<?= e(url('admin/consultations.php')) ?>">
-                    <svg class="ul-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
-                    <span>Consultations</span>
-                </a>
-                <a href="<?= e(url('admin/kuppiya.php')) ?>">
-                    <svg class="ul-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3"/><path d="M3 20v-2a6 6 0 0 1 12 0v2"/><path d="M17 5a3 3 0 0 1 0 6"/><path d="M18 15a5 5 0 0 1 3 5"/></svg>
-                    <span>Kuppiya Sessions</span>
-                </a>
-            </div>
-        </nav>
-
-        <div class="sidebar-bottom">
-            <small>Signed in as</small>
-            <strong><?= e($fullName) ?></strong>
-            <small><?= e((string)$admin['email']) ?></small>
-        </div>
-    </aside>
-
-    <main class="main" id="lecturers-main">
-        <header class="topbar">
-            <span class="eyebrow">
-                U LEARN / LECTURERS SPACE
-            </span>
-
-            <div class="topbar-right">
-                <a class="notification-bell" href="<?= e(url('dashboard/notifications.php')) ?>"
-                   aria-label="Notifications<?= $unreadNotifications ? ' (' . $unreadNotifications . ' unread)' : '' ?>"
-                   title="Open notification center">
-                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9"/><path d="M10 21h4"/></svg>
-                    <?php if ($unreadNotifications > 0): ?>
-                        <span class="notification-count" aria-hidden="true"><?= $unreadNotifications > 99 ? '99+' : $unreadNotifications ?></span>
-                    <?php endif; ?>
-                </a>
-
-                <button
-                    type="button"
-                    class="theme-toggle"
-                    id="themeToggle"
-                    aria-label="Switch appearance"
-                    title="Switch appearance"
-                >◐</button>
-
-                <a class="avatar" href="<?= e(url('admin/profile.php')) ?>" aria-label="Open My Profile and Settings" title="My Profile & Settings">
-                    <?= e($initial) ?>
-                </a>
-
-                <form method="post" action="<?= e(url('auth/logout.php')) ?>" style="margin:0;">
-                    <input type="hidden" name="csrf" value="<?= e(csrf()) ?>">
-                    <button type="submit" class="logout">
-                        Log out ↗
-                    </button>
-                </form>
-            </div>
-        </header>
-
-        <header class="hero">
-            <div>
-                <div style="font-size:12px; font-weight:750; text-transform:uppercase; letter-spacing:1.5px; opacity:0.8;">Administration / People</div>
-                <h1>Manage lecturers</h1>
-                <p>Invite lecturers, manage teaching profiles and control access.</p>
-            </div>
-            <span class="pill">
-                <?= e($roleLabel) ?>
-            </span>
-        </header>
-
-        <?php if ($success): ?>
-            <div class="message success" role="status"><?= e($success) ?></div>
-        <?php endif; ?>
-        <?php if ($error): ?>
-            <div class="message error" role="alert"><?= e($error) ?></div>
-        <?php endif; ?>
-
-        <div class="grid">
-            <section class="card form-card">
-                <div class="form-top">
-                    <div class="form-icon" aria-hidden="true">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-                            <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M19 8v6M22 11h-6"/>
-                        </svg>
-                    </div>
-                    <div>
-                        <span class="kicker">Lecturer access</span>
-                        <h2>Invite a lecturer</h2>
-                        <p class="hint">Invite new lecturers to create their teaching accounts.</p>
-                    </div>
-                </div>
-                <div class="divider"></div>
-                <form method="post">
-                    <input type="hidden" name="csrf" value="<?= e(csrf()) ?>">
-                    <input type="hidden" name="action" value="invite">
-
-                    <div class="field">
-                        <label for="email">Lecturer email <span class="optional">Required</span></label>
-                        <div class="input-wrap">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/></svg>
-                            <input id="email" name="email" type="email" placeholder="name@university.edu" maxlength="254" autocomplete="email" required>
-                        </div>
-                        <p class="field-note">We will email a one-time activation code to this address.</p>
-                    </div>
-
-                    <div class="form-row">
-                        <div class="field">
-                            <label for="title">Professional title</label>
-                            <select id="title" name="title"><option>Mr.</option><option>Mrs.</option><option>Ms.</option><option>Dr.</option><option>Prof.</option></select>
-                        </div>
-                        <div class="field">
-                            <label for="university_id">University *</label>
-                            <select id="university_id" name="university_id" required><option value="">Choose university</option><?php foreach($universities as $u): ?><option value="<?= (int)$u['id'] ?>"><?= e($u['name']) ?></option><?php endforeach; ?></select>
-                        </div>
-                    </div>
-
-                    <div class="form-row">
-                        <div class="field">
-                            <label for="department">Department *</label>
-                            <select id="department" name="department" required><option value="">Choose department</option><?php foreach($departments as $d): ?><option value="<?= e($d) ?>"><?= e($d) ?></option><?php endforeach; ?></select>
-                        </div>
-                        <div class="field">
-                            <label for="designation">Designation *</label>
-                            <select id="designation" name="designation" required><option value="">Choose designation</option><?php foreach($designations as $d): ?><option value="<?= e($d) ?>"><?= e($d) ?></option><?php endforeach; ?></select>
-                        </div>
-                    </div>
-
-                    <div class="form-row">
-                        <div class="field">
-                            <label for="degree_id">Degree programme *</label>
-                            <select id="degree_id" name="degree_id" required><option value="">Choose programme</option></select>
-                        </div>
-                        <div class="field">
-                            <label for="batch_id">Intake *</label>
-                            <select id="batch_id" name="batch_id" required><option value="">Choose intake</option></select>
-                        </div>
-                    </div>
-
-                    <div class="form-row">
-                        <div class="field">
-                            <label for="study_year">Academic year *</label>
-                            <select id="study_year" name="study_year" required><option value="">Choose year</option></select>
-                        </div>
-                        <div class="field">
-                            <label for="semester">Semester *</label>
-                            <select id="semester" name="semester" required><option value="">Choose semester</option></select>
-                        </div>
-                    </div>
-
-                    <p class="field-note">The first programme/intake/year/semester assignment activates after account setup. Assign modules later from Lecturer Assignments.</p>
-                    
-                    <script>
-                    const degreeData=<?= json_encode($degrees,JSON_HEX_TAG|JSON_HEX_AMP|JSON_HEX_APOS|JSON_HEX_QUOT) ?>;
-                    const intakeData=<?= json_encode($intakes,JSON_HEX_TAG|JSON_HEX_AMP|JSON_HEX_APOS|JSON_HEX_QUOT) ?>;
-                    const fields=['university_id','degree_id','batch_id','study_year','semester'].map(id=>document.getElementById(id));
-                    function fillSelect(el,options,label){
-                      const previous=el.value;
-                      el.replaceChildren(new Option(label,''));
-                      options.forEach(([value,name])=>el.add(new Option(name,String(value))));
-                      if([...el.options].some(o=>o.value===previous)) el.value=previous;
-                    }
-                    function updateScope(){
-                      const [u,d,b,y,se]=fields;
-                      const ds=degreeData.filter(x=>String(x.university_id)===u.value);
-                      fillSelect(d,ds.map(x=>[x.id,x.name]),'Choose programme');
-                      const bs=intakeData.filter(x=>String(x.degree_id)===d.value);
-                      fillSelect(b,bs.map(x=>[x.batch_id,x.batch_code]),'Choose intake');
-                      const chosen=ds.find(x=>String(x.id)===d.value);
-                      const duration=chosen ? Math.min(6,Math.max(0,Number(chosen.duration_years)||0)) : 0;
-                      const years=b.value ? Array.from({length:duration},(_,i)=>[i+1,'Year '+(i+1)]) : [];
-                      fillSelect(y,years,'Choose year');
-                      fillSelect(se,y.value ? [[1,'Semester 1'],[2,'Semester 2']] : [],'Choose semester');
-                    }
-                    fields.slice(0,4).forEach(el=>el.addEventListener('change',updateScope));
-                    updateScope();
-                    </script>
-
-                    <button class="primary" type="submit">
-                        Send lecturer invitation 
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
-                    </button>
-                    
-                    <div class="security">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="10" width="16" height="11" rx="2"/><path d="M8 10V7a4 4 0 1 1 8 0v3M9 15l2 2 4-4"/></svg>
-                        <span>Lecturers create their own accounts using the emailed activation code.</span>
-                    </div>
-                </form>
-            </section>
-
-            <section class="card directory">
-                <p style="margin-bottom: 16px;"><a href="<?= e(url('admin/module-lecturers.php')) ?>" style="color:var(--accent);font-weight:750">Manage programme, intake and module assignments →</a></p>
-                <div class="directory-head">
-                    <div>
-                        <span class="kicker">People &amp; permissions</span>
-                        <h2>Lecturer directory</h2>
-                        <p class="hint">Manage approved lecturers and their current access status.</p>
-                    </div>
-                    <span class="count"><?= $activeCount ?> active</span>
-                </div>
-                <div class="summary">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
-                    <span>Changes to lecturer access are reflected here after the action is saved.</span>
-                </div>
-
-                <?php if (!$lecturers): ?>
-                    <div class="empty">
-                        <div class="empty-icon" aria-hidden="true">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M19 8v6M16 11h6"/></svg>
-                        </div>
-                        <strong>Your lecturer directory is ready</strong>
-                        <p>No activated lecturers yet. Invite a lecturer to get started.</p>
-                    </div>
-                <?php endif; ?>
-
-                <?php foreach ($lecturers as $lecturer): ?>
-                    <article class="lecturer">
-                        <div class="lecturer-head">
-                            <div class="lecturer-name"><?= e($lecturer['title']) ?> <?= e($lecturer['full_name']) ?></div>
-                            <span class="status <?= (int)$lecturer['is_active'] === 1 ? '' : 'off' ?>"><?= (int)$lecturer['is_active'] === 1 ? 'Active' : 'Suspended' ?></span>
-                        </div>
-                        <div class="details">
-                            <?= e($lecturer['email']) ?><br>
-                            <?= e($lecturer['department'] ?: 'No department') ?> · <?= e($lecturer['designation'] ?: 'Lecturer') ?><br>
-                            <?= (int)$lecturer['module_count'] ?> teaching assignments
-                        </div>
-                        <form method="post" style="margin:0;">
-                            <input type="hidden" name="csrf" value="<?= e(csrf()) ?>">
-                            <input type="hidden" name="action" value="toggle">
-                            <input type="hidden" name="lecturer_id" value="<?= (int)$lecturer['id'] ?>">
-                            <button class="small-btn" type="submit" onclick="return confirm('Change lecturer access for this account?')"><?= (int)$lecturer['is_active'] === 1 ? 'Suspend access' : 'Reactivate access' ?></button>
-                        </form>
-                    </article>
-                <?php endforeach; ?>
-            </section>
-        </div>
-
-        <footer class="footer">
-            © <?= date('Y') ?> U Learn · Administration Workspace
-        </footer>
-    </main>
-</div>
-
+<div class="wrap">
+<header class="topbar">
+<?php require __DIR__ . '/../includes/brand-logo.php'; ?>
+<div class="top-actions"><span class="eyebrow"><?= e(str_replace('_',' ',$admin['role'])) ?></span><button id="themeButton" class="theme-btn" type="button" onclick="toggleTheme()" aria-label="Toggle theme">☾</button></div>
+</header>
+<section class="intro"><div class="eyebrow">Administration / People</div><h1>Manage lecturers<span>.</span></h1><p class="subtitle">Invite lecturers, manage teaching profiles and control access.</p></section>
+<?php if ($success): ?><div class="message success" role="status"><?= e($success) ?></div><?php endif; ?>
+<?php if ($error): ?><div class="message error" role="alert"><?= e($error) ?></div><?php endif; ?>
+<div class="grid">
+<section class="card form-card">
+<div class="form-top"><div class="form-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M19 8v6M22 11h-6"/></svg></div><div><span class="kicker">Lecturer access</span><h2>Invite a lecturer</h2><p class="hint">Invite new lecturers to create their teaching accounts.</p></div></div>
+<div class="divider"></div>
+<form method="post"><input type="hidden" name="csrf" value="<?= e(csrf()) ?>"><input type="hidden" name="action" value="invite">
+<div class="field"><label for="email">Lecturer email <span class="optional">Required</span></label><div class="input-wrap"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/></svg><input id="email" name="email" type="email" placeholder="name@university.edu" maxlength="254" autocomplete="email" required></div><p class="field-note">We will email a one-time activation code to this address.</p></div>
+<div class="form-row"><div class="field"><label for="title">Professional title</label><select id="title" name="title"><option>Mr.</option><option>Mrs.</option><option>Ms.</option><option>Dr.</option><option>Prof.</option></select></div><div class="field"><label for="university_id">University *</label><select id="university_id" name="university_id" required><option value="">Choose university</option><?php foreach($universities as $u): ?><option value="<?= (int)$u['id'] ?>"><?= e($u['name']) ?></option><?php endforeach; ?></select></div></div>
+<div class="form-row"><div class="field"><label for="department">Department *</label><select id="department" name="department" required><option value="">Choose department</option><?php foreach($departments as $d): ?><option value="<?= e($d) ?>"><?= e($d) ?></option><?php endforeach; ?></select></div><div class="field"><label for="designation">Designation *</label><select id="designation" name="designation" required><option value="">Choose designation</option><?php foreach($designations as $d): ?><option value="<?= e($d) ?>"><?= e($d) ?></option><?php endforeach; ?></select></div></div>
+<div class="form-row"><div class="field"><label for="degree_id">Degree programme *</label><select id="degree_id" name="degree_id" required><option value="">Choose programme</option></select></div><div class="field"><label for="batch_id">Intake *</label><select id="batch_id" name="batch_id" required><option value="">Choose intake</option></select></div></div>
+<div class="form-row"><div class="field"><label for="study_year">Academic year *</label><select id="study_year" name="study_year" required><option value="">Choose year</option></select></div><div class="field"><label for="semester">Semester *</label><select id="semester" name="semester" required><option value="">Choose semester</option></select></div></div>
+<p class="field-note">The first programme/intake/year/semester assignment activates after account setup. Assign modules later from Lecturer Assignments.</p>
 <script>
-const themeButton = document.getElementById('themeToggle');
-function updateThemeButton() {
-    const theme = document.documentElement.dataset.theme;
-    themeButton.textContent = theme === 'dark' ? '☀' : '☾';
+const degreeData=<?= json_encode($degrees,JSON_HEX_TAG|JSON_HEX_AMP|JSON_HEX_APOS|JSON_HEX_QUOT) ?>;
+const intakeData=<?= json_encode($intakes,JSON_HEX_TAG|JSON_HEX_AMP|JSON_HEX_APOS|JSON_HEX_QUOT) ?>;
+const fields=['university_id','degree_id','batch_id','study_year','semester'].map(id=>document.getElementById(id));
+function fillSelect(el,options,label){
+  const previous=el.value;
+  el.replaceChildren(new Option(label,''));
+  options.forEach(([value,name])=>el.add(new Option(name,String(value))));
+  if([...el.options].some(o=>o.value===previous)) el.value=previous;
 }
-themeButton.addEventListener('click', function () {
-    const current = document.documentElement.dataset.theme;
-    const next = current === 'dark' ? 'light' : 'dark';
-    document.documentElement.dataset.theme = next;
-    localStorage.setItem('ulearn-theme', next);
-    updateThemeButton();
-});
-updateThemeButton();
+function updateScope(){
+  const [u,d,b,y,se]=fields;
+  const ds=degreeData.filter(x=>String(x.university_id)===u.value);
+  fillSelect(d,ds.map(x=>[x.id,x.name]),'Choose programme');
+  const bs=intakeData.filter(x=>String(x.degree_id)===d.value);
+  fillSelect(b,bs.map(x=>[x.batch_id,x.batch_code]),'Choose intake');
+  const chosen=ds.find(x=>String(x.id)===d.value);
+  const duration=chosen ? Math.min(6,Math.max(0,Number(chosen.duration_years)||0)) : 0;
+  const years=b.value ? Array.from({length:duration},(_,i)=>[i+1,'Year '+(i+1)]) : [];
+  fillSelect(y,years,'Choose year');
+  fillSelect(se,y.value ? [[1,'Semester 1'],[2,'Semester 2']] : [],'Choose semester');
+}
+fields.slice(0,4).forEach(el=>el.addEventListener('change',updateScope));
+updateScope();
 </script>
-
+<button class="primary" type="submit">Send lecturer invitation <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M12 5l7 7-7 7"/></svg></button>
+<div class="security"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="10" width="16" height="11" rx="2"/><path d="M8 10V7a4 4 0 1 1 8 0v3M9 15l2 2 4-4"/></svg><span>Lecturers create their own accounts using the emailed activation code.</span></div>
+</form>
+</section>
+<section class="card directory">
+<p><a href="<?= e(url('admin/module-lecturers.php')) ?>" style="color:var(--accent);font-weight:750">Manage programme, intake and module assignments →</a></p>
+<div class="directory-head"><div><span class="kicker">People &amp; permissions</span><h2>Lecturer directory</h2><p class="hint">Manage approved lecturers and their current access status.</p></div><span class="count"><?= $activeCount ?> active</span></div>
+<div class="summary"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg><span>Changes to lecturer access are reflected here after the action is saved.</span></div>
+<?php if (!$lecturers): ?><div class="empty"><div class="empty-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M19 8v6M16 11h6"/></svg></div><strong>Your lecturer directory is ready</strong><p>No activated lecturers yet. Invite a lecturer to get started.</p></div><?php endif; ?>
+<?php foreach ($lecturers as $lecturer): ?>
+<article class="lecturer"><div class="lecturer-head"><div class="lecturer-name"><?= e($lecturer['title']) ?> <?= e($lecturer['full_name']) ?></div><span class="status <?= (int)$lecturer['is_active'] === 1 ? '' : 'off' ?>"><?= (int)$lecturer['is_active'] === 1 ? 'Active' : 'Suspended' ?></span></div>
+<div class="details"><?= e($lecturer['email']) ?><br><?= e($lecturer['department'] ?: 'No department') ?> · <?= e($lecturer['designation'] ?: 'Lecturer') ?><br><?= (int)$lecturer['module_count'] ?> teaching assignments</div>
+<form method="post"><input type="hidden" name="csrf" value="<?= e(csrf()) ?>"><input type="hidden" name="action" value="toggle"><input type="hidden" name="lecturer_id" value="<?= (int)$lecturer['id'] ?>"><button class="small-btn" type="submit" onclick="return confirm('Change lecturer access for this account?')"><?= (int)$lecturer['is_active'] === 1 ? 'Suspend access' : 'Reactivate access' ?></button></form></article>
+<?php endforeach; ?>
+</section>
+</div>
+</div>
 </body>
 </html>

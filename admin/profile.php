@@ -119,7 +119,7 @@ $roleLabel = (string)$user['role'] === 'main_admin' ? 'Main Administrator' : 'Ad
 <body>
 <div class="layout">
 <aside class="sidebar">
-<a class="brand" href="<?= e(url('admin/index.php')) ?>">u learn<span>.</span></a>
+<?php require __DIR__ . '/../includes/brand-logo.php'; ?>
 <div class="nav-label">Admin workspace</div>
 <nav class="nav" aria-label="Admin navigation">
 <a href="<?= e(url('admin/index.php')) ?>">◫ &nbsp; Overview</a>
