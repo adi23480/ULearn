@@ -113,8 +113,8 @@ $roleLabel = (string)$user['role'] === 'main_admin' ? 'Main Administrator' : 'Ad
 .theme-options{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;margin:20px 0}.theme-option{position:relative;display:grid;gap:10px;cursor:pointer;border:1.5px solid var(--border);border-radius:16px;padding:13px;text-align:center}.theme-option:has(input:checked){border-color:var(--accent);box-shadow:0 0 0 3px #987ef633}.theme-option input{position:absolute;top:12px;right:12px;accent-color:var(--accent)}.theme-preview{height:75px;border-radius:10px;position:relative;display:block;overflow:hidden;background:#f7f7fc;border:1px solid #e2e0ea}.theme-preview.dark{background:#151723;border-color:#34354a}.theme-preview.system{background:linear-gradient(90deg,#f7f7fc 50%,#151723 50%)}.theme-preview i{position:absolute;left:0;top:0;bottom:0;width:26%;background:#dcd7f6}.theme-preview.dark i{background:#29243f}.theme-preview.system i{background:linear-gradient(90deg,#dcd7f6 50%,#29243f 50%)}.theme-preview b,.theme-preview em{position:absolute;left:35%;height:10px;background:#bbb5e9;border-radius:5px;top:24px;width:50%}.theme-preview em{top:43px;width:35%;opacity:.55}@media(max-width:550px){.theme-options{gap:7px}.theme-option{padding:7px}.theme-preview{height:55px}}
 </style>
 <link rel="stylesheet" href="<?= e(url('assets/css/stage9-profile-v3.css')) ?>">
-<script src="<?= htmlspecialchars(url('assets/js/theme-global.js?v=20261107-2'), ENT_QUOTES, 'UTF-8') ?>"></script>
 <link rel="stylesheet" href="<?= e(url('assets/css/admin-unified-v1.css?v=1')) ?>">
+<script src="<?= htmlspecialchars(url('assets/js/theme-global.js?v=20261112-1'), ENT_QUOTES, 'UTF-8') ?>"></script>
 </head>
 <body>
 <div class="layout">
@@ -179,5 +179,6 @@ $roleLabel = (string)$user['role'] === 'main_admin' ? 'Main Administrator' : 'Ad
   });
 })();
 </script>
+
 </body>
 </html>

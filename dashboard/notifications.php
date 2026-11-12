@@ -245,11 +245,11 @@ function notificationTargetUrl(string $target): string {
             .topbar { margin-bottom: 35px; }
         }
 </style>
-<script src="<?= htmlspecialchars(url('assets/js/theme-global.js?v=20261107-2'), ENT_QUOTES, 'UTF-8') ?>"></script>
 <link rel="stylesheet" href="<?= e(url('assets/css/ulearn-design-system.css?v=1')) ?>">
 <script defer src="<?= e(url('assets/js/ulearn-motion.js?v=1')) ?>"></script>
 <link rel="stylesheet" href="<?= e(url('assets/css/ulearn-student-shell.css?v=2')) ?>">
 <script defer src="<?= e(url('assets/js/ulearn-student-shell.js?v=2')) ?>"></script>
+<script src="<?= htmlspecialchars(url('assets/js/theme-global.js?v=20261112-1'), ENT_QUOTES, 'UTF-8') ?>"></script>
 </head>
 <body>
 
@@ -373,6 +373,7 @@ function notificationTargetUrl(string $target): string {
 
     </main>
 </div>
+
 
 </body>
 </html>

@@ -88,16 +88,6 @@ $theme = (string)($admin['theme'] ?? 'system');
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Student Management — U Learn</title>
-<script>
-    try {
-        const saved = localStorage.getItem('ulearn-theme') || <?= json_encode($theme, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
-        const theme = saved === 'system'
-            ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')
-            : saved;
-        document.documentElement.dataset.theme = theme;
-        localStorage.setItem('ulearn-theme', theme);
-    } catch (error) {}
-</script>
 <style>
     :root {
         color-scheme: light;
@@ -407,9 +397,9 @@ $theme = (string)($admin['theme'] ?? 'system');
     }
 </style>
 
-<script src="<?= htmlspecialchars(url('assets/js/theme-global.js?v=20261107-2'), ENT_QUOTES, 'UTF-8') ?>"></script>
 <link rel="stylesheet" href="<?= e(url('assets/css/ulearn-design-system.css?v=1')) ?>">
 <script defer src="<?= e(url('assets/js/ulearn-motion.js?v=1')) ?>"></script>
+<script src="<?= htmlspecialchars(url('assets/js/theme-global.js?v=20261112-1'), ENT_QUOTES, 'UTF-8') ?>"></script>
 </head>
 
 <body>
@@ -509,13 +499,7 @@ $theme = (string)($admin['theme'] ?? 'system');
                     <?php endif; ?>
                 </a>
 
-                <button
-                    type="button"
-                    class="theme-toggle"
-                    id="themeToggle"
-                    aria-label="Switch appearance"
-                    title="Switch appearance"
-                >◐</button>
+                <?php require __DIR__ . '/../includes/theme-toggle-button.php'; ?>
 
                 <a class="avatar" href="<?= e(url('admin/profile.php')) ?>" aria-label="Open My Profile and Settings" title="My Profile & Settings">
                     <?= e($initial) ?>
@@ -639,20 +623,6 @@ $theme = (string)($admin['theme'] ?? 'system');
 </div>
 
 <script>
-const themeButton = document.getElementById('themeToggle');
-function updateThemeButton() {
-    const theme = document.documentElement.dataset.theme;
-    themeButton.textContent = theme === 'dark' ? '☀' : '☾';
-}
-themeButton.addEventListener('click', function () {
-    const current = document.documentElement.dataset.theme;
-    const next = current === 'dark' ? 'light' : 'dark';
-    document.documentElement.dataset.theme = next;
-    localStorage.setItem('ulearn-theme', next);
-    updateThemeButton();
-});
-updateThemeButton();
-
 const search = document.getElementById('search');
 if (search) {
     search.addEventListener('input', e => {
@@ -661,6 +631,7 @@ if (search) {
     });
 }
 </script>
+
 
 </body>
 </html>

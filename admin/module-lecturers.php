@@ -169,16 +169,6 @@ $theme = (string)($user['theme'] ?? 'system');
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Module Lecturers — U Learn</title>
-<script>
-    try {
-        const saved = localStorage.getItem('ulearn-theme') || <?= json_encode($theme, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
-        const theme = saved === 'system'
-            ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')
-            : saved;
-        document.documentElement.dataset.theme = theme;
-        localStorage.setItem('ulearn-theme', theme);
-    } catch (error) {}
-</script>
 <style>
     :root {
         color-scheme: light;
@@ -653,6 +643,7 @@ $theme = (string)($user['theme'] ?? 'system');
 
 <link rel="stylesheet" href="<?= e(url('assets/css/ulearn-design-system.css?v=1')) ?>">
 <script defer src="<?= e(url('assets/js/ulearn-motion.js?v=1')) ?>"></script>
+<script src="<?= htmlspecialchars(url('assets/js/theme-global.js?v=20261112-1'), ENT_QUOTES, 'UTF-8') ?>"></script>
 </head>
 
 <body>
@@ -1021,22 +1012,7 @@ $theme = (string)($user['theme'] ?? 'system');
         </footer>
     </main>
 </div>
-
-<script>
-const themeButton = document.getElementById('themeToggle');
-function updateThemeButton() {
-    const theme = document.documentElement.dataset.theme;
-    themeButton.textContent = theme === 'dark' ? '☀' : '☾';
-}
-themeButton.addEventListener('click', function () {
-    const current = document.documentElement.dataset.theme;
-    const next = current === 'dark' ? 'light' : 'dark';
-    document.documentElement.dataset.theme = next;
-    localStorage.setItem('ulearn-theme', next);
-    updateThemeButton();
-});
-updateThemeButton();
-</script>
+<script src="<?= e(url('assets/js/ulearn-theme.js?v=1')) ?>"></script>
 
 </body>
 </html>
