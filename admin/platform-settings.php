@@ -13,7 +13,6 @@ foreach (['Students'=>"SELECT COUNT(*) FROM users WHERE role='student'",
   try {$stats[$label]=(int)$pdo->query($query)->fetchColumn();}catch(Throwable $e){$stats[$label]=null;error_log('Platform settings overview: '.$e->getMessage());}
 }
 ?><!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>ULearn · Platform Settings</title>
-<script src="<?=ps_e(url('assets/js/theme-global.js?v=20261107-2'))?>"></script>
 <style>
 @import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap");
 :root{--bg:#f5f7fb;--card:#fff;--text:#14213a;--muted:#65748b;--line:#dce3ed;--green:#087d62;--tint:#e8f7f1}
@@ -45,6 +44,7 @@ h1{font-size:clamp(28px,4vw,42px);letter-spacing:-.04em;margin:28px 0 6px}h2{fon
 .note{line-height:1.75}
 @media(prefers-reduced-motion:reduce){*,*:before,*:after{transition:none!important}}
 </style><link rel="stylesheet" href="<?= e(url('assets/css/admin-unified-v1.css?v=1')) ?>">
+<script src="<?= htmlspecialchars(url('assets/js/theme-global.js?v=20261112-1'), ENT_QUOTES, 'UTF-8') ?>"></script>
 </head><body><main>
 <div class="top"><strong><span style="color:var(--green)">◈</span> ULEARN <span style="color:var(--muted);font-weight:500">/ ADMINISTRATION</span></strong><a class="back" href="<?=ps_e(url('admin/index.php'))?>">← Admin Dashboard</a></div>
 <section class="hero"><div class="eyebrow">ADMINISTRATION / CONTROL CENTER</div><h1>Platform Settings<span style="color:#9ce9cd">.</span></h1><p>A unified space for your administration tools, workspace appearance and live platform insights.</p></section>
@@ -75,4 +75,5 @@ h1{font-size:clamp(28px,4vw,42px);letter-spacing:-.04em;margin:28px 0 6px}h2{fon
  buttons.forEach(b=>b.addEventListener('click',()=>{try{localStorage.setItem('ulearn-theme-preference',b.dataset.themeChoice)}catch(e){};if(window.ULearnTheme?.setPreference){window.ULearnTheme.setPreference(b.dataset.themeChoice)}else{const value=b.dataset.themeChoice;document.documentElement.dataset.theme=value==='system'?(matchMedia('(prefers-color-scheme:dark)').matches?'dark':'light'):value};paint()}));
  paint();
 })();
-</script></body></html>
+</script>
+</body></html>

@@ -678,57 +678,13 @@ $notePoints = (int)$notePointsStmt->fetchColumn();
 <title>Kuppiya Sessions — ULearn</title>
 
 
-<!-- KUPPIYA THEME + INVITATION JAVASCRIPT -->
+<!-- KUPPIYA INVITATION JAVASCRIPT -->
 <script>
 (function () {
     'use strict';
-    var preferenceKey = 'ulearn-theme-preference';
-    var legacyKey = 'ulearn-theme';
 
-    function resolveTheme() {
-        try {
-            var preference = localStorage.getItem(preferenceKey);
-            if (preference === 'system') {
-                return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
-            }
-            if (preference === 'dark' || preference === 'light') return preference;
-            var legacy = localStorage.getItem(legacyKey);
-            if (legacy === 'dark' || legacy === 'light') return legacy;
-        } catch (e) {}
-        return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
-    }
-
-    document.documentElement.setAttribute('data-theme', resolveTheme());
-
-    function updateThemeButton() {
-        var button = document.getElementById('themeButton');
-        if (!button) return;
-        var dark = document.documentElement.getAttribute('data-theme') === 'dark';
-        button.textContent = dark ? '\u2600' : '\u263E';
-        button.setAttribute('aria-label', dark ? 'Switch to light mode' : 'Switch to dark mode');
-        button.setAttribute('title', dark ? 'Switch to light mode' : 'Switch to dark mode');
-    }
-
-    function setTheme(theme) {
-        document.documentElement.setAttribute('data-theme', theme);
-        try {
-            localStorage.setItem(preferenceKey, theme);
-            localStorage.setItem(legacyKey, theme);
-        } catch (e) {}
-        updateThemeButton();
-    }
-
-    document.addEventListener('DOMContentLoaded', function () {
-        var button = document.getElementById('themeButton');
-        if (button) {
-            button.addEventListener('click', function () {
-                var current = document.documentElement.getAttribute('data-theme');
-                setTheme(current === 'dark' ? 'light' : 'dark');
-            });
-        }
-        updateThemeButton();
-    });
-
+    // Theme handling is managed only by the shared theme-global.js file.
+    // Keep invitation copying local to this page.
     window.copyInvite = function (id) {
         var field = document.getElementById(id);
         if (!field) return;
@@ -750,7 +706,6 @@ $notePoints = (int)$notePointsStmt->fetchColumn();
     };
 })();
 </script>
-
 
 <style>
 
@@ -1562,6 +1517,7 @@ textarea::placeholder {
 <link rel="stylesheet" href="<?= e(url('assets/css/ulearn-community-phase4.css?v=1')) ?>">
 <link rel="stylesheet" href="<?= e(url('assets/css/ulearn-kuppiya-premium.css?v=3-20261110')) ?>">
 <script defer src="<?= e(url('assets/js/ulearn-kuppiya-premium.js?v=3-20261110')) ?>"></script>
+<script src="<?= htmlspecialchars(url('assets/js/theme-global.js?v=20261112-1'), ENT_QUOTES, 'UTF-8') ?>"></script>
 </head>
 
 
@@ -1624,7 +1580,9 @@ textarea::placeholder {
         <span class="notification-count" aria-hidden="true"><?= $unreadNotifications > 99 ? '99+' : $unreadNotifications ?></span>
     <?php endif; ?>
 </a>
-<button id="themeButton" class="theme-button" type="button" aria-label="Toggle theme" title="Toggle theme">☾</button>
+<button id="themeButton" class="theme-button" type="button" aria-label="Switch to dark mode" title="Switch to dark mode" aria-pressed="false">
+    <span class="theme-icon" aria-hidden="true">☾</span>
+</button>
 
 <a class="avatar"
    href="<?= e(url('dashboard/profile.php')) ?>"
@@ -2564,5 +2522,76 @@ document.querySelectorAll('[data-kp-scope]').forEach(function(toolbar){
 </script>
 
 <script src="<?= e(url('assets/js/notifications-live.js?v=20261107-profile-only-2')) ?>" data-base="<?= e(rtrim(url(), '/')) ?>" defer></script>
-<?php require_once __DIR__ . '/../includes/student-bot.php'; ?></body>
+<?php require_once __DIR__ . '/../includes/student-bot.php'; ?>
+
+<!-- Theme fallback: used only if the shared theme-global.js did not load. -->
+<script>
+(function () {
+    'use strict';
+
+    // The shared ULearn theme script remains the primary theme controller.
+    // This fallback prevents the Kuppiya toggle from becoming inactive if
+    // the shared script URL is temporarily unavailable.
+    if (window.ULearnTheme) return;
+
+    var root = document.documentElement;
+    var button = document.getElementById('themeButton');
+    if (!button) return;
+
+    var preference = 'system';
+    var media = window.matchMedia('(prefers-color-scheme: dark)');
+
+    try {
+        var saved = localStorage.getItem('ulearn-theme-preference');
+        if (saved === 'light' || saved === 'dark' || saved === 'system') {
+            preference = saved;
+        } else {
+            var legacy = localStorage.getItem('ulearn-theme');
+            if (legacy === 'light' || legacy === 'dark') preference = legacy;
+        }
+    } catch (error) {
+        // Use the system preference when browser storage is unavailable.
+    }
+
+    function activeTheme() {
+        return preference === 'system' ? (media.matches ? 'dark' : 'light') : preference;
+    }
+
+    function applyTheme() {
+        var active = activeTheme();
+        root.setAttribute('data-theme', active);
+        root.style.colorScheme = active;
+
+        var icon = button.querySelector('.theme-icon');
+        if (icon) icon.textContent = active === 'dark' ? '☀' : '☾';
+
+        var label = active === 'dark' ? 'Switch to light mode' : 'Switch to dark mode';
+        button.setAttribute('aria-label', label);
+        button.setAttribute('title', label);
+        button.setAttribute('aria-pressed', String(active === 'dark'));
+
+        try {
+            localStorage.setItem('ulearn-theme-preference', preference);
+            localStorage.setItem('ulearn-theme', active);
+        } catch (error) {
+            // Theme remains active for this page even if storage is blocked.
+        }
+    }
+
+    button.addEventListener('click', function () {
+        preference = activeTheme() === 'dark' ? 'light' : 'dark';
+        applyTheme();
+    });
+
+    if (media.addEventListener) {
+        media.addEventListener('change', function () {
+            if (preference === 'system') applyTheme();
+        });
+    }
+
+    applyTheme();
+})();
+</script>
+
+</body>
 </html>

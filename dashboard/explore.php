@@ -16,14 +16,18 @@ if (($u['role'] ?? '') !== 'student') {
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     csrf_check();
+
     $action = (string)($_POST['action'] ?? '');
     $moduleId = filter_var($_POST['module_id'] ?? null, FILTER_VALIDATE_INT);
 
     if ($action !== 'enroll' || $moduleId === false || $moduleId < 1) {
         $error = 'Invalid enrollment request.';
     } else {
-        $check = $pdo->prepare('SELECT id FROM academic_modules WHERE id = ? AND is_active = 1');
+        $check = $pdo->prepare(
+            'SELECT id FROM academic_modules WHERE id = ? AND is_active = 1'
+        );
         $check->execute([$moduleId]);
+
         if (!$check->fetchColumn()) {
             $error = 'This module is not available for enrollment.';
         } else {
@@ -31,9 +35,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 'INSERT IGNORE INTO student_module_enrollments (user_id, module_id) VALUES (?, ?)'
             );
             $stmt->execute([$userId, $moduleId]);
+
             $_SESSION['explore_notice'] = $stmt->rowCount() > 0
                 ? 'You enrolled in the module successfully.'
                 : 'You are already enrolled in this module.';
+
             go('dashboard/explore.php');
         }
     }
@@ -58,6 +64,7 @@ $modules = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
 $enrolled = [];
 $available = [];
+
 foreach ($modules as $module) {
     if ((int)$module['is_enrolled'] === 1) {
         $enrolled[] = $module;
@@ -67,6 +74,7 @@ foreach ($modules as $module) {
 }
 
 $theme = (string)($u['theme'] ?? 'system');
+
 if (!in_array($theme, ['light', 'dark', 'system'], true)) {
     $theme = 'system';
 }
@@ -76,123 +84,488 @@ if (!in_array($theme, ['light', 'dark', 'system'], true)) {
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
+
     <title>Explore &amp; Enroll — ULearn</title>
+
     <style>
-        :root { color-scheme: light; --bg:#f7f8fc; --surface:#fff; --text:#171927; --muted:#777b90; --border:#e7e8f0; --accent:#6756e8; --soft:#f0edff; }
-        :root[data-theme="dark"] { color-scheme: dark; --bg:#0c0e16; --surface:#161924; --text:#f4f4fa; --muted:#a0a4b6; --border:#2b2e3c; --accent:#a99aff; --soft:#292440; }
-        @media (prefers-color-scheme: dark) { :root[data-theme="system"] { color-scheme:dark; --bg:#0c0e16; --surface:#161924; --text:#f4f4fa; --muted:#a0a4b6; --border:#2b2e3c; --accent:#a99aff; --soft:#292440; } }
-        * { box-sizing:border-box; }
-        body { margin:0; font-family:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif; background:var(--bg); color:var(--text); line-height:1.55; }
-        a { color:var(--accent); text-decoration:none; }
-        .container { max-width:1100px; margin:0 auto; padding:36px 22px 90px; }
-        .top { display:flex; justify-content:space-between; align-items:center; gap:16px; flex-wrap:wrap; }
-        .brand { font-weight:800; font-size:24px; letter-spacing:-1px; color:var(--text); }
-        .brand span { color:var(--accent); }
-        .back { font-size:14px; font-weight:700; }
-        h1 { font-size:clamp(30px,5vw,48px); letter-spacing:-1.6px; margin:48px 0 10px; }
-        h2 { margin:38px 0 16px; font-size:24px; }
-        .lead,.hint { color:var(--muted); }
-        .lead { max-width:760px; }
-        .grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:16px; }
-        .card { background:var(--surface); border:1px solid var(--border); border-radius:18px; padding:24px; min-width:0; }
-        .code { font-size:12px; color:var(--muted); font-weight:800; letter-spacing:1px; }
-        .card h3 { margin:8px 0; font-size:20px; overflow-wrap:anywhere; }
-        .card p { color:var(--muted); font-size:14px; overflow-wrap:anywhere; }
-        .pill { display:inline-block; border-radius:100px; background:var(--soft); color:var(--accent); padding:6px 12px; font-size:12px; font-weight:800; }
-        button { border:0; background:var(--accent); color:#fff; padding:11px 18px; border-radius:10px; cursor:pointer; font-weight:750; font-size:14px; }
-        .message { border-radius:12px; padding:14px 18px; margin-top:22px; background:var(--soft); }
-        .error { background:#ffedf0; color:#a32143; }
-        .empty { padding:25px; border:1px dashed var(--border); border-radius:16px; color:var(--muted); }
-        .count { color:var(--muted); font-size:14px; font-weight:500; }
-        @media (max-width:650px) { .grid { grid-template-columns:1fr; } }
+        :root {
+            color-scheme: light;
+            --bg: #f7f8fc;
+            --surface: #fff;
+            --text: #171927;
+            --muted: #777b90;
+            --border: #e7e8f0;
+            --accent: #6756e8;
+            --soft: #f0edff;
+        }
+
+        :root[data-theme="dark"] {
+            color-scheme: dark;
+            --bg: #0c0e16;
+            --surface: #161924;
+            --text: #f4f4fa;
+            --muted: #a0a4b6;
+            --border: #2b2e3c;
+            --accent: #a99aff;
+            --soft: #292440;
+        }
+
+        @media (prefers-color-scheme: dark) {
+            :root[data-theme="system"] {
+                color-scheme: dark;
+                --bg: #0c0e16;
+                --surface: #161924;
+                --text: #f4f4fa;
+                --muted: #a0a4b6;
+                --border: #2b2e3c;
+                --accent: #a99aff;
+                --soft: #292440;
+            }
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            font-family: Inter, -apple-system, BlinkMacSystemFont,
+                "Segoe UI", Arial, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            line-height: 1.55;
+        }
+
+        a {
+            color: var(--accent);
+            text-decoration: none;
+        }
+
+        .container {
+            max-width: 1100px;
+            margin: 0 auto;
+            padding: 36px 22px 90px;
+        }
+
+        .top {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 16px;
+            flex-wrap: wrap;
+        }
+
+        .brand {
+            font-weight: 800;
+            font-size: 24px;
+            letter-spacing: -1px;
+            color: var(--text);
+        }
+
+        .brand span {
+            color: var(--accent);
+        }
+
+        .back {
+            font-size: 14px;
+            font-weight: 700;
+        }
+
+        .ex-top-actions {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+        }
+
+        h1 {
+            font-size: clamp(30px, 5vw, 48px);
+            letter-spacing: -1.6px;
+            margin: 48px 0 10px;
+        }
+
+        h2 {
+            margin: 38px 0 16px;
+            font-size: 24px;
+        }
+
+        .lead,
+        .hint {
+            color: var(--muted);
+        }
+
+        .lead {
+            max-width: 760px;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 16px;
+        }
+
+        .card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 18px;
+            padding: 24px;
+            min-width: 0;
+        }
+
+        .code {
+            font-size: 12px;
+            color: var(--muted);
+            font-weight: 800;
+            letter-spacing: 1px;
+        }
+
+        .card h3 {
+            margin: 8px 0;
+            font-size: 20px;
+            overflow-wrap: anywhere;
+        }
+
+        .card p {
+            color: var(--muted);
+            font-size: 14px;
+            overflow-wrap: anywhere;
+        }
+
+        .pill {
+            display: inline-block;
+            border-radius: 100px;
+            background: var(--soft);
+            color: var(--accent);
+            padding: 6px 12px;
+            font-size: 12px;
+            font-weight: 800;
+        }
+
+        button:not(.theme-toggle) {
+            border: 0;
+            background: var(--accent);
+            color: #fff;
+            padding: 11px 18px;
+            border-radius: 10px;
+            cursor: pointer;
+            font-weight: 750;
+            font-size: 14px;
+        }
+
+        .message {
+            border-radius: 12px;
+            padding: 14px 18px;
+            margin-top: 22px;
+            background: var(--soft);
+        }
+
+        .error {
+            background: #ffedf0;
+            color: #a32143;
+        }
+
+        .empty {
+            padding: 25px;
+            border: 1px dashed var(--border);
+            border-radius: 16px;
+            color: var(--muted);
+        }
+
+        .count {
+            color: var(--muted);
+            font-size: 14px;
+            font-weight: 500;
+        }
+
+        @media (max-width: 650px) {
+            .grid {
+                grid-template-columns: 1fr;
+            }
+
+            .ex-top-actions {
+                width: 100%;
+                justify-content: space-between;
+            }
+        }
     </style>
 
-<script src="<?= htmlspecialchars(url('assets/js/theme-global.js?v=20261107-2'), ENT_QUOTES, 'UTF-8') ?>"></script>
-<link rel="stylesheet" href="<?= e(url('assets/css/ulearn-design-system.css?v=1')) ?>">
-<script defer src="<?= e(url('assets/js/ulearn-motion.js?v=1')) ?>"></script>
-<link rel="stylesheet" href="<?= e(url('assets/css/ulearn-student-workspaces.css?v=3')) ?>">
-<link rel="stylesheet" href="<?= e(url('assets/css/ulearn-explore-premium.css?v=20261110-21')) ?>">
-<script defer src="<?= e(url('assets/js/ulearn-explore-premium.js?v=20261110-21')) ?>"></script>
+    <!-- Shared ULearn theme styles -->
+    <link rel="stylesheet"
+          href="<?= e(url('assets/css/ulearn-design-system.css?v=1')) ?>">
+
+    <link rel="stylesheet"
+          href="<?= e(url('assets/css/theme-global.css?v=20261112-1')) ?>">
+
+    <!-- Shared theme controller -->
+    <script defer
+            src="<?= e(url('assets/js/theme-global.js?v=20261112-3')) ?>">
+    </script>
+
+    <!-- Existing page assets -->
+    <script defer
+            src="<?= e(url('assets/js/ulearn-motion.js?v=1')) ?>">
+    </script>
+
+    <link rel="stylesheet"
+          href="<?= e(url('assets/css/ulearn-student-workspaces.css?v=3')) ?>">
+
+    <link rel="stylesheet"
+          href="<?= e(url('assets/css/ulearn-explore-premium.css?v=20261110-21')) ?>">
+
+    <script defer
+            src="<?= e(url('assets/js/ulearn-explore-premium.js?v=20261110-21')) ?>">
+    </script>
 </head>
+
 <body class="ul3-explore">
+
 <main class="container">
+
     <header class="top">
-        <a class="brand ex-brand" href="<?= e(url('dashboard/index.php')) ?>" aria-label="ULearn dashboard"><img src="<?= e(url('assets/images/nsbm-shield-only.png')) ?>" width="38" height="42" alt=""><span class="ex-wordmark"><b>u</b>Learn<span>.</span></span></a>
+
+        <a class="brand ex-brand"
+           href="<?= e(url('dashboard/index.php')) ?>"
+           aria-label="ULearn dashboard">
+
+            <img src="<?= e(url('assets/images/nsbm-shield-only.png')) ?>"
+                 width="38"
+                 height="42"
+                 alt="">
+
+            <span class="ex-wordmark">
+                <b>u</b>Learn<span>.</span>
+            </span>
+        </a>
+
         <div class="ex-top-actions">
-            <button type="button" id="ex-theme-toggle" class="ex-theme-toggle" aria-label="Switch color theme" title="Switch light/dark theme"><span class="ex-theme-icon" aria-hidden="true">☾</span><span class="ex-theme-label">Dark mode</span></button>
-            <a class="back" href="<?= e(url('dashboard/index.php')) ?>">← Back to dashboard</a>
+
+            <!-- Shared theme button -->
+            <button
+                type="button"
+                id="themeButton"
+                class="theme-toggle"
+                aria-label="Switch color theme"
+                title="Switch color theme"
+            >
+                <span class="theme-icon" aria-hidden="true">☾</span>
+            </button>
+
+            <a class="back" href="<?= e(url('dashboard/index.php')) ?>">
+                ← Back to dashboard
+            </a>
+
         </div>
+
     </header>
+
     <div class="explore-heading">
-        <div><div class="explore-eyebrow"><span class="explore-status-dot"></span> YOUR LEARNING JOURNEY</div>
-        <h1>Explore <span>&amp; Enroll</span></h1></div>
-        <div class="explore-summary" aria-label="Module summary">
-            <div><strong><?= count($enrolled) ?></strong><small>Enrolled</small></div>
-            <div><strong><?= count($available) ?></strong><small>Available</small></div>
+
+        <div>
+            <div class="explore-eyebrow">
+                <span class="explore-status-dot"></span>
+                YOUR LEARNING JOURNEY
+            </div>
+
+            <h1>Explore <span>&amp; Enroll</span></h1>
         </div>
+
+        <div class="explore-summary" aria-label="Module summary">
+
+            <div>
+                <strong><?= count($enrolled) ?></strong>
+                <small>Enrolled</small>
+            </div>
+
+            <div>
+                <strong><?= count($available) ?></strong>
+                <small>Available</small>
+            </div>
+
+        </div>
+
     </div>
+
     <nav class="ex-quick-nav" aria-label="Explore page sections">
-        <a href="#enrolled-heading">My enrolled modules <span><?= count($enrolled) ?></span></a>
-        <a href="#explore-heading">Available modules <span><?= count($available) ?></span></a>
+
+        <a href="#enrolled-heading">
+            My enrolled modules
+            <span><?= count($enrolled) ?></span>
+        </a>
+
+        <a href="#explore-heading">
+            Available modules
+            <span><?= count($available) ?></span>
+        </a>
+
     </nav>
-    <p class="lead">Discover available modules across programmes and enroll to add them to your learning list. Enrollment here is for self-directed learning; it does not change your official degree, batch, or academic progression.</p>
+
+    <p class="lead">
+        Discover available modules across programmes and enroll to add them
+        to your learning list. Enrollment here is for self-directed learning;
+        it does not change your official degree, batch, or academic progression.
+    </p>
 
     <?php if ($notice !== ''): ?>
-        <div class="message" role="status"><?= e($notice) ?></div>
-    <?php endif; ?>
-    <?php if ($error !== ''): ?>
-        <div class="message error" role="alert"><?= e($error) ?></div>
-    <?php endif; ?>
-
-    <section class="explore-section" aria-labelledby="enrolled-heading">
-        <h2 id="enrolled-heading">My Enrolled Modules <span class="count">(<?= count($enrolled) ?>)</span></h2>
-        <?php if (!$enrolled): ?>
-            <div class="empty">You haven't enrolled in any modules yet. Explore the modules below to get started.</div>
-        <?php else: ?>
-            <div class="grid ex-card-grid">
-                <?php foreach ($enrolled as $module): ?>
-                    <article class="card ex-module-card">
-                        <div class="code"><?= e($module['module_code']) ?></div>
-                        <h3><?= e($module['module_name']) ?></h3>
-                        <p><?= e($module['description'] ?: 'Learning module') ?></p>
-                        <span class="pill">Enrolled ✓</span>
-                    </article>
-                <?php endforeach; ?>
-            </div>
-        <?php endif; ?>
-    </section>
-
-    <section class="explore-section" aria-labelledby="explore-heading">
-        <?php if ($available): ?>
-        <div class="explore-tools">
-            <label for="explore-module-search">Find a module</label>
-            <input id="explore-module-search" type="search" placeholder="Search module name or code..." autocomplete="off" aria-controls="explore-available-grid">
-            <span id="explore-search-count" aria-live="polite"></span>
+        <div class="message" role="status">
+            <?= e($notice) ?>
         </div>
-        <?php endif; ?>
-        <h2 id="explore-heading">Explore Available Modules <span class="count">(<?= count($available) ?>)</span></h2>
-        <p class="hint">Only active modules appear here. Semester information will be added when we connect curriculum listings in the next step.</p>
-        <?php if (!$available): ?>
-            <div class="empty">No additional active modules are available to enroll in right now.</div>
-        <?php else: ?>
-            <div class="grid ex-card-grid" id="explore-available-grid">
-                <?php foreach ($available as $module): ?>
-                    <article class="card ex-module-card">
-                        <div class="code"><?= e($module['module_code']) ?></div>
-                        <h3><?= e($module['module_name']) ?></h3>
-                        <p><?= e($module['description'] ?: 'Learning module') ?></p>
-                        <form method="post" action="<?= e(url('dashboard/explore.php')) ?>">
-                            <input type="hidden" name="csrf" value="<?= e(csrf()) ?>">
-                            <input type="hidden" name="action" value="enroll">
-                            <input type="hidden" name="module_id" value="<?= (int)$module['id'] ?>">
-                            <button type="submit">Enroll in module</button>
-                        </form>
-                    </article>
-                <?php endforeach; ?>
+    <?php endif; ?>
+
+    <?php if ($error !== ''): ?>
+        <div class="message error" role="alert">
+            <?= e($error) ?>
+        </div>
+    <?php endif; ?>
+
+
+    <!-- Enrolled Modules -->
+    <section class="explore-section" aria-labelledby="enrolled-heading">
+
+        <h2 id="enrolled-heading">
+            My Enrolled Modules
+            <span class="count">(<?= count($enrolled) ?>)</span>
+        </h2>
+
+        <?php if (!$enrolled): ?>
+
+            <div class="empty">
+                You haven't enrolled in any modules yet.
+                Explore the modules below to get started.
             </div>
-            <p class="empty" id="explore-no-results" hidden>No modules match your search. Try another name or code.</p>
+
+        <?php else: ?>
+
+            <div class="grid ex-card-grid">
+
+                <?php foreach ($enrolled as $module): ?>
+
+                    <article class="card ex-module-card">
+
+                        <div class="code">
+                            <?= e($module['module_code']) ?>
+                        </div>
+
+                        <h3>
+                            <?= e($module['module_name']) ?>
+                        </h3>
+
+                        <p>
+                            <?= e($module['description'] ?: 'Learning module') ?>
+                        </p>
+
+                        <span class="pill">
+                            Enrolled ✓
+                        </span>
+
+                    </article>
+
+                <?php endforeach; ?>
+
+            </div>
+
         <?php endif; ?>
+
     </section>
+
+
+    <!-- Available Modules -->
+    <section class="explore-section" aria-labelledby="explore-heading">
+
+        <?php if ($available): ?>
+
+            <div class="explore-tools">
+
+                <label for="explore-module-search">
+                    Find a module
+                </label>
+
+                <input
+                    id="explore-module-search"
+                    type="search"
+                    placeholder="Search module name or code..."
+                    autocomplete="off"
+                    aria-controls="explore-available-grid"
+                >
+
+                <span id="explore-search-count" aria-live="polite"></span>
+
+            </div>
+
+        <?php endif; ?>
+
+        <h2 id="explore-heading">
+            Explore Available Modules
+            <span class="count">(<?= count($available) ?>)</span>
+        </h2>
+
+        <p class="hint">
+            Only active modules appear here. Semester information will be
+            added when we connect curriculum listings in the next step.
+        </p>
+
+        <?php if (!$available): ?>
+
+            <div class="empty">
+                No additional active modules are available to enroll in right now.
+            </div>
+
+        <?php else: ?>
+
+            <div class="grid ex-card-grid" id="explore-available-grid">
+
+                <?php foreach ($available as $module): ?>
+
+                    <article class="card ex-module-card">
+
+                        <div class="code">
+                            <?= e($module['module_code']) ?>
+                        </div>
+
+                        <h3>
+                            <?= e($module['module_name']) ?>
+                        </h3>
+
+                        <p>
+                            <?= e($module['description'] ?: 'Learning module') ?>
+                        </p>
+
+                        <form method="post"
+                              action="<?= e(url('dashboard/explore.php')) ?>">
+
+                            <input type="hidden"
+                                   name="csrf"
+                                   value="<?= e(csrf()) ?>">
+
+                            <input type="hidden"
+                                   name="action"
+                                   value="enroll">
+
+                            <input type="hidden"
+                                   name="module_id"
+                                   value="<?= (int)$module['id'] ?>">
+
+                            <button type="submit">
+                                Enroll in module
+                            </button>
+
+                        </form>
+
+                    </article>
+
+                <?php endforeach; ?>
+
+            </div>
+
+            <p class="empty" id="explore-no-results" hidden>
+                No modules match your search. Try another name or code.
+            </p>
+
+        <?php endif; ?>
+
+    </section>
+
 </main>
-<?php require_once __DIR__ . '/../includes/student-bot.php'; ?></body>
+
+<?php require_once __DIR__ . '/../includes/student-bot.php'; ?>
+
+</body>
 </html>

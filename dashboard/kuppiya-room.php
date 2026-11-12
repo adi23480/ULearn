@@ -124,6 +124,7 @@ a{color:inherit;text-decoration:none}.wrap{max-width:1240px;margin:0 auto;paddin
 </style>
 
 <link rel="stylesheet" href="<?= e(url('assets/css/ulearn-community-phase4.css?v=1')) ?>">
+<script src="<?= htmlspecialchars(url('assets/js/theme-global.js?v=20261112-1'), ENT_QUOTES, 'UTF-8') ?>"></script>
 </head>
 <body>
 
@@ -217,4 +218,5 @@ a{color:inherit;text-decoration:none}.wrap{max-width:1240px;margin:0 auto;paddin
 })();
 </script>
 <script>(function(){const chat=document.getElementById('messages');if(chat)chat.scrollTop=chat.scrollHeight;const form=document.getElementById('chatForm');if(!form)return;const input=document.getElementById('messageInput'),button=document.getElementById('sendButton');input.addEventListener('keydown',function(e){if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();if(input.value.trim()&&!button.disabled)form.requestSubmit();}});form.addEventListener('submit',function(e){if(!input.value.trim()){e.preventDefault();return;}button.disabled=true;button.textContent='Sending…';});})();</script><script src="<?= e(url('assets/js/notifications-live.js?v=20261107-profile-only-2')) ?>" data-base="<?= e(rtrim(url(), '/')) ?>" defer></script>
-<?php require_once __DIR__ . '/../includes/student-bot.php'; ?></body></html><div class=
+<?php require_once __DIR__ . '/../includes/student-bot.php'; ?>
+</body></html><div class=

@@ -136,7 +136,6 @@ $initial = strtoupper(substr(trim((string)$profile['full_name']), 0, 1));
 </style>
 <style>.stage9-card{background:var(--card,#fff);color:var(--text,#1c2040);border:1px solid var(--border,#e5e7ef);border-radius:20px;padding:22px;margin:20px 0;box-shadow:0 10px 35px #13172a09}.stage9-card h2{margin:0 0 8px;font-size:20px}.stage9-card p{color:var(--muted,#6d7486);margin:0 0 14px}.stage9-head{display:flex;align-items:center;gap:18px}.stage9-head img{width:86px;height:86px;border-radius:20px}.stage9-card label{display:block;font-size:13px;font-weight:650;margin:14px 0 6px}.stage9-card select,.stage9-card textarea{width:100%;max-width:440px;padding:11px;border-radius:10px;border:1px solid var(--border,#dce0eb);background:var(--card,#fff);color:var(--text,#222);font:inherit}.stage9-button{border:0;border-radius:10px;background:#7158d9;color:#fff;padding:11px 16px;cursor:pointer;margin:10px 0;font:inherit}.stage9-avatars{display:grid;grid-template-columns:repeat(auto-fill,minmax(60px,1fr));gap:10px;margin-top:14px}.stage9-avatars img{width:100%;border-radius:14px}.stage9-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:14px}.stage9-grid strong{display:block}.stage9-note{font-size:13px;color:var(--muted,#777)}@media(max-width:600px){.stage9-card{padding:16px}.stage9-head img{width:64px;height:64px}}</style>
 <style>.appearance-title{display:flex;justify-content:space-between;align-items:start}.appearance-symbol{font-size:32px;color:var(--accent)}.theme-options{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;margin:22px 0}.theme-choice{display:flex;flex-direction:column;gap:7px;padding:13px;border:1.5px solid var(--border);border-radius:17px;cursor:pointer;transition:transform .18s,border-color .18s,box-shadow .18s;position:relative}.theme-choice:hover{transform:translateY(-2px)}.theme-choice:has(input:checked){border-color:var(--accent);box-shadow:0 0 0 3px color-mix(in srgb,var(--accent) 13%,transparent)}.theme-choice input{position:absolute;right:15px;top:15px;accent-color:#8069e8;width:17px;height:17px}.theme-choice strong{font-size:15px}.theme-choice small{font-size:12px;color:var(--muted)}.theme-art{height:92px;border-radius:11px;display:block;position:relative;overflow:hidden;border:1px solid #9ca1bc44}.theme-art i{position:absolute;top:15px;left:13px;width:22%;height:68%;border-radius:5px}.theme-art b{position:absolute;top:15px;left:39%;width:49%;height:22%;border-radius:5px;box-shadow:0 28px 0 -2px currentColor,0 48px 0 -2px currentColor}.theme-art-light{background:#f4f5fa;color:#dedff0}.theme-art-light i{background:#d5d8ec}.theme-art-dark{background:#111625;color:#333a58}.theme-art-dark i{background:#282f4c}.theme-art-system{background:linear-gradient(90deg,#f4f5fa 50%,#111625 50%);color:#8d8eaf}.theme-art-system i{background:linear-gradient(90deg,#d5d8ec 50%,#282f4c 50%)}.appearance-save{margin-top:4px}@media(max-width:650px){.theme-options{gap:8px}.theme-choice{padding:8px}.theme-art{height:65px}.theme-choice strong{font-size:12px}.theme-choice small{font-size:10px}}</style>
-<script src="<?= htmlspecialchars(url('assets/js/theme-global.js?v=20261107-2'), ENT_QUOTES, 'UTF-8') ?>"></script>
 <style id="ulearn-notification-contrast-fix">
 #uln-settings-host{background:var(--card)!important;color:var(--text)!important;border-color:var(--border)!important}
 #uln-settings-host h2,#uln-settings-host h3,#uln-settings-host label,#uln-settings-host #uln-panel{color:var(--text)!important}
@@ -145,6 +144,7 @@ $initial = strtoupper(substr(trim((string)$profile['full_name']), 0, 1));
 </style>
 <link rel="stylesheet" href="<?= e(url('assets/css/ulearn-community-phase4.css?v=1')) ?>">
 <link rel="stylesheet" href="<?= e(url('assets/css/ulearn-profile-premium.css?v=2')) ?>">
+<script src="<?= htmlspecialchars(url('assets/js/theme-global.js?v=20261112-1'), ENT_QUOTES, 'UTF-8') ?>"></script>
 </head>
 <body class="profile-premium">
 <div class="layout">
@@ -198,5 +198,6 @@ $stage9Requests->execute([$userId]);$stage9Requests=$stage9Requests->fetchAll(PD
 
 <script src="<?= e(url('assets/js/notifications-live.js?v=20261107-profile-only-2')) ?>" data-base="<?= e(rtrim(url(), '/')) ?>" defer></script>
 <script src="<?= e(url('assets/js/ulearn-profile-premium.js?v=2')) ?>" defer></script>
-<?php require_once __DIR__ . '/../includes/student-bot.php'; ?></body>
+<?php require_once __DIR__ . '/../includes/student-bot.php'; ?>
+</body>
 </html>

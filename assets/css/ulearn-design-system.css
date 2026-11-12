@@ -100,8 +100,8 @@ body.ul-ready :where(main,.main-content,.dashboard-main,.content-area):first-of-
     flex-shrink: 0;
 
     transition: transform .18s ease,
-                background .18s ease,
-                border-color .18s ease;
+            background-color .18s ease,
+            border-color .18s ease;
 }
 
 .theme-toggle:hover {
@@ -120,4 +120,28 @@ body.ul-ready :where(main,.main-content,.dashboard-main,.content-area):first-of-
 
 :root[data-theme="dark"] .theme-toggle {
     color: var(--accent, var(--green, #5ce3b5));
+}
+
+.theme-toggle {
+    width: 42px;
+    height: 42px;
+    min-width: 42px;
+
+    display: inline-grid;
+    place-items: center;
+
+    border: 1px solid var(--border, var(--line, #dce5e9));
+    border-radius: 12px;
+
+    background: var(--surface, var(--card, #ffffff));
+    color: var(--accent, var(--green, #07845f));
+
+    box-shadow: var(--shadow, 0 4px 16px #00000008);
+
+    cursor: pointer;
+    flex-shrink: 0;
+
+    transition: transform .18s ease,
+                background .18s ease,
+                border-color .18s ease;
 }

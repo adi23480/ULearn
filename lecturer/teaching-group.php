@@ -36,9 +36,9 @@ $base=url('lecturer/teaching-group.php').'?id='.(int)$group['id'];
 </style>
 <script>(function(){try{let t=localStorage.getItem('ulearn-theme');if(t!=='light'&&t!=='dark'){const p=<?= json_encode($theme) ?>;t=p==='system'?(matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light'):p;}document.documentElement.dataset.theme=t;}catch(e){}})();</script>
 
-<script src="<?= htmlspecialchars(url('assets/js/theme-global.js?v=20261107-2'), ENT_QUOTES, 'UTF-8') ?>"></script>
 <link rel="stylesheet" href="<?= e(url('assets/css/lecturer-premium-v5.css?v=1')) ?>">
 <script defer src="<?= e(url('assets/js/lecturer-premium-v5.js?v=1')) ?>"></script>
+<script src="<?= htmlspecialchars(url('assets/js/theme-global.js?v=20261112-1'), ENT_QUOTES, 'UTF-8') ?>"></script>
 </head><body>
 <?php
 function groupIcon(string $name):string {
@@ -75,4 +75,5 @@ function groupIcon(string $name):string {
 <div class="tool-grid"><a class="tool-link" href="<?= e(url('lecturer/quizzes.php')) ?>"><span class="tool-icon"><?= groupIcon('quizzes') ?></span><span><strong>Quiz management</strong><small>Create and manage assessments</small></span><span class="tool-arrow">→</span></a><a class="tool-link" href="<?= e(url('lecturer/materials.php')) ?>"><span class="tool-icon"><?= groupIcon('materials') ?></span><span><strong>Learning materials</strong><small>Upload and manage resources</small></span><span class="tool-arrow">→</span></a></div>
 <?php endif; ?>
 <p class="note">Module access is controlled by individual lecturer assignments. Teaching group membership alone does not grant module permissions.</p>
-</div></main></div></div><script src="<?= e(url('assets/js/scroll-position.js')) ?>" defer></script></body></html>
+</div></main></div></div><script src="<?= e(url('assets/js/scroll-position.js')) ?>" defer></script>
+</body></html>

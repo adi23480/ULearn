@@ -1,232 +1,315 @@
 
-/* ULearn Global Theme System — Light, Dark, System */
+/* ULearn Global Theme System
+ * Shared by Admin, Student and Lecturer.
+ */
 (() => {
     'use strict';
 
+    if (window.ULearnTheme) return;
+
     const root = document.documentElement;
-    const key = 'ulearn-theme-preference';
-    const legacyKey = 'ulearn-theme';
-    const api = '/ulearn/theme-preference.php';
-    const media = window.matchMedia('(prefers-color-scheme: dark)');
 
-    const valid = value =>
-        ['light', 'dark', 'system'].includes(value);
+    const STORAGE_KEY = 'ulearn-theme-preference';
+    const LEGACY_KEY = 'ulearn-theme';
 
-    function readPreference() {
-        try {
-            const saved = localStorage.getItem(key);
-            if (valid(saved)) return saved;
+    const API = new URL(
+        '../../theme-preference.php',
+        document.currentScript.src
+    ).href;
 
-            const legacy = localStorage.getItem(legacyKey);
-            if (legacy === 'light' || legacy === 'dark') {
-                return legacy;
-            }
-        } catch (_) {}
+    const VALID_THEMES = ['light', 'dark', 'system'];
 
-        return 'system';
-    }
+    const media = window.matchMedia(
+        '(prefers-color-scheme: dark)'
+    );
 
-    let preference = readPreference();
+    let preference = 'system';
     let csrfToken = '';
     let userChanged = false;
-    let applying = false;
-    let pendingSave = false;
+    let saveQueue = Promise.resolve();
 
-    function resolved() {
-        return preference === 'system'
-            ? (media.matches ? 'dark' : 'light')
-            : preference;
-    }
+    const validTheme = value =>
+        VALID_THEMES.includes(value);
 
-    function updateIcons(theme) {
-        document.querySelectorAll('.theme-icon').forEach(icon => {
-            icon.textContent = theme === 'dark' ? '☀' : '☾';
-        });
-
-        const qaToggle = document.getElementById('qaThemeToggle');
-
-        if (qaToggle) {
-            qaToggle.innerHTML = theme === 'dark'
-                ? '<svg viewBox="0 0 24 24" width="20" height="20"><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line></svg>'
-                : '<svg viewBox="0 0 24 24" width="20" height="20"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>';
-
-            qaToggle.setAttribute(
-                'aria-label',
-                theme === 'dark'
-                    ? 'Switch to light mode'
-                    : 'Switch to dark mode'
-            );
-            qaToggle.title = qaToggle.getAttribute('aria-label');
+    function getActiveTheme() {
+        if (preference === 'system') {
+            return media.matches ? 'dark' : 'light';
         }
 
+        return preference;
+    }
+
+    function updateButton(button) {
+        if (!(button instanceof HTMLButtonElement)) return;
+
+        const active = getActiveTheme();
+
+        const icon = button.querySelector(
+            '.theme-icon, .theme-symbol, #ul-theme-icon, #themeIcon, #themeSymbol, #ucThemeIcon, #upaThemeIcon'
+        );
+
+        if (icon) {
+            icon.textContent = active === 'dark' ? '☀' : '☾';
+        }
+
+        const label = button.querySelector(
+            '.theme-name, .ex-theme-label, #themeName, #ul-theme-text, #qh-theme-text, #notes-theme-label'
+        );
+
+        if (label) {
+            label.textContent =
+                active === 'dark' ? 'Light mode' : 'Dark mode';
+        }
+
+        button.setAttribute(
+            'aria-label',
+            active === 'dark'
+                ? 'Switch to light mode'
+                : 'Switch to dark mode'
+        );
+
+        button.setAttribute('aria-pressed', String(active === 'dark'));
+    }
+
+    function updateAllButtons() {
         document.querySelectorAll(
-            '#themeToggle, #theme-toggle, #themeButton'
-        ).forEach(button => {
-            if (button.querySelector('.theme-icon')) return;
-            if (button.querySelector('svg')) return;
-
-            if (button.textContent.trim() === '☾' ||
-                button.textContent.trim() === '☀') {
-                button.textContent = theme === 'dark' ? '☀' : '☾';
-            }
-        });
+            '#themeToggle, #theme-toggle, #themeButton, #nextTheme, #qaThemeToggle, #ucTheme, #utTheme, #upaTheme, #ul-theme-toggle, #theme-button, #qh-theme, #ex-theme-toggle, #notes-theme-toggle, .theme-btn, .theme-button, .theme-toggle, .theme, .uc-theme, .ut-theme, .upa-theme, .qh-theme, .ex-theme-toggle, .notes-theme-toggle, .ui-theme, .uai-theme, [data-theme-toggle="true"]'
+        ).forEach(updateButton);
     }
 
-    function apply() {
-        const theme = resolved();
+    function applyTheme() {
+        const active = getActiveTheme();
 
-        applying = true;
-        root.dataset.theme = theme;
-        root.style.colorScheme = theme;
-
-        updateIcons(theme);
+        root.dataset.theme = active;
+        root.style.colorScheme = active;
 
         try {
-            localStorage.setItem(key, preference);
-            localStorage.setItem(legacyKey, theme);
-        } catch (_) {}
-
-        applying = false;
-    }
-
-    async function saveToDatabase() {
-        if (!csrfToken) {
-            pendingSave = true;
-            return;
+            localStorage.setItem(STORAGE_KEY, preference);
+            localStorage.setItem(LEGACY_KEY, active);
+        } catch (error) {
+            // Continue without local storage.
         }
 
-        const value = preference;
-        pendingSave = false;
+        updateAllButtons();
+    }
 
-        try {
-            const response = await fetch(api, {
+    async function saveTheme() {
+        if (!csrfToken) return;
+
+        const currentPreference = preference;
+
+        saveQueue = saveQueue.then(async () => {
+            const response = await fetch(API, {
                 method: 'POST',
                 credentials: 'same-origin',
                 headers: {
-                    'Content-Type': 'application/x-www-form-urlencoded',
+                    'Content-Type':
+                        'application/x-www-form-urlencoded;charset=UTF-8',
                     'X-Requested-With': 'XMLHttpRequest'
                 },
                 body: new URLSearchParams({
-                    theme: value,
+                    theme: currentPreference,
                     csrf: csrfToken
                 })
             });
 
             if (!response.ok) {
-                console.error('Could not save theme preference.');
+                throw new Error('Theme save failed: ' + response.status);
             }
-        } catch (error) {
-            console.error('Theme preference request failed.', error);
-        }
+
+            const result = await response.json();
+
+            if (!result.success) {
+                throw new Error(result.message || 'Theme save failed.');
+            }
+        }).catch(error => {
+            console.error('ULearn theme save error:', error);
+        });
+
+        return saveQueue;
     }
 
-    function choose(value) {
-        if (!valid(value)) return;
+    function setTheme(value) {
+        if (!validTheme(value)) return;
 
         userChanged = true;
         preference = value;
 
-        apply();
-        saveToDatabase();
+        applyTheme();
+        saveTheme();
     }
 
-    async function loadPreference() {
+    async function loadTheme() {
         try {
-            const response = await fetch(api, {
+            const response = await fetch(API, {
                 method: 'GET',
                 credentials: 'same-origin',
                 cache: 'no-store'
             });
 
-            if (!response.ok) return;
+            if (!response.ok) {
+                throw new Error('Unable to load theme preference.');
+            }
 
             const data = await response.json();
 
             csrfToken = data.csrf || '';
 
-            if (!userChanged && valid(data.theme)) {
+            if (!userChanged && validTheme(data.theme)) {
                 preference = data.theme;
-                apply();
+                applyTheme();
             }
 
-            if (pendingSave) {
-                saveToDatabase();
+            if (userChanged) {
+                saveTheme();
             }
+
         } catch (error) {
-            console.error('Could not load theme preference.', error);
+            console.error('ULearn theme loading error:', error);
         }
     }
 
-    apply();
-    loadPreference();
+    function handleToggle(event) {
+        const target = event.target;
 
-    document.addEventListener('DOMContentLoaded', apply);
+        if (!(target instanceof Element)) return;
 
-    media.addEventListener?.('change', () => {
-        if (preference === 'system') apply();
-    });
-
-    document.addEventListener('click', event => {
-        if (!(event.target instanceof Element)) return;
-
-        const button = event.target.closest(
-            '#themeToggle, #theme-toggle, #themeButton, ' +
-            '#qaThemeToggle, .theme-btn, .theme-button, .theme-toggle'
+        const button = target.closest(
+            '#themeToggle, #theme-toggle, #themeButton, #nextTheme, #qaThemeToggle, #ucTheme, #utTheme, #upaTheme, #ul-theme-toggle, #theme-button, #qh-theme, #ex-theme-toggle, #notes-theme-toggle, .theme-btn, .theme-button, .theme-toggle, .theme, .uc-theme, .ut-theme, .upa-theme, .qh-theme, .ex-theme-toggle, .notes-theme-toggle, .ui-theme, .uai-theme, [data-theme-toggle="true"]'
         );
 
         if (!button) return;
 
-        const next = resolved() === 'dark' ? 'light' : 'dark';
+        event.preventDefault();
+        event.stopPropagation();
+        event.stopImmediatePropagation();
 
-        queueMicrotask(() => choose(next));
-    }, true);
+        setTheme(getActiveTheme() === 'dark' ? 'light' : 'dark');
+    }
 
+    function ensureThemeButton() {
+        const existing = document.querySelector(
+            '#themeToggle, #theme-toggle, #themeButton, #nextTheme, #qaThemeToggle, #ucTheme, #utTheme, #upaTheme, #ul-theme-toggle, #theme-button, #qh-theme, #ex-theme-toggle, #notes-theme-toggle, .theme-btn, .theme-button, .theme-toggle, .theme, .uc-theme, .ut-theme, .upa-theme, .qh-theme, .ex-theme-toggle, .notes-theme-toggle, .ui-theme, .uai-theme, [data-theme-toggle="true"]'
+        );
+
+        if (existing) {
+            updateAllButtons();
+            return;
+        }
+
+        const button = document.createElement('button');
+
+        button.type = 'button';
+        button.className = 'ulearn-global-theme-toggle';
+        button.dataset.themeToggle = 'true';
+        button.innerHTML =
+            '<span class="theme-icon" aria-hidden="true">☾</span>';
+
+        const style = document.createElement('style');
+
+        style.textContent = `
+            .ulearn-global-theme-toggle {
+                width:42px;
+                height:42px;
+                display:inline-flex;
+                align-items:center;
+                justify-content:center;
+                border:1px solid var(--border,#ddd);
+                border-radius:12px;
+                background:var(--surface,#fff);
+                color:var(--text,#222);
+                font-size:21px;
+                cursor:pointer;
+                margin-left:8px;
+            }
+            .ulearn-global-theme-toggle.is-floating {
+                position:fixed;
+                top:16px;
+                right:18px;
+                z-index:9999;
+            }
+        `;
+
+        document.head.appendChild(style);
+
+        const host = document.querySelector(
+            '.top-actions, .topbar-right, .topbar .actions, .header-actions, .uai-headright, .upa-nav, .topbar, .top, header nav, header'
+        );
+
+        if (host) {
+            host.appendChild(button);
+        } else {
+            button.classList.add('is-floating');
+            document.body.appendChild(button);
+        }
+
+        updateButton(button);
+    }
+
+    // Restore preference before the page is displayed.
+    try {
+        const saved = localStorage.getItem(STORAGE_KEY);
+
+        if (validTheme(saved)) {
+            preference = saved;
+        } else {
+            const legacy = localStorage.getItem(LEGACY_KEY);
+
+            if (legacy === 'light' || legacy === 'dark') {
+                preference = legacy;
+            }
+        }
+    } catch (error) {
+        // Use system preference.
+    }
+
+    applyTheme();
+
+    // One global click handler for all theme buttons.
+    document.addEventListener('click', handleToggle, true);
+
+    // Support Light, Dark and System radio controls.
     document.addEventListener('change', event => {
         const target = event.target;
 
         if (
             target instanceof HTMLInputElement &&
-            target.matches('input[name="theme"]') &&
-            valid(target.value)
+            target.name === 'theme' &&
+            validTheme(target.value)
         ) {
-            choose(target.value);
+            setTheme(target.value);
         }
     }, true);
 
-    document.addEventListener('submit', event => {
-        const form = event.target;
-
-        if (!(form instanceof HTMLFormElement)) return;
-
-        const selected = form.querySelector(
-            'input[name="theme"]:checked'
-        );
-
-        if (selected && valid(selected.value)) {
-            choose(selected.value);
+    media.addEventListener('change', () => {
+        if (preference === 'system') {
+            applyTheme();
         }
-    }, true);
-
-    const observer = new MutationObserver(() => {
-        if (!applying && root.dataset.theme !== resolved()) {
-            apply();
-        }
-    });
-
-    observer.observe(root, {
-        attributes: true,
-        attributeFilter: ['data-theme']
     });
 
     window.addEventListener('storage', event => {
-        if (event.key === key && valid(event.newValue)) {
+        if (event.key === STORAGE_KEY && validTheme(event.newValue)) {
             preference = event.newValue;
-            apply();
+            applyTheme();
         }
     });
 
+    if (document.readyState === 'loading') {
+        document.addEventListener(
+            'DOMContentLoaded',
+            ensureThemeButton,
+            { once: true }
+        );
+    } else {
+        ensureThemeButton();
+    }
+
+    loadTheme();
+
     window.ULearnTheme = {
         getPreference: () => preference,
-        setPreference: choose
+        getActiveTheme,
+        setPreference: setTheme
     };
+
 })();

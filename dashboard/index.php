@@ -1230,7 +1230,6 @@ $initial = strtoupper(substr($firstName, 0, 1));
     </script>
 
 
-<script src="<?= htmlspecialchars(url('assets/js/theme-global.js?v=20261107-2'), ENT_QUOTES, 'UTF-8') ?>"></script>
 <link rel="stylesheet" href="<?= e(url('assets/css/ulearn-design-system.css?v=1')) ?>">
 <script defer src="<?= e(url('assets/js/ulearn-motion.js?v=1')) ?>"></script>
 <link rel="stylesheet" href="<?= e(url('assets/css/ulearn-student-shell.css?v=2')) ?>">
@@ -1241,6 +1240,7 @@ $initial = strtoupper(substr($firstName, 0, 1));
 <link rel="stylesheet" href="<?= e(url('assets/css/ulearn-dashboard-v51.css?v=511')) ?>">
 <link rel="stylesheet" href="<?= e(url('assets/css/ulearn-dashboard-v52.css?v=20261110')) ?>">
 <script defer src="<?= e(url('assets/js/ulearn-dashboard-v52.js?v=20261110')) ?>"></script>
+<script src="<?= htmlspecialchars(url('assets/js/theme-global.js?v=20261112-1'), ENT_QUOTES, 'UTF-8') ?>"></script>
 </head>
 
 <body>
@@ -1871,6 +1871,7 @@ $initial = strtoupper(substr($firstName, 0, 1));
 </div>
 
 <script src="<?= e(url('assets/js/notifications-live.js')) ?>" data-base="<?= e(rtrim(url(), '/')) ?>" defer></script>
+
 </body>
 
 </html>

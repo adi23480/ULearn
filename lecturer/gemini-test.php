@@ -169,9 +169,9 @@ html[data-theme="dark"] .ai-footer {
     color: #94a3b8 !important;
 }
 </style>
-<script src="<?= htmlspecialchars(url('assets/js/theme-global.js?v=20261110-3'), ENT_QUOTES, 'UTF-8') ?>"></script>
 <link rel="stylesheet" href="<?= e(url('assets/css/ulearn-design-system.css?v=1')) ?>">
 <script defer src="<?= e(url('assets/js/ulearn-motion.js?v=1')) ?>"></script>
+<script src="<?= htmlspecialchars(url('assets/js/theme-global.js?v=20261112-1'), ENT_QUOTES, 'UTF-8') ?>"></script>
 </head><body><div class="ai-layout"><aside class="ai-nav"><a class="ai-nav-brand" href="<?= e(url('lecturer/index.php')) ?>">u learn<span>.</span></a><div class="ai-nav-title">Lecturer workspace</div><nav class="ai-nav-links" aria-label="Lecturer navigation"><a href="<?= e(url('lecturer/index.php')) ?>">▦ Overview</a><a href="<?= e(url('lecturer/index.php#modules')) ?>">▤ My modules</a><a href="<?= e(url('lecturer/materials.php')) ?>">▣ Study materials</a><a href="<?= e(url('lecturer/quizzes.php')) ?>">▣ Quiz management</a><a class="nested current" aria-current="page" href="<?= e(url('lecturer/gemini-test.php')) ?>">✦ Generate quiz with AI</a><a href="<?= e(url('lecturer/consultations.php')) ?>">◷ Consultations</a><a href="<?= e(url('lecturer/profile.php')) ?>">⚙ My profile</a></nav></aside><main class="ai-shell">
 <header class="ai-top">
     <div class="ai-brand">
@@ -193,4 +193,5 @@ html[data-theme="dark"] .ai-footer {
 <?php if ($generated !== ''): ?><section class="ai-card ai-result-card" id="generated-results"><h2 class="ai-title">Your generated questions are ready</h2><p class="ai-sub">You can edit the text below. Copy it into Quiz Management → Paste question set → Preview pasted questions.</p><label class="ai-label" for="result">Editable question set</label><textarea id="result" class="ai-textarea ai-result-text" spellcheck="true"><?= e($generated) ?></textarea><div class="ai-result-actions"><button class="ai-action" type="button" id="copy-button">Copy question set</button><a class="ai-action ai-outline" href="<?= e(url('lecturer/quizzes.php')) ?>">Open Quiz Management →</a></div></section><?php endif; ?>
 <div class="ai-footer">ULearn AI Studio · Built for better learning</div></main><script>
 (function(){const form=document.getElementById('ai-form'),button=document.getElementById('generate-button');if(form&&button)form.addEventListener('submit',function(){if(form.checkValidity()){button.disabled=true;button.textContent='✦ Generating questions…';}});const copy=document.getElementById('copy-button');if(copy)copy.addEventListener('click',async function(){const area=document.getElementById('result');try{await navigator.clipboard.writeText(area.value);copy.textContent='✓ Copied to clipboard';}catch(e){area.focus();area.select();copy.textContent='Select text and press Ctrl+C';}});})();
-</script></div></body></html>
+</script></div>
+</body></html>

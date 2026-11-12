@@ -131,6 +131,7 @@ function qa_header(string $title): void {
 
 <title><?= e($title) ?> | Group Peer & Q&A</title>
 
+
 <style>
 :root {
     color-scheme: light;
@@ -150,7 +151,8 @@ function qa_header(string $title): void {
     --code-bg: #101c2d;
     --code-text: #f0f6fc;
     --shadow: 0 12px 36px rgba(12,38,32,.045);
-}
+
+
 
 html[data-theme="dark"] {
     color-scheme: dark;

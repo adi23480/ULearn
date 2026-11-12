@@ -166,8 +166,8 @@ $theme = (string)($user['theme'] ?? 'system');
 function noteExt(array $note): string { return strtoupper((string)pathinfo((string)$note['original_filename'], PATHINFO_EXTENSION)); }
 function noteLink(array $query): string { return url('dashboard/notes-library.php?' . http_build_query($query)); }
 ?>
-<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Explore Notes — ULearn</title>
-<script>(function(){let p=<?= json_encode($theme, JSON_HEX_TAG|JSON_HEX_AMP|JSON_HEX_APOS|JSON_HEX_QUOT) ?>;if(p==='system')p=matchMedia('(prefers-color-scheme:dark)').matches?'dark':'light';document.documentElement.dataset.theme=p;})();</script>
+<!doctype html><html lang="en">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Explore Notes — ULearn</title>
 <style>
 :root{color-scheme:light;--bg:#f7f8fc;--card:#fff;--text:#171927;--muted:#777b90;--border:#e7e8f0;--accent:#6756e8;--soft:#f0edff;--shadow:0 10px 35px #1719270b} :root[data-theme=dark]{color-scheme:dark;--bg:#0c0e16;--card:#161924;--text:#f4f4fa;--muted:#a0a4b6;--border:#2b2e3c;--accent:#a99aff;--soft:#292440;--shadow:none}*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font-family:Inter,system-ui,-apple-system,"Segoe UI",sans-serif;line-height:1.5}a{color:inherit;text-decoration:none}button,input,select{font:inherit}button{cursor:pointer}.shell{max-width:1440px;margin:auto;padding:30px clamp(16px,3vw,46px) 80px}.top{display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap}.brand{font-weight:850;font-size:26px;letter-spacing:-1.5px}.brand b{color:var(--accent)}.toplinks{display:flex;gap:10px;flex-wrap:wrap}.btn{display:inline-flex;align-items:center;justify-content:center;gap:7px;background:var(--card);border:1px solid var(--border);border-radius:11px;padding:10px 15px;font-size:13px;font-weight:750}.btn:hover{border-color:var(--accent)}.btn.primary{background:var(--accent);color:#fff;border-color:var(--accent)}.hero{display:flex;align-items:center;justify-content:space-between;gap:20px;margin:38px 0 25px}.eyebrow{font-size:11px;text-transform:uppercase;letter-spacing:1.6px;font-weight:800;color:var(--muted)}h1{font-size:clamp(32px,4vw,50px);letter-spacing:-1.7px;line-height:1.1;margin:8px 0 12px}h2{margin:0 0 8px;font-size:23px;letter-spacing:-.5px}.muted{color:var(--muted)}.points{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:17px 24px;min-width:170px}.points strong{display:block;font-size:28px;color:var(--accent)}.filters{background:var(--card);border:1px solid var(--border);border-radius:17px;padding:18px;display:grid;grid-template-columns:minmax(170px,2fr) minmax(160px,1.5fr) repeat(2,minmax(110px,1fr)) auto;gap:10px;align-items:end}.field{display:grid;gap:5px;font-size:12px;font-weight:750}.field input,.field select{min-width:0;width:100%;border:1px solid var(--border);background:var(--bg);color:var(--text);border-radius:10px;padding:10px 11px}.sectionbar{display:flex;justify-content:space-between;align-items:center;gap:14px;flex-wrap:wrap;margin:30px 0 18px}.layoutswitch{display:flex;gap:6px}.layoutswitch a{padding:7px 12px;border-radius:9px;border:1px solid var(--border);font-size:12px;font-weight:750}.layoutswitch a.active{background:var(--soft);color:var(--accent)}.cards{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:17px}.cards.list{grid-template-columns:1fr}.card{background:var(--card);border:1px solid var(--border);border-radius:17px;overflow:hidden;min-width:0;box-shadow:var(--shadow);display:flex;flex-direction:column;transition:transform .15s,border-color .15s}.card:hover{transform:translateY(-3px);border-color:var(--accent)}.cover{aspect-ratio:16/9;display:flex;align-items:center;justify-content:center;position:relative;color:white;overflow:hidden}.cover:before{content:'';position:absolute;inset:-30%;background:repeating-linear-gradient(40deg,transparent 0 38px,#ffffff13 38px 78px);transform:rotate(8deg)}.cover span{position:relative;font-weight:900;font-size:31px;letter-spacing:2px;text-shadow:0 2px 12px #0002}.cover small{position:absolute;bottom:12px;left:15px;font-weight:800;font-size:11px;background:#0004;padding:4px 9px;border-radius:20px}.tone0{background:linear-gradient(130deg,#6658e8,#b48aff)}.tone1{background:linear-gradient(130deg,#1889c9,#55c1ed)}.tone2{background:linear-gradient(130deg,#efab46,#ffce7c)}.tone3{background:linear-gradient(130deg,#0eaa8b,#52d2aa)}.tone4{background:linear-gradient(130deg,#da5e8e,#f8a3b8)}.tone5{background:linear-gradient(130deg,#425c9d,#8da8e4)}.cardbody{padding:18px;display:flex;flex-direction:column;flex:1;gap:8px}.card h3{font-size:17px;line-height:1.35;margin:0;letter-spacing:-.3px;overflow-wrap:anywhere}.small{font-size:12px;color:var(--muted)}.clamp{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}.metrics{display:flex;align-items:center;gap:12px;flex-wrap:wrap;font-size:12px;color:var(--muted);margin-top:auto;padding-top:10px}.star{color:#e5a21a}.cardfoot{padding-top:12px}.cardfoot a{width:100%}.empty,.detail{background:var(--card);border:1px solid var(--border);border-radius:18px;padding:25px}.detail{margin:25px 0}.detailhead{display:flex;justify-content:space-between;align-items:start;gap:18px;flex-wrap:wrap}.pill{display:inline-block;background:var(--soft);color:var(--accent);font-size:12px;font-weight:800;border-radius:99px;padding:6px 11px}.viewer{width:100%;height:min(75vh,800px);min-height:400px;border:1px solid var(--border);border-radius:12px;background:white;margin:18px 0}.rate{border-top:1px solid var(--border);padding-top:20px;margin-top:20px}.rate form{display:flex;align-items:end;flex-wrap:wrap;gap:10px}.rate select{padding:10px 14px;border:1px solid var(--border);border-radius:10px;background:var(--bg);color:var(--text)}.alert{padding:13px 17px;border-radius:12px;background:var(--soft);color:var(--accent);margin:15px 0}.alert.error{background:#ffedf0;color:#9e2240}.cards.list .card{display:grid;grid-template-columns:240px 1fr}.cards.list .cover{aspect-ratio:auto;min-height:175px}@media(max-width:1200px){.cards{grid-template-columns:repeat(3,minmax(0,1fr))}.filters{grid-template-columns:repeat(3,minmax(0,1fr))}}@media(max-width:820px){.cards{grid-template-columns:repeat(2,minmax(0,1fr))}.hero{align-items:flex-start}.filters{grid-template-columns:repeat(2,minmax(0,1fr))}}@media(max-width:580px){.shell{padding:20px 14px 55px}.cards{grid-template-columns:1fr}.filters{grid-template-columns:1fr}.hero{flex-direction:column}.cards.list .card{grid-template-columns:1fr}.cards.list .cover{aspect-ratio:16/9}.viewer{min-height:330px}}
 .rating-heading{display:flex;justify-content:space-between;align-items:center;gap:20px;flex-wrap:wrap}.rating-heading h2{margin:6px 0}.rating-current{font-size:23px;font-weight:850;display:grid;grid-template-columns:auto auto;column-gap:6px;align-items:center}.rating-current small{grid-column:1/-1;font-size:11px;font-weight:500;color:var(--muted)}.rating-form{display:flex;align-items:end;gap:22px;flex-wrap:wrap;margin-top:20px}.rating-fieldset{border:0;padding:0;margin:0;min-width:0}.rating-fieldset legend{font-size:13px;font-weight:750;margin-bottom:9px}.rating-stars{display:flex;flex-direction:row-reverse;justify-content:flex-end;gap:5px}.rating-stars input{position:absolute;width:1px;height:1px;opacity:0}.rating-stars label{font-size:clamp(32px,5vw,43px);line-height:1.2;color:var(--border);cursor:pointer;transition:color .15s,transform .15s;user-select:none}.rating-stars label:hover{transform:translateY(-3px)}.rating-stars label:hover,.rating-stars label:hover~label,.rating-stars input:checked~label{color:#f3b53f}.rating-stars input:focus-visible+label{outline:2px solid var(--accent);outline-offset:3px;border-radius:4px}.rating-feedback{display:block;min-height:20px;margin-top:8px;color:var(--muted);font-size:12px}.rating-submit{min-height:46px;padding:12px 20px}.rate{background:var(--card);border:1px solid var(--border);border-radius:17px;padding:23px;margin-top:24px}.rate .eyebrow{color:var(--accent)}@media(prefers-reduced-motion:reduce){.rating-stars label{transition:none}}
@@ -189,15 +189,157 @@ body{font-family:Inter,ui-sans-serif,system-ui,-apple-system,'Segoe UI',sans-ser
 @media(max-width:1050px){.cards{grid-template-columns:repeat(2,minmax(0,1fr))}.filters{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:650px){.cards{grid-template-columns:1fr}.filters{grid-template-columns:1fr}.shell{padding:18px 15px 55px}.detailhead{flex-direction:column}.viewer{min-height:380px}.hero{align-items:stretch;flex-direction:column}.rating-form{align-items:stretch;flex-direction:column;gap:14px}.rating-submit{width:100%}}
 @media(prefers-reduced-motion:reduce){.btn,.card{transition:none!important}.btn:hover,.card:hover{transform:none}}
+
+/* Same 42px theme control used by dashboard/kuppiya.php */
+.theme-button {
+    width: 42px;
+    height: 42px;
+    min-width: 42px;
+    padding: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    background: var(--card);
+    color: var(--text);
+    font-size: 20px;
+    line-height: 1;
+    cursor: pointer;
+    transition: .2s;
+}
+.theme-button:hover {
+    background: var(--soft);
+    color: var(--accent);
+    transform: scale(1.05);
+}
+.theme-button:focus-visible {
+    outline: 3px solid var(--accent);
+    outline-offset: 3px;
+}
 </style>
-<script src="<?= htmlspecialchars(url('assets/js/theme-global.js?v=20261107-2'), ENT_QUOTES, 'UTF-8') ?>"></script>
+
 <link rel="stylesheet" href="<?= e(url('assets/css/ulearn-design-system.css?v=1')) ?>">
 <script defer src="<?= e(url('assets/js/ulearn-motion.js?v=1')) ?>"></script>
 <link rel="stylesheet" href="<?= e(url('assets/css/ulearn-student-workspaces.css?v=3')) ?>">
 <link rel="stylesheet" href="<?= e(url('assets/css/ulearn-notes-premium.css?v=20261110-2')) ?>">
 <script defer src="<?= e(url('assets/js/ulearn-notes-premium.js?v=20261110-2')) ?>"></script>
+<script defer src="<?= e(url('assets/js/theme-global.js?v=20261112-2')) ?>"></script>
+<style>
+/* FIX: ULearn Notes Global Theme */
+
+html[data-theme="light"] {
+    color-scheme: light !important;
+    --bg: #f5f8f7;
+    --card: #ffffff;
+    --text: #10233a;
+    --muted: #627386;
+    --border: #dce7e5;
+    --accent: #087b57;
+    --soft: #eaf6f1;
+    --shadow: 0 10px 30px rgba(14,40,57,.045);
+}
+
+html[data-theme="dark"] {
+    color-scheme: dark !important;
+    --bg: #0b1522;
+    --card: #142235;
+    --text: #f1f7fa;
+    --muted: #9eafbf;
+    --border: #293d50;
+    --accent: #43d5a1;
+    --soft: #173b37;
+    --shadow: 0 10px 35px rgba(0,0,0,.10);
+}
+
+html[data-theme="dark"] body {
+    background: var(--bg) !important;
+    color: var(--text) !important;
+}
+
+html[data-theme="dark"] .shell,
+html[data-theme="dark"] .top,
+html[data-theme="dark"] .hero,
+html[data-theme="dark"] .sectionbar {
+    color: var(--text) !important;
+}
+
+html[data-theme="dark"] .card,
+html[data-theme="dark"] .points,
+html[data-theme="dark"] .filters,
+html[data-theme="dark"] .detail,
+html[data-theme="dark"] .rate,
+html[data-theme="dark"] .empty {
+    background: var(--card) !important;
+    color: var(--text) !important;
+    border-color: var(--border) !important;
+}
+
+html[data-theme="dark"] .cardbody,
+html[data-theme="dark"] .detailhead,
+html[data-theme="dark"] .rating-heading {
+    color: var(--text) !important;
+}
+
+html[data-theme="dark"] .field input,
+html[data-theme="dark"] .field select,
+html[data-theme="dark"] .rate select {
+    background: var(--bg) !important;
+    color: var(--text) !important;
+    border-color: var(--border) !important;
+}
+
+html[data-theme="dark"] .btn:not(.primary) {
+    background: var(--card) !important;
+    color: var(--text) !important;
+    border-color: var(--border) !important;
+}
+
+html[data-theme="dark"] .btn.primary {
+    background: #087b57 !important;
+    color: #ffffff !important;
+}
+
+html[data-theme="dark"] .cover {
+    background: linear-gradient(145deg,#173b37,#142235) !important;
+    color: #43d5a1 !important;
+}
+
+html[data-theme="dark"] .cover span {
+    background: var(--card) !important;
+    color: var(--accent) !important;
+    border-color: var(--border) !important;
+}
+
+html[data-theme="dark"] .rate {
+    background: var(--soft) !important;
+}
+
+html[data-theme="dark"] .muted,
+html[data-theme="dark"] .small {
+    color: var(--muted) !important;
+}
+
+html[data-theme="dark"] .viewer {
+    background: #ffffff !important;
+}
+
+html[data-theme="dark"] .theme-button {
+    background: var(--card) !important;
+    color: var(--text) !important;
+    border-color: var(--border) !important;
+}
+</style>
 </head><body class="ul3-notes"><div class="nl-scroll-track" aria-hidden="true"><div id="nl-scroll-progress"></div></div><div class="nl-page-loader" id="nl-page-loader" aria-hidden="true"><span></span></div><main class="shell">
-<header class="top"><a class="brand notes-brand" href="<?= e(url('dashboard/index.php')) ?>" aria-label="ULearn dashboard"><img src="<?= e(url('assets/images/nsbm-shield-only.png')) ?>" width="37" height="42" alt=""><span><b>u</b>Learn<i>.</i></span></a><nav class="toplinks"><button class="btn notes-theme-toggle" type="button" id="notes-theme-toggle" aria-label="Switch color theme"><span id="notes-theme-icon" aria-hidden="true">☾</span><span id="notes-theme-label">Dark mode</span></button><a class="btn" href="<?= e(url('dashboard/index.php')) ?>">← Dashboard</a><a class="btn" href="<?= e(url('dashboard/notes.php')) ?>">My uploads</a><a class="btn primary" href="<?= e(url('dashboard/notes.php')) ?>">＋ Upload note</a></nav></header>
+<header class="top"><a class="brand notes-brand" href="<?= e(url('dashboard/index.php')) ?>" aria-label="ULearn dashboard"><img src="<?= e(url('assets/images/nsbm-shield-only.png')) ?>" width="37" height="42" alt=""><span><b>u</b>Learn<i>.</i></span></a><nav class="toplinks">
+<button type="button" id="themeToggle"
+        class="theme-button"
+        data-theme-toggle="true"
+        title="Switch appearance"
+        aria-label="Toggle dark mode">
+    <span class="theme-icon" aria-hidden="true">☾</span>
+</button>
+<a class="btn" href="<?= e(url('dashboard/index.php')) ?>">← Dashboard</a><a class="btn" href="<?= e(url('dashboard/notes.php')) ?>">My uploads</a><a class="btn primary" href="<?= e(url('dashboard/notes.php')) ?>">＋ Upload note</a></nav></header>
 <section class="hero nl-animate-in"><div><div class="eyebrow"><span class="notes-live-dot"></span> ULEARN / STUDENT COMMUNITY</div><h1>Explore notes<span style="color:var(--accent)">.</span></h1><p class="muted">Browse approved notes for your enrolled modules. Preview, download and rate useful resources.</p></div><div class="points nl-points"><div class="eyebrow">Your contribution points</div><strong><?= number_format($points) ?></strong><span class="small">+10 per approved upload</span></div></section>
 <?php if ($error !== ''): ?><div class="alert error" role="alert"><?= e($error) ?></div><?php endif; ?>
 <?php if ($notice !== ''): ?><div class="alert" role="status"><?= e($notice) ?></div><?php endif; ?>
@@ -206,10 +348,13 @@ body{font-family:Inter,ui-sans-serif,system-ui,-apple-system,'Segoe UI',sans-ser
 <iframe class="viewer" title="Document preview: <?= e((string)$viewNote['title']) ?>" src="<?= e(noteLink(['id'=>(int)$viewNote['id'],'file'=>'preview'])) ?>" loading="lazy"></iframe>
 <p class="small">If the preview says LibreOffice is required, the ULearn server needs document conversion configured. You can still download the original.</p>
 <div class="rate nl-animate-in"><div class="rating-heading"><div><div class="eyebrow">COMMUNITY FEEDBACK</div><h2>How useful was this note?</h2><p class="small">Select a star rating to help fellow students. You can update it anytime.</p></div><div class="rating-current"><span class="star">★</span> <?= $viewNote['avg_rating'] !== null ? e((string)$viewNote['avg_rating']) : '—' ?><small>Average rating</small></div></div>
-<form class="rating-form" method="post" action="<?= e(url($base . '?view=' . (int)$viewNote['id'])) ?>"><input type="hidden" name="csrf" value="<?= e(csrf()) ?>"><input type="hidden" name="note_id" value="<?= (int)$viewNote['id'] ?>"><fieldset class="rating-fieldset"><legend>Your rating</legend><div class="rating-stars" aria-label="Rate this note from one to five stars"><?php for($r=1;$r<=5;$r++): ?><input type="radio" id="note-rating-<?= $r ?>" name="rating" value="<?= $r ?>" <?= (int)$viewNote['my_rating']===$r?'checked':'' ?> required><label for="note-rating-<?= $r ?>" title="<?= $r ?> out of 5 stars" aria-label="<?= $r ?> out of 5 stars">★</label><?php endfor; ?></div><span class="rating-feedback" id="rating-feedback" aria-live="polite"><?= (int)$viewNote['my_rating'] ? 'Your rating: '.(int)$viewNote['my_rating'].' / 5' : 'Choose a rating' ?></span></fieldset><button class="btn primary rating-submit" type="submit">Save my rating <span aria-hidden="true">→</span></button></form></div></section>
+<form class="rating-form" method="post" action="<?= e(url($base . '?view=' . (int)$viewNote['id'])) ?>"><input type="hidden" name="csrf" value="<?= e(csrf()) ?>"><input type="hidden" name="note_id" value="<?= (int)$viewNote['id'] ?>"><fieldset class="rating-fieldset"><legend>Your rating</legend><div class="rating-stars" aria-label="Rate this note from one to five stars"><?php for($r=1;$r<=5;$r++): ?><input type="radio" id="note-rating-<?= $r ?>" name="rating" value="<?= $r ?>" <?= (int)$viewNote['my_rating']===$r?'checked':'' ?> required><label for="note-rating-<?= $r ?>" title="<?= $r ?> out of 5 stars" aria-label="<?= $r ?> out of 5 stars">★</label><?php endfor; ?></div><span class="rating-feedback" id="rating-feedback" aria-live="polite"><?= (int)$viewNote['my_rating'] ? 'Your rating: '.(int)$viewNote['my_rating'].' / 5' : 'Choose a rating' ?></span></fieldset>
+    
+    <button class="btn primary rating-submit" type="submit">Save my rating <span aria-hidden="true">→</span></button></form></div></section>
 <?php endif; ?>
 <div class="notes-filter-head nl-animate-in"><span>Find your next study resource</span><a href="<?= e(url($base)) ?>" class="notes-clear">Clear filters ↗</a></div>
-<form class="filters nl-animate-in" method="get" action="<?= e(url($base)) ?>"><label class="field">Search notes<input type="search" name="q" value="<?= e($search) ?>" placeholder="Title, module or uploader..."></label><label class="field">Module<select name="module_id"><option value="">All enrolled modules</option><?php foreach($modules as $m): ?><option value="<?= (int)$m['id'] ?>" <?= $moduleFilter===(int)$m['id']?'selected':'' ?>><?= e((string)$m['module_code'].' · '.$m['module_name']) ?></option><?php endforeach; ?></select></label><label class="field">File type<select name="type"><?php foreach(['all'=>'All types','pdf'=>'PDF','pptx'=>'PowerPoint','docx'=>'Word'] as $k=>$v): ?><option value="<?= e($k) ?>" <?= $typeFilter===$k?'selected':'' ?>><?= e($v) ?></option><?php endforeach; ?></select></label><label class="field">Sort by<select name="sort"><?php foreach(['newest'=>'Newest','top'=>'Highest rated','downloads'=>'Most downloaded'] as $k=>$v): ?><option value="<?= e($k) ?>" <?= $sort===$k?'selected':'' ?>><?= e($v) ?></option><?php endforeach; ?></select></label><button class="btn primary" type="submit">Apply filters</button></form>
+<form class="filters nl-animate-in" method="get" action="<?= e(url($base)) ?>"><label class="field">Search notes<input type="search" name="q" value="<?= e($search) ?>" placeholder="Title, module or uploader..."></label><label class="field">Module<select name="module_id"><option value="">All enrolled modules</option><?php foreach($modules as $m): ?><option value="<?= (int)$m['id'] ?>" <?= $moduleFilter===(int)$m['id']?'selected':'' ?>><?= e((string)$m['module_code'].' · '.$m['module_name']) ?></option><?php endforeach; ?></select></label><label class="field">File type<select name="type"><?php foreach(['all'=>'All types','pdf'=>'PDF','pptx'=>'PowerPoint','docx'=>'Word'] as $k=>$v): ?><option value="<?= e($k) ?>" <?= $typeFilter===$k?'selected':'' ?>><?= e($v) ?></option><?php endforeach; ?></select></label><label class="field">Sort by<select name="sort"><?php foreach(['newest'=>'Newest','top'=>'Highest rated','downloads'=>'Most downloaded'] as $k=>$v): ?><option value="<?= e($k) ?>" <?= $sort===$k?'selected':'' ?>><?= e($v) ?></option><?php endforeach; ?></select></label>
+    <button class="btn primary" type="submit">Apply filters</button></form>
 <div class="sectionbar nl-animate-in"><div><h2>Community notes</h2><span class="small"><?= count($notes) ?> approved notes shown · Only your enrolled modules</span></div><div class="layoutswitch"><a class="<?= $viewStyle==='grid'?'active':'' ?>" href="<?= e(noteLink(['q'=>$search,'module_id'=>$moduleFilter?:null,'type'=>$typeFilter,'sort'=>$sort,'layout'=>'grid'])) ?>">▦ Grid</a><a class="<?= $viewStyle==='list'?'active':'' ?>" href="<?= e(noteLink(['q'=>$search,'module_id'=>$moduleFilter?:null,'type'=>$typeFilter,'sort'=>$sort,'layout'=>'list'])) ?>">☷ List</a></div></div>
 <?php if (!$notes): ?><div class="empty"><strong>No approved notes match your filters.</strong><p class="muted">Try another module or search term. Notes become visible after admin approval.</p></div><?php else: ?><div class="cards notes-cards <?= $viewStyle==='list'?'list':'' ?>">
 <?php foreach($notes as $n): ?><article class="card notes-card" style="--nl-order:<?= (int)($n['id'] % 7) ?>"><a class="cover nl-cover tone<?= (int)$n['id']%6 ?>" href="<?= e(noteLink(['view'=>(int)$n['id']])) ?>" aria-label="Open <?= e((string)$n['title']) ?>"><span><?= e(noteExt($n)) ?></span><small><?= e((string)$n['module_code']) ?></small></a><div class="cardbody"><div class="eyebrow"><?= e((string)$n['module_code']) ?> · <?= e((string)$n['module_name']) ?></div><h3 class="clamp"><?= e((string)$n['title']) ?></h3><div class="small clamp"><?= e((string)($n['description'] ?: 'Shared study notes')) ?></div><div class="small">By <strong><?= e((string)$n['author_name']) ?></strong> · <?= e(ucwords(str_replace('_',' ',(string)$n['author_role']))) ?></div><div class="metrics"><span><span class="star">★</span> <?= $n['rating_avg']!==null?e((string)$n['rating_avg']):'New' ?> (<?= (int)$n['rating_count'] ?>)</span><span>↓ <?= number_format((int)$n['download_count']) ?></span><span><?= e(noteExt($n)) ?></span></div><div class="cardfoot"><a class="btn primary nl-open-note" href="<?= e(noteLink(['view'=>(int)$n['id']])) ?>">Open note →</a></div></div></article><?php endforeach; ?></div><?php endif; ?>
