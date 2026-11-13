@@ -831,6 +831,7 @@ body{background:var(--quiz-bg);color:var(--quiz-text)}.quiz-wrap{max-width:1080p
 <link rel="stylesheet" href="<?= e(url('assets/css/ulearn-design-system.css?v=1')) ?>">
 <script defer src="<?= e(url('assets/js/ulearn-motion.js?v=1')) ?>"></script>
 <link rel="stylesheet" href="<?= e(url('assets/css/ulearn-student-workspaces.css?v=3')) ?>">
+<link rel="stylesheet" href="quiz-premium.css?v=2">
 </head>
 
 
@@ -859,7 +860,7 @@ body{background:var(--quiz-bg);color:var(--quiz-text)}.quiz-wrap{max-width:1080p
 
 
 
-<section class="quiz-hero"><div class="topline"><?= e((string)($attempt['module_code'] ?? 'PROGRAMME')) ?> · <?= e((string)($attempt['module_name'] ?? 'Degree programme quiz')) ?></div><h1><?= e((string)$attempt['title']) ?></h1><p class="muted"><?= e((string)($attempt['description'] ?? 'Answer each question, then submit to see your score and explanations.')) ?></p><div class="quiz-meta"><span class="pill"><?= count($questions) ?> questions</span><span class="pill"><?= (int)$attempt['duration_minutes'] ?> minutes</span><span>Time remaining: <span class="timer" id="quizTimer"><?= gmdate('i:s', $remainingSeconds) ?></span></span></div></section>
+<section class="quiz-hero"><div class="quiz-art" aria-hidden="true"><span class="quiz-art-tag tag-one">01 · EXPLORE</span><span class="quiz-art-core"><span class="quiz-art-symbol">✦</span><span class="quiz-art-letter">Q</span><span class="quiz-art-caption">QUIZ ARENA</span></span><span class="quiz-art-tag tag-two">02 · PRACTICE</span><span class="quiz-art-tag tag-three">03 · MASTER</span></div><div class="topline"><?= e((string)($attempt['module_code'] ?? 'PROGRAMME')) ?> · <?= e((string)($attempt['module_name'] ?? 'Degree programme quiz')) ?></div><h1><?= e((string)$attempt['title']) ?></h1><p class="muted"><?= e((string)($attempt['description'] ?? 'Answer each question, then submit to see your score and explanations.')) ?></p><div class="quiz-meta"><span class="pill"><?= count($questions) ?> questions</span><span class="pill"><?= (int)$attempt['duration_minutes'] ?> minutes</span><span class="quiz-timebox">Time remaining: <span class="timer" id="quizTimer"><?= gmdate('i:s', $remainingSeconds) ?></span></span></div></section>
 
 
 
@@ -883,7 +884,7 @@ body{background:var(--quiz-bg);color:var(--quiz-text)}.quiz-wrap{max-width:1080p
 
 
 
-<section class="quiz-hero"><div class="topline">Quiz results · <?= e((string)($result['module_code'] ?? 'PROGRAMME')) ?></div><h1><?= e((string)$result['title']) ?></h1><div class="result-score"><?= e(rtrim(rtrim(number_format((float)$result['score'],2,'.',''),'0'),'.')) ?> <span class="muted" style="font-size:20px">/ <?= e(rtrim(rtrim(number_format((float)$result['max_score'],2,'.',''),'0'),'.')) ?></span></div><p class="muted"><?= $result['max_score'] > 0 ? (int)round(((float)$result['score']/(float)$result['max_score'])*100) : 0 ?>% · <?= $result['status'] === 'timed_out' ? 'Time expired' : 'Submitted' ?> · <?= !empty($result['submitted_at']) ? e(date('d M Y, H:i', strtotime((string)$result['submitted_at']))) : '' ?></p><div class="btn-row"><a class="quiz-btn primary" href="quiz-history.php">Back to Quiz History</a><a class="quiz-btn" href="quizzes.php">Quiz Arena</a></div></section>
+<section class="quiz-hero"><div class="quiz-art" aria-hidden="true"><span class="quiz-art-tag tag-one">01 · EXPLORE</span><span class="quiz-art-core"><span class="quiz-art-symbol">✦</span><span class="quiz-art-letter">Q</span><span class="quiz-art-caption">QUIZ ARENA</span></span><span class="quiz-art-tag tag-two">02 · PRACTICE</span><span class="quiz-art-tag tag-three">03 · MASTER</span></div><div class="topline">Quiz results · <?= e((string)($result['module_code'] ?? 'PROGRAMME')) ?></div><h1><?= e((string)$result['title']) ?></h1><div class="result-score"><?= e(rtrim(rtrim(number_format((float)$result['score'],2,'.',''),'0'),'.')) ?> <span class="muted" style="font-size:20px">/ <?= e(rtrim(rtrim(number_format((float)$result['max_score'],2,'.',''),'0'),'.')) ?></span></div><div class="result-summary"><div class="result-percent" style="--score:<?= max(0,min(100,$result['max_score'] > 0 ? (int)round(((float)$result['score']/(float)$result['max_score'])*100) : 0)) ?>%" aria-label="Score percentage"><?= $result['max_score'] > 0 ? (int)round(((float)$result['score']/(float)$result['max_score'])*100) : 0 ?>%</div><p class="muted"><?= $result['status'] === 'timed_out' ? 'Time expired' : 'Submitted' ?> · <?= !empty($result['submitted_at']) ? e(date('d M Y, H:i', strtotime((string)$result['submitted_at']))) : '' ?><br>Keep learning, every attempt counts.</p></div><div class="btn-row"><a class="quiz-btn primary" href="quiz-history.php">Back to Quiz History</a><a class="quiz-btn" href="quizzes.php">Quiz Arena</a></div></section>
 
 
 
@@ -916,7 +917,7 @@ $youtubeSearchUrl = 'https://www.youtube.com/results?search_query=' . rawurlenco
 
 
 
-<section class="quiz-hero"><div class="topline">Practice · Learn · Improve</div><h1><?= $moduleFilter ? e((string)$moduleFilter['module_name']) . ' Quizzes' : 'Your Quiz Arena' ?></h1><p class="muted"><?= $moduleFilter ? 'Practice quizzes for this enrolled module.' : 'Take published quizzes from modules you have enrolled in.' ?> Answers and explanations appear after submission.</p></section>
+<section class="quiz-hero"><div class="quiz-art" aria-hidden="true"><span class="quiz-art-tag tag-one">01 · EXPLORE</span><span class="quiz-art-core"><span class="quiz-art-symbol">✦</span><span class="quiz-art-letter">Q</span><span class="quiz-art-caption">QUIZ ARENA</span></span><span class="quiz-art-tag tag-two">02 · PRACTICE</span><span class="quiz-art-tag tag-three">03 · MASTER</span></div><div class="topline">Practice · Learn · Improve</div><h1><?= $moduleFilter ? e((string)$moduleFilter['module_name']) . ' Quizzes' : 'Your Quiz Arena' ?></h1><p class="muted"><?= $moduleFilter ? 'Practice quizzes for this enrolled module.' : 'Take published quizzes from modules you have enrolled in.' ?> Answers and explanations appear after submission.</p></section>
 
 
 
