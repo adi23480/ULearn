@@ -854,11 +854,23 @@ if (!in_array($theme, ['light', 'dark', 'system'], true)) {
 
 
 <link rel="stylesheet" href="<?= e(url('assets/css/lecturer-purple-premium.css')) ?>?v=20261111">
+
+<link rel="stylesheet" href="<?= e(url('assets/css/lecturer-login-inspired.css')) ?>?v=20261112">
 </head>
 
 
 
 <body>
+<script>
+// Remove an accidental standalone > emitted before the lecturer layout.
+// Only standalone text nodes are affected; no elements or application data are changed.
+document.addEventListener('DOMContentLoaded', function () {
+  for (const node of Array.from(document.body.childNodes)) {
+    if (node.nodeType === Node.ELEMENT_NODE && node.classList.contains('layout')) break;
+    if (node.nodeType === Node.TEXT_NODE && node.textContent.trim() === '>') node.remove();
+  }
+});
+</script>
 
 
 
@@ -880,7 +892,7 @@ if (!in_array($theme, ['light', 'dark', 'system'], true)) {
 
         <nav class="nav">
 
-            <a class="active" href="#overview">◫ Overview</a>
+            <a class="active" href="<?= e(url('lecturer/index.php')) ?>">◫ Overview</a>
 
             <a href="#modules">▤ My Modules</a>
 
@@ -891,7 +903,7 @@ if (!in_array($theme, ['light', 'dark', 'system'], true)) {
 
             <a href="<?= e(url('lecturer/consultations.php')) ?>">◷ Consultations</a>
 
-            <a href="<?= e(url('dashboard/notifications.php')) ?>">♧ Notifications</a>
+            <a href="<?= e(url('lecturer/notifications.php')) ?>">♧ Notifications</a>
 
                 <a href="<?= e(url('lecturer/profile.php')) ?>">⚙ &nbsp; My Profile &amp; Settings</a>
 
@@ -921,7 +933,7 @@ if (!in_array($theme, ['light', 'dark', 'system'], true)) {
 
             <div class="topbar-right">
 
-                <a class="notification-button" href="<?= e(url('dashboard/notifications.php')) ?>"
+                <a class="notification-button" href="<?= e(url('lecturer/notifications.php')) ?>"
 
                    aria-label="Notifications<?= $unreadNotifications ? ': ' . $unreadNotifications . ' unread' : '' ?>"
 
@@ -1001,6 +1013,7 @@ if (!in_array($theme, ['light', 'dark', 'system'], true)) {
 
 
 
+        <section class="lp-overview-hero" aria-label="Teaching workspace introduction">
         <div class="eyebrow">YOUR TEACHING WORKSPACE</div>
 
 
@@ -1026,6 +1039,8 @@ if (!in_array($theme, ['light', 'dark', 'system'], true)) {
 
 
         <nav class="ul-workspace-actions" aria-label="Quick lecturer actions"><a href="<?= e(url('lecturer/quizzes.php')) ?>">Create or manage quizzes →</a><a href="<?= e(url('lecturer/materials.php')) ?>">Study materials</a><a href="<?= e(url('lecturer/performance.php')) ?>">Student performance</a><a href="<?= e(url('lecturer/consultations.php')) ?>">Consultations</a></nav>
+        </section>
+
 <section class="stats">
 
 
@@ -1074,7 +1089,7 @@ if (!in_array($theme, ['light', 'dark', 'system'], true)) {
 
                 <div class="stat-label">
 
-                    <a href="<?= e(url('dashboard/notifications.php')) ?>" style="color:var(--accent)">Unread notifications ↗</a>
+                    <a href="<?= e(url('lecturer/notifications.php')) ?>" style="color:var(--accent)">Unread notifications ↗</a>
 
                 </div>
 
@@ -1235,7 +1250,7 @@ if (!in_array($theme, ['light', 'dark', 'system'], true)) {
 
                 View your personal notifications and university announcements
 
-                in the <a href="<?= e(url('dashboard/notifications.php')) ?>" style="color:var(--accent)">Notification Center ↗</a>.
+                in the <a href="<?= e(url('lecturer/notifications.php')) ?>" style="color:var(--accent)">Notification Center ↗</a>.
 
                 Automatic activity alerts will be connected in the next stage.
 
@@ -1253,7 +1268,15 @@ if (!in_array($theme, ['light', 'dark', 'system'], true)) {
 
 
 
-    <script src="<?= e(url('assets/js/scroll-position.js')) ?>" defer></script>
+    <script>
+    // Overview opens at the top; keep intentional #modules deep links working.
+    if (!window.location.hash) {
+        if ('scrollRestoration' in history) history.scrollRestoration = 'manual';
+        window.addEventListener('pageshow', function () {
+            window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+        });
+    }
+    </script>
 <script src="<?= e(url('assets/js/notifications-live.js')) ?>" data-base="<?= e(rtrim(url(), '/')) ?>" defer></script>
 <script src="<?= e(url('assets/js/lecturer-purple-premium.js')) ?>?v=20261111" defer></script>
 </body>

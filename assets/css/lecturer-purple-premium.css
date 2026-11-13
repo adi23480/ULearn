@@ -23,3 +23,25 @@ body :is(.card,.panel,.ai-card,.stat,.consult-stat,.quiz-item,.tool-link){backgr
 @media(min-width:1000px){body .layout,body .ai-layout{grid-template-columns:244px minmax(0,1fr)}body .shell{grid-template-columns:244px minmax(0,1fr)}body main:not(.ai-shell),body .main{padding-top:27px;padding-left:40px;padding-right:40px}}
 @media(max-width:850px){body .sidebar,body .ai-nav{padding:18px 16px 10px!important}body .sidebar .brand,body .ai-nav-brand{font-size:23px!important;margin:0 8px 17px!important}body .sidebar :is(.nav-label,.side-label),body .ai-nav-title{display:none}body .sidebar .nav,body .sidebar .side-links,body .ai-nav-links{display:flex!important;overflow-x:auto;gap:6px;scrollbar-width:thin;scrollbar-color:#4b405d transparent;padding:0 0 8px!important;scroll-snap-type:x proximity}body .sidebar .nav a,body .sidebar .side-link,body .ai-nav a:not(.ai-nav-brand){flex:none;min-height:38px;font-size:11px!important;padding:9px 12px!important;scroll-snap-align:start}body .sidebar-foot,body .side-foot{display:none}body .sidebar .subnav{display:flex;border:0;margin:0;padding:0;gap:6px}body .sidebar a.active:after,body .ai-nav a.current:after{display:none}body main,body .main,body .content{padding:24px 18px 50px}body :is(.topbar,.top,.ai-top){margin-bottom:26px;padding-bottom:16px}body .sidebar .nav{margin:0!important}}
 @media(max-width:550px){body h1,body .intro h1{font-size:30px}body :is(.card,.panel,.ai-card){padding:20px}body .stat{padding:17px!important}body :is(.stat-number,.stat strong){font-size:27px!important}body .topbar :is(.eyebrow,.crumb){font-size:8px!important;letter-spacing:1px}body .ai-hero{padding:25px 22px}.stats,.cards,.module-grid{gap:12px!important}}
+
+/* Lecturer-only layout corrections. No student or database styles. */
+body .sidebar .ulearn-shared-brand .ulearn-brand-word{color:#f7f5ff!important}
+body .sidebar .ulearn-shared-brand .ulearn-brand-dot{color:#b9a5ff!important}
+body .sidebar .ulearn-shared-brand{margin:0 8px 30px!important}
+body .sidebar .nav a.active{background:#7863e5!important;color:#fff!important;box-shadow:none!important}
+body .sidebar .nav a:not(.active):hover{background:#29253e!important;color:#fff!important}
+body .sidebar .nav a:not(.active){box-shadow:none!important}
+body .ul-workspace-actions{display:flex!important;flex-wrap:wrap!important;align-items:center;gap:10px!important;margin:22px 0 30px!important}
+body .ul-workspace-actions a{display:inline-flex!important;align-items:center;justify-content:center;min-height:42px;padding:10px 15px!important;border-radius:11px!important;background:var(--card)!important;border:1px solid var(--border)!important;color:var(--accent)!important;font-size:13px!important;font-weight:700!important;text-decoration:none!important;white-space:normal}
+body .ul-workspace-actions a:first-child{background:#6955df!important;color:#fff!important;border-color:#6955df!important}
+body .ul-workspace-actions a:hover{transform:translateY(-2px)}
+body .consult-hero{padding:32px!important}
+body .consult-stats{display:grid!important;grid-template-columns:repeat(3,minmax(0,1fr))!important;gap:14px!important;margin-top:24px!important}
+body .consult-stats .consult-stat{display:flex!important;flex-direction:column!important;align-items:flex-start!important;justify-content:center!important;gap:6px!important;min-width:0!important;min-height:115px!important;padding:20px 22px!important;background:var(--card)!important;border:1px solid var(--border)!important;border-radius:15px!important;box-shadow:none!important}
+body .consult-stats .consult-stat strong{display:block!important;font-size:30px!important;line-height:1.15!important;color:var(--text)!important;font-weight:800!important}
+body .consult-stats .consult-stat span{display:block!important;font-size:12px!important;color:var(--muted)!important;line-height:1.4!important}
+body .hero{background:linear-gradient(115deg,#201a43,#4f3c91 72%,#6854bc)!important;color:#fff!important}
+body .hero .eyebrow{color:#e1d9ff!important}
+body .hero p{color:#e9e5fa!important}
+body .sidebar .nav a{margin-bottom:4px}
+@media(max-width:800px){body .consult-stats{grid-template-columns:1fr!important}body .consult-stats .consult-stat{min-height:90px!important}body .ul-workspace-actions a{flex:1 1 180px}}

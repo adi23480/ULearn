@@ -580,6 +580,8 @@ document.addEventListener('DOMContentLoaded',()=>{const b=document.getElementByI
 
 
 <link rel="stylesheet" href="<?= e(url('assets/css/lecturer-purple-premium.css')) ?>?v=20261111">
+
+<link rel="stylesheet" href="<?= e(url('assets/css/lecturer-login-inspired.css')) ?>?v=20261112">
 </head>
 <body>
 <div class="layout">

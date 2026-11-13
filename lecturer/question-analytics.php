@@ -101,6 +101,8 @@ $theme = (string)($user['theme'] ?? 'system');
 
 
 <link rel="stylesheet" href="<?= e(url('assets/css/lecturer-purple-premium.css')) ?>?v=20261111">
+
+<link rel="stylesheet" href="<?= e(url('assets/css/lecturer-login-inspired.css')) ?>?v=20261112">
 </head>
 <body><div class="layout">
 <aside class="sidebar"><?php require __DIR__ . '/../includes/brand-logo.php'; ?><div class="nav-label">Your workspace</div><nav class="nav"><a href="<?= e(url('lecturer/index.php')) ?>">▦ Overview</a><a href="<?= e(url('lecturer/index.php#modules')) ?>">▤ My modules</a><a href="<?= e(url('lecturer/materials.php')) ?>">♧ Study materials</a><a href="<?= e(url('lecturer/quizzes.php')) ?>">▣ Quiz management</a><a href="<?= e(url('lecturer/performance.php')) ?>">◉ Student performance</a><a class="active" href="<?= e(url('lecturer/question-analytics.php')) ?>">◇ Question analytics</a></nav></aside>

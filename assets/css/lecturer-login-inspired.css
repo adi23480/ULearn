@@ -1,0 +1,64 @@
+/* ULearn lecturer premium surfaces — isolated to lecturer PHP pages. */
+:root{--lp-navy:#19172c;--lp-purple:#6952e7;--lp-lavender:#eeeafe;--lp-shadow:0 15px 45px rgba(40,29,92,.075),0 2px 8px rgba(40,29,92,.035);--lp-glow:0 18px 48px rgba(105,82,231,.16)}
+body{background:radial-gradient(ellipse at 85% 0%,#ded6ff55,transparent 45%),#f6f5fc!important}
+body .sidebar{background:#19172c!important;border-right:1px solid #302c4c!important;box-shadow:8px 0 36px rgba(25,23,44,.08)}
+body .sidebar :is(.brand,.nav-label,.side-label){color:#f4f1ff!important}
+body .sidebar .nav-label{color:#aaa4ca!important}
+body .sidebar .nav a,body .sidebar .side-link{color:#c8c4dc!important;border:1px solid transparent!important}
+body .sidebar .nav a:hover,body .sidebar .side-link:hover{background:#30294d!important;color:#fff!important;transform:translateX(2px)}
+body .sidebar .nav a.active,body .sidebar .side-link.active{background:linear-gradient(110deg,#7259e9,#8974f0)!important;color:white!important;box-shadow:0 7px 20px #6c50d344!important;border-color:#9a86ff55!important}
+body .sidebar .brand-logo,body .sidebar .brand-wordmark{color:#fff!important}
+body .sidebar .brand-logo *,body .sidebar .brand-wordmark *{color:inherit}
+body .sidebar .brand-logo .brand-dot{color:#b8a4ff!important}
+body :is(.card,.panel,.ai-card,.stat,.consult-stat,.quiz-item,.tool-link,.schedule-board,.booking,.slot,.empty){border-radius:24px!important;border:1px solid #e7e1f6!important;background:#fff!important;box-shadow:var(--lp-shadow)!important;min-width:0}
+body :is(.card,.panel,.ai-card,.stat,.consult-stat,.quiz-item,.tool-link,.schedule-board,.booking,.slot){transition:transform .25s ease,box-shadow .25s ease,border-color .25s ease!important}
+body :is(a.card,a.panel,a.ai-card,a.tool-link,.quiz-item):hover{transform:translateY(-3px)!important;border-color:#b9a8f8!important;box-shadow:var(--lp-glow)!important}
+body :is(.card,.panel,.ai-card,.schedule-board){padding:clamp(18px,2vw,28px)}
+body .topbar{margin-bottom:28px!important;padding-bottom:18px;border-bottom:1px solid #e9e4f5}
+body :is(.hero,.consult-hero,.ai-hero){background:linear-gradient(118deg,#292354 0%,#493ba2 52%,#6e55e6 100%)!important;color:#fff!important;border:1px solid #8d7af066!important;border-radius:30px!important;box-shadow:0 22px 52px #5141aa22!important;padding:clamp(24px,4vw,48px)!important;overflow:hidden}
+body :is(.hero,.consult-hero,.ai-hero) :is(h1,h2,p,.subtitle,.eyebrow){color:#fff!important}
+body :is(.hero,.consult-hero,.ai-hero) .eyebrow{opacity:.8}
+body :is(.btn.primary,.button.primary,button.primary,.ai-action:not(.ai-outline)){background:linear-gradient(105deg,#6650dd,#8067ee)!important;border-color:#7058e8!important;color:#fff!important;box-shadow:0 5px 15px #6d54dd25}
+body :is(.btn.primary,.button.primary,button.primary):hover{box-shadow:0 9px 25px #6d54dd40!important;transform:translateY(-2px)}
+body :is(.btn,.button,.theme-button){border-radius:13px!important}
+body .ul-workspace-actions{display:flex!important;gap:10px!important;flex-wrap:wrap!important;margin:20px 0 26px!important}
+body .ul-workspace-actions a{display:inline-flex!important;align-items:center!important;padding:10px 15px!important;background:#fff!important;border:1px solid #e7e1f6!important;border-radius:13px!important;text-decoration:none!important;color:#5f49ce!important;font-weight:700!important;box-shadow:0 4px 12px #34247709!important}
+body .ul-workspace-actions a:hover{background:#f0ecff!important;transform:translateY(-2px)}
+body .stats,body .consult-stats{display:grid!important;grid-template-columns:repeat(3,minmax(0,1fr))!important;gap:16px!important;margin:22px 0!important}
+body .consult-stat{display:flex!important;flex-direction:column!important;align-items:flex-start!important;gap:6px!important;padding:22px!important;color:#24203e!important}
+body .consult-stat strong{display:block!important;font-size:clamp(27px,3vw,38px)!important;line-height:1.2!important;color:#5f49d5!important}
+body .consult-stat span{display:block!important;font-size:13px!important;color:#6d6886!important}
+body .consult-hero .consult-stats{margin-bottom:0!important}
+body .section{margin-top:32px}
+body .grid,body .module-grid{gap:18px!important}
+body :is(input,select,textarea){border-radius:12px!important}
+body :is(.schedule-tabs,.toolbar,.availability-heading){gap:12px;flex-wrap:wrap}
+@media(max-width:1050px){body .stats,body .consult-stats{grid-template-columns:repeat(2,minmax(0,1fr))!important}}
+@media(max-width:680px){body .stats,body .consult-stats{grid-template-columns:1fr!important}body :is(.hero,.consult-hero,.ai-hero){border-radius:22px!important;padding:22px!important}body .sidebar{box-shadow:none}}
+@media(prefers-reduced-motion:reduce){body :is(.card,.panel,.btn,.button,.nav a){transition:none!important;animation:none!important}}
+/* Dark mode keeps lecturer navy and purple, without green. */
+:root[data-theme=dark] body{background:#11101e!important}
+:root[data-theme=dark] body :is(.card,.panel,.ai-card,.stat,.consult-stat,.quiz-item,.tool-link,.schedule-board,.booking,.slot,.empty){background:#211e34!important;border-color:#38314e!important;color:#f5f2ff!important}
+:root[data-theme=dark] body .consult-stat strong{color:#b7a6ff!important}
+:root[data-theme=dark] body .consult-stat span{color:#c2badc!important}
+:root[data-theme=dark] body .ul-workspace-actions a{background:#25203a!important;border-color:#39304f!important;color:#d3c6ff!important}
+
+/* V3: Student-dashboard-inspired welcome surface, lecturer-only. */
+body .lp-overview-hero{position:relative;isolation:isolate;overflow:hidden;margin:6px 0 28px;padding:clamp(28px,3.7vw,52px)!important;border:1px solid #8979e855;border-radius:32px;background:linear-gradient(115deg,#27234e 0%,#443696 54%,#7357e8 100%);box-shadow:0 20px 48px rgba(55,39,127,.17),0 4px 14px rgba(55,39,127,.08);color:#fff}
+body .lp-overview-hero:after{content:"";position:absolute;right:-72px;bottom:-115px;width:360px;height:360px;border:1px solid #ffffff26;border-radius:50%;box-shadow:0 0 0 52px #ffffff08,0 0 0 110px #ffffff05;z-index:-1;pointer-events:none}
+body .lp-overview-hero .eyebrow{color:#d9d0ff!important;letter-spacing:.14em}
+body .lp-overview-hero h1{color:#fff!important;font-size:clamp(29px,3.1vw,49px);line-height:1.18;max-width:950px;margin:12px 0 18px}
+body .lp-overview-hero h1 span{color:#c8b7ff!important}
+body .lp-overview-hero .subtitle{color:#e2ddff!important;max-width:720px}
+body .lp-overview-hero .ul-workspace-actions{margin:26px 0 0!important;gap:12px!important}
+body .lp-overview-hero .ul-workspace-actions a{background:#ffffff14!important;color:#fff!important;border:1px solid #ffffff55!important;backdrop-filter:blur(7px);box-shadow:0 4px 12px #100d3520!important}
+body .lp-overview-hero .ul-workspace-actions a:hover{background:#ffffff28!important;border-color:#fff!important;box-shadow:0 8px 22px #100d3530!important}
+body .stats>.card{border-radius:28px!important;box-shadow:0 14px 35px #352b7814!important}
+@media(max-width:680px){body .lp-overview-hero{border-radius:23px;padding:25px!important}body .lp-overview-hero:after{width:180px;height:180px;right:-60px;bottom:-60px}}
+
+/* Lecturer-only shared logo contrast; never changes the student logo. */
+body .sidebar .ulearn-shared-brand {display:inline-flex!important;align-items:center!important;gap:11px!important;}
+body .sidebar .ulearn-shared-brand .ulearn-brand-word,
+body .sidebar .ulearn-shared-brand .ulearn-brand-word[style] {color:#F9F7FF!important;text-shadow:0 1px 12px rgba(255,255,255,.08)!important;}
+body .sidebar .ulearn-shared-brand .ulearn-brand-dot,
+body .sidebar .ulearn-shared-brand .ulearn-brand-dot[style] {color:#B9A5FF!important;}
