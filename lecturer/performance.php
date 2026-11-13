@@ -50,6 +50,8 @@ function performancePercent($score,$max): string { return (float)$max > 0 ? numb
 
 
 <link rel="stylesheet" href="<?= e(url('assets/css/lecturer-purple-premium.css')) ?>?v=20261111">
+
+<link rel="stylesheet" href="<?= e(url('assets/css/lecturer-login-inspired.css')) ?>?v=20261112">
 </head>
 <body><div class="layout"><aside class="sidebar"><?php require __DIR__ . '/../includes/brand-logo.php'; ?><nav class="nav"><a href="<?= e(url('lecturer/index.php')) ?>">Overview</a><a href="<?= e(url('lecturer/index.php#modules')) ?>">My modules</a><a href="<?= e(url('lecturer/materials.php')) ?>">Study materials</a><a href="<?= e(url('lecturer/quizzes.php')) ?>">Quiz management</a><a class="active" href="<?= e(url('lecturer/performance.php')) ?>">Student performance</a></nav></aside><main><div class="top"><div class="eyebrow">U Learn / Lecturer space</div><div><button class="theme" type="button" onclick="toggleTheme()" aria-label="Toggle theme">☾ / ☀</button> <a class="btn" href="<?= e(url('lecturer/quizzes.php')) ?>">Quiz management</a></div></div><h1>Student performance<span>.</span></h1><p>Review completed quiz attempts in modules assigned to you. Scores are based on the points earned out of the maximum available.</p>
 <?php if($error!==''): ?><div class="notice" role="alert"><?= e($error) ?></div><?php endif; ?>

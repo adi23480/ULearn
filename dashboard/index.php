@@ -1242,6 +1242,12 @@ $initial = strtoupper(substr($firstName, 0, 1));
 <link rel="stylesheet" href="<?= e(url('assets/css/ulearn-dashboard-v52.css?v=20261110')) ?>">
 <link rel="stylesheet" href="<?= e(url('assets/css/ulearn-dashboard-identity.css?v=1')) ?>">
 <script defer src="<?= e(url('assets/js/ulearn-dashboard-v52.js?v=20261110')) ?>"></script>
+<style>
+/* Student menu: hide on desktop; display a legible icon on mobile. */
+@media (max-width: 900px) { #ulMenuToggle.ul-menu-toggle { display: inline-flex !important; } }
+@media (min-width: 901px) { #ulMenuToggle.ul-menu-toggle { display: none !important; } }
+#ulMenuToggle svg { width:22px !important; height:22px !important; display:block !important; }
+</style>
 </head>
 
 <body>
@@ -1291,7 +1297,7 @@ $initial = strtoupper(substr($firstName, 0, 1));
     <main class="main" id="overview">
 
         <header class="topbar">
-            <button type="button" class="ul-menu-toggle" id="ulMenuToggle" aria-expanded="false" aria-controls="studentSidebar" aria-label="Toggle navigation"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
+            <button type="button" class="ul-menu-toggle" id="ulMenuToggle" aria-expanded="false" aria-controls="studentSidebar" aria-label="Toggle navigation" style="display:none;align-items:center;justify-content:center;width:42px;height:42px;min-width:42px;padding:9px;border:1px solid #d9e6e2;border-radius:12px;background:#fff;color:#17333d;cursor:pointer"><svg aria-hidden="true" width="22" height="22" style="display:block;width:22px;height:22px;flex-shrink:0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
 
             <span class="eyebrow">
 

@@ -62,6 +62,8 @@ body{background:#f7f8fc;color:var(--ai-ink);margin:0;font-family:Manrope,'DM San
 <!-- Premium purple lecturer UI -->
 <link rel="stylesheet" href="<?= e(url('assets/css/lecturer-purple-premium.css')) ?>?v=20261111">
 
+
+<link rel="stylesheet" href="<?= e(url('assets/css/lecturer-login-inspired.css')) ?>?v=20261112">
 </head><body><div class="ai-layout"><aside class="ai-nav"><?php require __DIR__ . '/../includes/brand-logo.php'; ?><div class="ai-nav-title">Lecturer workspace</div><nav class="ai-nav-links" aria-label="Lecturer navigation"><a href="<?= e(url('lecturer/index.php')) ?>">▦ Overview</a><a href="<?= e(url('lecturer/index.php#modules')) ?>">▤ My modules</a><a href="<?= e(url('lecturer/materials.php')) ?>">▣ Study materials</a><a href="<?= e(url('lecturer/quizzes.php')) ?>">▣ Quiz management</a><a class="nested current" aria-current="page" href="<?= e(url('lecturer/gemini-test.php')) ?>">✦ Generate quiz with AI</a><a href="<?= e(url('lecturer/consultations.php')) ?>">◷ Consultations</a><a href="<?= e(url('lecturer/profile.php')) ?>">⚙ My profile</a></nav></aside><main class="ai-shell">
 <header class="ai-top"><?php require __DIR__ . '/../includes/brand-logo.php'; ?><a class="ai-back" href="<?= e(url('lecturer/index.php')) ?>">← Lecturer dashboard</a></header>
 <section class="ai-hero"><div class="ai-eyebrow">Teaching tools · Powered by Gemini</div><h1>Turn your lecture notes into better quizzes.</h1><p>Create multiple-choice questions in seconds, review every answer, and bring the finished set into your existing ULearn quiz workflow.</p><span class="ai-pill">✦ AI-assisted · Lecturer reviewed</span></section>

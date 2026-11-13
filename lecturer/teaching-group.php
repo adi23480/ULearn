@@ -44,6 +44,8 @@ $base=url('lecturer/teaching-group.php').'?id='.(int)$group['id'];
 
 
 <link rel="stylesheet" href="<?= e(url('assets/css/lecturer-purple-premium.css')) ?>?v=20261111">
+
+<link rel="stylesheet" href="<?= e(url('assets/css/lecturer-login-inspired.css')) ?>?v=20261112">
 </head><body>
 <?php
 function groupIcon(string $name):string {

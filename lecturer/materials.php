@@ -110,6 +110,8 @@ $theme=in_array(($user['theme'] ?? 'system'),['light','dark','system'],true)?$us
 
 
 <link rel="stylesheet" href="<?= e(url('assets/css/lecturer-purple-premium.css')) ?>?v=20261111">
+
+<link rel="stylesheet" href="<?= e(url('assets/css/lecturer-login-inspired.css')) ?>?v=20261112">
 </head>
 <body><div class="layout"><aside class="sidebar"><?php require __DIR__ . '/../includes/brand-logo.php'; ?><div class="nav-label">LECTURER WORKSPACE</div><nav class="nav"><a href="<?= e(url('lecturer/index.php')) ?>">◫ Overview</a><a href="<?= e(url('lecturer/index.php')) ?>#modules">▤ My Modules</a><a class="active" href="<?= e(url('lecturer/materials.php')) ?>">▣ Study Materials</a><a href="<?= e(url('lecturer/index.php')) ?>#consultations">◷ Consultations</a><a href="<?= e(url('lecturer/index.php')) ?>#notifications">♧ Notifications</a></nav></aside><main><header class="top"><div class="eyebrow">U LEARN / LECTURER PORTAL</div><button class="theme" type="button" id="themeButton" aria-label="Switch color theme" title="Switch color theme"><svg id="themeIcon" viewBox="0 0 24 24" aria-hidden="true"><path d="M20.985 12.486A9 9 0 0 1 11.514 3.015 9 9 0 1 0 20.985 12.486Z"/></svg></button></header><div class="eyebrow">TEACHING RESOURCES</div><h1>Study Materials<span>.</span></h1><p class="muted">Upload and publish resources for the degree, batch, and module groups you teach.</p>
 <?php if ($flash): ?><div class="flash <?= $flash[0]==='error'?'error':'' ?>" role="status"><?= e((string)$flash[1]) ?></div><?php endif; ?>
