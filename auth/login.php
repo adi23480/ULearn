@@ -9,6 +9,7 @@ require_once __DIR__ . '/../config/bootstrap.php';
 |--------------------------------------------------------------------------
 */
 
+
 function loginDestination(string $role): string
 {
     switch ($role) {
@@ -17,13 +18,14 @@ function loginDestination(string $role): string
 
         case 'admin':
         case 'main_admin':
-            return 'admin/lecturers.php';
+            return 'admin/index.php';
 
         case 'student':
         default:
             return 'dashboard/index.php';
     }
 }
+
 
 // Already logged in? Send user to correct dashboard.
 $currentUser = me();
